@@ -10,6 +10,7 @@ htmlcov/
 # Environment & local config
 .env
 .env.*
+!.env.example
 
 # IDE / editor
 .vscode/*
