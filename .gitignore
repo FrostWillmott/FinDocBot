@@ -1,0 +1,37 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.pyc
+
+# Environment & local config
+.env
+.env.*
+
+# IDE / editor
+.vscode/*
+.junie/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# UV / Python build artifacts
+dist/
+build/
+*.egg-info/
+
+# Docker
+*.log
+
+# Archives / dumps
+*.zip
+*.tar
+*.tar.gz
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.cursor/rules/snyk_rules.mdc
