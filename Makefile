@@ -4,7 +4,7 @@ APP_MODULE := findocbot.main:app
 .PHONY: sync dev lint fmt test precommit-install up down logs migrate
 
 sync:
-	$(UV) sync --all-extras
+	$(UV) sync --all-groups
 
 dev:
 	$(UV) run uvicorn $(APP_MODULE) --host 0.0.0.0 --port 8000 --reload
