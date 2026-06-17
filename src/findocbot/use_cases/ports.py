@@ -1,7 +1,7 @@
 """Abstractions for use-case dependencies."""
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from findocbot.domain.entities import ChatTurn, Chunk, Document
 
@@ -39,6 +39,11 @@ class ModelProviderGateway(Protocol):
 
     async def generate(self, prompt: str) -> str:
         """Generate model response from prompt."""
+
+    async def generate_structured(
+        self, prompt: str, schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generate a JSON-structured response matching the given schema."""
 
 
 class DocumentRepositoryPort(Protocol):

@@ -1,5 +1,8 @@
 """Ollama implementation for model provider gateway."""
 
+import json
+from typing import Any
+
 import httpx
 
 
@@ -84,3 +87,27 @@ class OllamaGateway:
         response.raise_for_status()
         payload = response.json()
         return payload["response"].strip()
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Generate JSON response constrained to the given JSON Schema.
+
+        Uses Ollama's ``format`` field to enforce structured output so the
+        caller receives a parsed dict rather than raw text.
+        """
+        client = self._get_client()
+        response = await client.post(
+            f"{self._base_url}/api/generate",
+            json={
+                "model": self._chat_model,
+                "prompt": prompt,
+                "stream": False,
+                "format": schema,
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return json.loads(payload["response"])

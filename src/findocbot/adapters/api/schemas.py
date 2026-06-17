@@ -1,5 +1,7 @@
 """API request and response schemas."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -40,4 +42,5 @@ class AskResponse(BaseModel):
     """Answer response payload."""
 
     answer: str
+    confidence: Literal["high", "medium", "low"] = "medium"
     sources: list[ChunkResponse]

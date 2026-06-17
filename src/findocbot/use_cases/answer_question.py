@@ -11,6 +11,28 @@ from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
 
+# JSON Schema for the structured answer returned by the LLM.
+_ANSWER_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "answer": {
+            "type": "string",
+            "description": (
+                "Concise answer to the user question"
+                " based solely on the provided context."
+            ),
+        },
+        "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": (
+                "Self-assessed confidence given the available context."
+            ),
+        },
+    },
+    "required": ["answer", "confidence"],
+}
+
 
 class AnswerQuestionUseCase:
     """Generate answer based on document chunks and short history."""
@@ -51,7 +73,11 @@ class AnswerQuestionUseCase:
             sources=sources,
             recent_turns=recent_turns,
         )
-        answer = await self._provider.generate(prompt)
+        structured = await self._provider.generate_structured(
+            prompt, _ANSWER_SCHEMA
+        )
+        answer: str = structured["answer"]
+        confidence: str = structured.get("confidence", "medium")
 
         await self._history.add_turn(
             ChatTurn.create(
@@ -60,7 +86,9 @@ class AnswerQuestionUseCase:
                 answer=answer,
             )
         )
-        return AskResponseDTO(answer=answer, sources=sources)
+        return AskResponseDTO(
+            answer=answer, confidence=confidence, sources=sources
+        )
 
     @staticmethod
     def _build_prompt(
@@ -68,19 +96,21 @@ class AnswerQuestionUseCase:
         sources: list,
         recent_turns: list[ChatTurn],
     ) -> str:
-        """Build RAG prompt with context and short history."""
+        """Build RAG prompt that requests a structured JSON response."""
         history_text = "\n".join(
-            (f"Q: {turn.question}\nA: {turn.answer}") for turn in recent_turns
+            f"Q: {turn.question}\nA: {turn.answer}" for turn in recent_turns
         )
         context_text = "\n\n".join(
             f"[score={source.score:.4f}] {source.text}" for source in sources
         )
         return (
             "You are an assistant for financial documents.\n"
-            "Use only the provided context and chat history.\n"
-            "If context is insufficient, say so explicitly.\n\n"
+            "Use only the provided context and chat history to answer.\n"
+            "If the context is insufficient, say so in the answer field.\n"
+            "Reply with a JSON object containing:\n"
+            "  - answer: your concise answer (string)\n"
+            "  - confidence: one of high / medium / low\n\n"
             f"Chat history:\n{history_text or 'No prior turns.'}\n\n"
             f"Context:\n{context_text or 'No relevant chunks found.'}\n\n"
-            f"Question: {question}\n"
-            "Answer:"
+            f"Question: {question}"
         )

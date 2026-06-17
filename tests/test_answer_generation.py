@@ -26,6 +26,14 @@ class FakeProviderGateway:
             return "Revenue growth is 20 percent according to the report."
         return "Insufficient context."
 
+    async def generate_structured(self, prompt: str, schema: dict) -> dict:
+        if "revenue" in prompt.lower():
+            return {
+                "answer": "Revenue growth is 20 percent.",
+                "confidence": "high",
+            }
+        return {"answer": "Insufficient context.", "confidence": "low"}
+
     @staticmethod
     def _encode(text: str) -> list[float]:
         lower = text.lower()

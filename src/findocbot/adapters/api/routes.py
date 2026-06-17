@@ -76,6 +76,7 @@ def build_router(container: AppContainer) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(error)) from error
         return AskResponse(
             answer=result.answer,
+            confidence=result.confidence,
             sources=[
                 ChunkResponse(
                     chunk_id=item.chunk_id,

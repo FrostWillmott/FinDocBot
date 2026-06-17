@@ -21,3 +21,4 @@ class AskResponseDTO:
 
     answer: str
     sources: list[SearchResultDTO]
+    confidence: str = "medium"
