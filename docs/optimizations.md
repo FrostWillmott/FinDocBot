@@ -1,78 +1,78 @@
-# Оптимизации обработки эмбеддингов и векторного поиска
+# Embedding Processing and Vector Search Optimizations
 
-## Обзор
+## Overview
 
-Документ описывает реализованные оптимизации для улучшения производительности обработки эмбеддингов и векторного поиска в FinDocBot.
+This document describes the implemented optimizations to improve embedding processing performance and vector search in FinDocBot.
 
-## Реализованные оптимизации
+## Implemented Optimizations
 
-### 1. Переиспользование HTTP-клиента в OllamaGateway
+### 1. HTTP Client Reuse in OllamaGateway
 
-**Проблема:** Каждый запрос к Ollama API создавал новый `httpx.AsyncClient`, что приводило к overhead на установку соединений.
+**Problem:** Each request to the Ollama API created a new `httpx.AsyncClient`, leading to connection setup overhead.
 
-**Решение:** Добавлены lifecycle методы `start()` и `stop()` для управления единым HTTP-клиентом на протяжении всего жизненного цикла приложения.
+**Solution:** Added `start()` and `stop()` lifecycle methods to manage a single HTTP client throughout the application's lifecycle.
 
-**Файл:** `src/findocbot/infrastructure/ollama_gateway.py`
+**File:** `src/findocbot/infrastructure/ollama_gateway.py`
 
-**Изменения:**
-- Добавлено поле `_client: httpx.AsyncClient | None`
-- Метод `start()` инициализирует клиент
-- Метод `stop()` корректно закрывает соединения
-- Методы `embed_one()`, `embed_many()`, `generate()` используют переиспользуемый клиент
+**Changes:**
+- Added `_client: httpx.AsyncClient | None` field.
+- `start()` method initializes the client.
+- `stop()` method correctly closes connections.
+- `embed_one()`, `embed_many()`, and `generate()` methods use the reusable client.
 
-**Преимущества:**
-- Снижение latency за счет переиспользования TCP-соединений
-- Уменьшение overhead на создание/уничтожение клиентов
-- Более эффективное использование connection pooling
+**Benefits:**
+- Latency reduction by reusing TCP connections.
+- Reduced overhead for creating/destroying clients.
+- More efficient use of connection pooling.
 
-### 2. LRU-кеширование эмбеддингов запросов с TTL и метриками
+### 2. LRU Caching of Request Embeddings with TTL and Metrics
 
-**Проблема:** Повторяющиеся пользовательские запросы вычисляли эмбеддинги заново, что неэффективно. Отсутствовали метрики для мониторинга эффективности кеша в production.
+**Problem:** Repeating user queries recomputed embeddings, which is inefficient. There were no metrics to monitor cache effectiveness in production.
 
-**Решение:** Создан `CachedEmbeddingGateway` — wrapper с LRU-кешем, TTL и метриками для эмбеддингов пользовательских запросов.
+**Solution:** Created `CachedEmbeddingGateway` — a wrapper with LRU cache, TTL, and metrics for user query embeddings.
 
-**Файл:** `src/findocbot/infrastructure/cached_embedding_gateway.py`
+**File:** `src/findocbot/infrastructure/cached_embedding_gateway.py`
 
-**Архитектура:**
-- Использует `OrderedDict` для реализации LRU-логики
-- Кеширует только `embed_one()` (пользовательские запросы)
-- НЕ кеширует `embed_many()` (чанки документов — уникальны)
-- Ключ кеша: SHA256 хеш текста запроса
-- Хранит timestamp для каждой записи для поддержки TTL
+**Architecture:**
+- Uses `OrderedDict` to implement LRU logic.
+- Caches only `embed_one()` (user queries).
+- Does NOT cache `embed_many()` (document chunks — typically unique).
+- Cache key: SHA256 hash of the query text.
+- Stores a timestamp for each entry to support TTL.
 
-**Новые возможности:**
+**New Features:**
 
-1. **Метрики кеша:**
-   - Счетчики hits/misses для отслеживания эффективности
-   - Метод `get_stats()` возвращает `CacheStats` с метриками
-   - Автоматическое логирование статистики при shutdown
-   - Hit rate для оценки эффективности кеширования
+1. **Cache Metrics:**
+   - Hits/misses counters to track effectiveness.
+   - `get_stats()` method returns `CacheStats` with metrics.
+   - Automatic statistics logging on shutdown.
+   - Hit rate for assessing caching efficiency.
 
 2. **TTL (Time To Live):**
-   - Опциональный параметр `ttl_seconds` для автоматического истечения записей
-   - Проверка TTL при каждом доступе к кешу
-   - Автоматическое удаление устаревших записей
-   - По умолчанию: 3600 секунд (1 час)
+   - Optional `ttl_seconds` parameter for automatic entry expiration.
+   - TTL check on every cache access.
+   - Automatic removal of stale entries.
+   - Default: 3600 seconds (1 hour).
 
-3. **Warning при большом размере:**
-   - Автоматическое предупреждение при `cache_size > 10000`
-   - Помогает избежать чрезмерного потребления памяти
+3. **Large Size Warning:**
+   - Automatic warning if `cache_size > 10000`.
+   - Helps avoid excessive memory consumption.
 
-**Конфигурация:**
-- Параметр `embedding_cache_size` в `Settings` (по умолчанию: 1000)
-- Параметр `embedding_cache_ttl_seconds` в `Settings` (по умолчанию: 3600)
-- Настраивается через переменные окружения или код
+**Configuration:**
+- `embedding_cache_size` in `Settings` (default: 1000).
+- `embedding_cache_ttl_seconds` in `Settings` (default: 3600).
+- Configurable via environment variables or code.
 
-**Преимущества:**
-- Мгновенный ответ для повторяющихся запросов
-- Снижение нагрузки на Ollama API
-- Экономия вычислительных ресурсов
-- Production-ready метрики для мониторинга
-- Автоматическая очистка устаревших данных
+**Benefits:**
+- Instant response for repeating queries.
+- Reduced load on the Ollama API.
+- Saving computational resources.
+- Production-ready metrics for monitoring.
+- Automatic cleanup of stale data.
 
-**Пример использования:**
+**Usage Example:**
 ```python
-# В container.py
+# In container.py
 ollama_gateway = OllamaGateway(...)
 provider = CachedEmbeddingGateway(
     gateway=ollama_gateway,
@@ -80,40 +80,40 @@ provider = CachedEmbeddingGateway(
     ttl_seconds=settings.embedding_cache_ttl_seconds,
 )
 
-# Получение метрик
+# Getting metrics
 stats = provider.get_stats()
 print(f"Hit rate: {stats.hit_rate:.2%}")
 print(f"Cache size: {stats.size}/{stats.max_size}")
 ```
 
-### 3. Автоматический батчинг эмбеддингов в Gateway
+### 3. Automatic Embedding Batching in Gateway
 
-**Проблема:** Большие документы с сотнями чанков отправляли все эмбеддинги одним запросом, что могло вызвать timeout или перегрузку API. Батчинг в use case нарушал принципы чистой архитектуры — use case не должен знать о деталях реализации.
+**Problem:** Large documents with hundreds of chunks sent all embeddings in a single request, which could cause timeouts or API overload. Batching in the use case violated Clean Architecture principles — the use case should not know about implementation details.
 
-**Решение:** Батчинг перенесен из `UploadPDFUseCase` в `OllamaGateway`, где он является деталью реализации, невидимой для use cases.
+**Solution:** Batching moved from `UploadPDFUseCase` to `OllamaGateway`, where it is an implementation detail invisible to use cases.
 
-**Файл:** `src/findocbot/infrastructure/ollama_gateway.py`
+**File:** `src/findocbot/infrastructure/ollama_gateway.py`
 
-**Изменения:**
-- Добавлен параметр `batch_size` в конструктор `OllamaGateway` (по умолчанию: 50)
-- Метод `embed_many()` автоматически разбивает большие списки на батчи
-- Результаты батчей прозрачно объединяются в единый список
-- Use cases просто вызывают `embed_many()` без знания о батчинге
+**Changes:**
+- Added `batch_size` parameter to `OllamaGateway` constructor (default: 50).
+- `embed_many()` method automatically splits large lists into batches.
+- Batch results are transparently merged into a single list.
+- Use cases simply call `embed_many()` without knowing about batching.
 
-**Конфигурация:**
-- Параметр `embedding_batch_size` в `Settings` (по умолчанию: 50)
-- Передается в `OllamaGateway` через `container.py`
+**Configuration:**
+- `embedding_batch_size` in `Settings` (default: 50).
+- Passed to `OllamaGateway` via `container.py`.
 
-**Преимущества:**
-- Предотвращение timeout на больших документах
-- Более стабильная работа с API
-- Возможность обработки документов любого размера
-- **Соблюдение принципов чистой архитектуры** — use case не знает о деталях реализации
-- Прозрачность для всех use cases
+**Benefits:**
+- Preventing timeouts on large documents.
+- More stable API interaction.
+- Ability to process documents of any size.
+- **Adherence to Clean Architecture principles** — the use case doesn't know about implementation details.
+- Transparency for all use cases.
 
-**Пример кода:**
+**Code Example:**
 ```python
-# В OllamaGateway.embed_many()
+# In OllamaGateway.embed_many()
 async def embed_many(self, texts: list[str]) -> list[list[float]]:
     """Embed many chunk texts with automatic batching."""
     if not texts:
@@ -135,88 +135,88 @@ async def embed_many(self, texts: list[str]) -> list[list[float]]:
     
     return all_embeddings
 
-# Use case теперь просто:
+# Use case is now simply:
 embeddings = await self._provider.embed_many([c.text for c in built_chunks])
 ```
 
-### 4. Lifecycle управление в AppContainer
+### 4. Lifecycle Management in AppContainer
 
-**Проблема:** Отсутствовало централизованное управление жизненным циклом компонентов с внешними ресурсами.
+**Problem:** Lack of centralized lifecycle management for components with external resources.
 
-**Решение:** Обновлен `AppContainer` для управления lifecycle provider'а.
+**Solution:** Updated `AppContainer` to manage the provider's lifecycle.
 
-**Файл:** `src/findocbot/infrastructure/container.py`
+**File:** `src/findocbot/infrastructure/container.py`
 
-**Изменения:**
-- Добавлено поле `provider: CachedEmbeddingGateway` в контейнер
-- Метод `startup()` вызывает `provider.start()`
-- Метод `shutdown()` вызывает `provider.stop()` для корректной очистки
+**Changes:**
+- Added `provider: CachedEmbeddingGateway` field to the container.
+- `startup()` method calls `provider.start()`.
+- `shutdown()` method calls `provider.stop()` for correct cleanup.
 
-**Преимущества:**
-- Гарантированная инициализация ресурсов при старте
-- Корректное освобождение ресурсов при остановке
-- Централизованное управление lifecycle
+**Benefits:**
+- Guaranteed resource initialization on start.
+- Correct resource release on stop.
+- Centralized lifecycle management.
 
-## Конфигурация
+## Configuration
 
-Новые параметры в `src/findocbot/config.py`:
+New parameters in `src/findocbot/config.py`:
 
 ```python
 @dataclass(frozen=True)
 class Settings:
-    # ... существующие параметры ...
-    embedding_cache_size: int = 1000                    # Размер LRU-кеша для эмбеддингов
-    embedding_batch_size: int = 50                      # Размер батча при загрузке документов
-    embedding_cache_ttl_seconds: int | None = 3600      # TTL для записей кеша (1 час)
+    # ... existing parameters ...
+    embedding_cache_size: int = 1000                    # LRU cache size for embeddings
+    embedding_batch_size: int = 50                      # Batch size for document uploads
+    embedding_cache_ttl_seconds: int | None = 3600      # Cache entry TTL (1 hour)
 ```
 
-Переопределение через переменные окружения:
+Override via environment variables:
 ```bash
 export EMBEDDING_CACHE_SIZE=2000
 export EMBEDDING_BATCH_SIZE=100
-export EMBEDDING_CACHE_TTL_SECONDS=7200  # 2 часа
+export EMBEDDING_CACHE_TTL_SECONDS=7200  # 2 hours
 ```
 
-## Тестирование
+## Testing
 
-Созданы comprehensive тесты в `tests/test_embedding_cache.py`:
+Comprehensive tests created in `tests/test_embedding_cache.py`:
 
-1. **test_cached_gateway_caches_identical_queries** — проверка кеширования идентичных запросов
-2. **test_cached_gateway_does_not_cache_embed_many** — проверка отсутствия кеша для batch операций
-3. **test_cached_gateway_respects_cache_size** — проверка соблюдения размера кеша и LRU-логики
-4. **test_cached_gateway_clears_cache_on_stop** — проверка очистки кеша при остановке
-5. **test_cached_gateway_tracks_metrics** — проверка корректности метрик hits/misses и hit rate
-6. **test_cached_gateway_respects_ttl** — проверка истечения записей по TTL
-7. **test_cached_gateway_without_ttl** — проверка работы без TTL (бесконечное хранение)
-8. **test_ollama_gateway_batching** — проверка батчинга в OllamaGateway
+1. **test_cached_gateway_caches_identical_queries** — verification of identical query caching.
+2. **test_cached_gateway_does_not_cache_embed_many** — verification of no cache for batch operations.
+3. **test_cached_gateway_respects_cache_size** — verification of cache size and LRU logic compliance.
+4. **test_cached_gateway_clears_cache_on_stop** — verification of cache clearing on stop.
+5. **test_cached_gateway_tracks_metrics** — verification of hit/miss and hit rate metric correctness.
+6. **test_cached_gateway_respects_ttl** — verification of TTL expiration.
+7. **test_cached_gateway_without_ttl** — verification of operation without TTL (infinite storage).
+8. **test_ollama_gateway_batching** — verification of batching in OllamaGateway.
 
-Все тесты проходят успешно.
+All tests pass successfully.
 
-## Метрики производительности
+## Performance Metrics
 
-### Ожидаемые улучшения:
+### Expected Improvements:
 
-1. **Повторяющиеся запросы:**
-   - Без кеша: ~200-500ms (вызов Ollama API)
-   - С кешем: <1ms (чтение из памяти)
-   - **Ускорение: 200-500x**
+1. **Repeating Queries:**
+   - Without cache: ~200-500ms (Ollama API call).
+   - With cache: <1ms (memory read).
+   - **Acceleration: 200-500x.**
 
-2. **Загрузка больших документов:**
-   - Без батчинга: риск timeout на >100 чанков
-   - С батчингом: стабильная обработка любого размера
-   - **Надежность: значительно повышена**
+2. **Large Document Upload:**
+   - Without batching: risk of timeout on >100 chunks.
+   - With batching: stable processing of any size.
+   - **Reliability: significantly improved.**
 
-3. **HTTP-соединения:**
-   - Без переиспользования: новое соединение на каждый запрос
-   - С переиспользованием: единое соединение
-   - **Снижение latency: 10-50ms на запрос**
+3. **HTTP Connections:**
+   - Without reuse: new connection per request.
+   - With reuse: single connection.
+   - **Latency reduction: 10-50ms per request.**
 
-## Мониторинг
+## Monitoring
 
-Кеш предоставляет встроенные метрики для production мониторинга:
+The cache provides built-in metrics for production monitoring:
 
 ```python
-# Получение метрик кеша
+# Getting cache metrics
 stats = provider.get_stats()
 
 print(f"Cache hits: {stats.hits}")
@@ -224,11 +224,11 @@ print(f"Cache misses: {stats.misses}")
 print(f"Hit rate: {stats.hit_rate:.2%}")
 print(f"Current size: {stats.size}/{stats.max_size}")
 
-# Метрики автоматически логируются при shutdown:
+# Metrics are automatically logged on shutdown:
 # INFO: Cache stats: 150 hits, 50 misses, hit rate: 75.00%, final size: 45
 ```
 
-**Интеграция с Prometheus (будущее улучшение):**
+**Prometheus Integration (Future Improvement):**
 ```python
 from prometheus_client import Counter, Gauge
 
@@ -237,26 +237,26 @@ cache_misses = Counter('embedding_cache_misses_total', 'Total cache misses')
 cache_size = Gauge('embedding_cache_size', 'Current cache size')
 ```
 
-## Дальнейшие оптимизации
+## Further Optimizations
 
-Возможные направления для будущих улучшений:
+Possible directions for future improvements:
 
-1. **Кеширование результатов векторного поиска** — кешировать не только эмбеддинги, но и результаты поиска
-2. **Предварительный прогрев кеша** — загрузка популярных запросов при старте
-3. **Персистентный кеш** — сохранение кеша на диск для переиспользования между перезапусками
-4. **Prometheus метрики** — интеграция с Prometheus для централизованного мониторинга
-5. **Адаптивный batch size** — динамическая настройка размера батча в зависимости от нагрузки
-6. **Распределенный кеш** — использование Redis для shared кеша между инстансами
+1. **Vector Search Result Caching** — caching search results, not just embeddings.
+2. **Cache Pre-warming** — loading popular queries on start.
+3. **Persistent Cache** — saving cache to disk for reuse between restarts.
+4. **Prometheus Metrics** — integration with Prometheus for centralized monitoring.
+5. **Adaptive Batch Size** — dynamic batch size adjustment based on load.
+6. **Distributed Cache** — using Redis for shared cache between instances.
 
-## Совместимость
+## Compatibility
 
-Все оптимизации:
-- ✅ Обратно совместимы с существующим API
-- ✅ Не требуют изменений в клиентском коде
-- ✅ Прозрачны для use cases
-- ✅ Следуют архитектуре Ports and Adapters
-- ✅ Покрыты тестами
+All optimizations:
+- ✅ Backward compatible with the existing API.
+- ✅ Require no changes in client code.
+- ✅ Transparent for use cases.
+- ✅ Follow Ports and Adapters architecture.
+- ✅ Covered by tests.
 
-## Заключение
+## Conclusion
 
-Реализованные оптимизации значительно улучшают производительность системы при работе с эмбеддингами и векторным поиском, сохраняя при этом чистоту архитектуры и обратную совместимость.
+The implemented optimizations significantly improve system performance when working with embeddings and vector search, while maintaining architectural cleanliness and backward compatibility.

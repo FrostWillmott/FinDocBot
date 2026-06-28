@@ -3,9 +3,7 @@
 import re
 
 TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
-SECTION_PATTERN = re.compile(
-    r"^(section|глава|раздел|chapter)\b", re.IGNORECASE
-)
+SECTION_PATTERN = re.compile(r"^(section|chapter)\b", re.IGNORECASE)
 
 
 class ParagraphTokenChunker:
