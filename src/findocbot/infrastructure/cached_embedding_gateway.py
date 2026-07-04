@@ -83,25 +83,6 @@ class CachedEmbeddingGateway:
             return False
         return (time.time() - timestamp) > self._ttl_seconds
 
-    def _cleanup_expired(self) -> int:
-        """Remove all expired entries from cache.
-
-        Returns count of removed entries.
-        """
-        if self._ttl_seconds is None:
-            return 0
-
-        expired_keys = [
-            key
-            for key, (_, timestamp) in self._cache.items()
-            if self._is_expired(timestamp)
-        ]
-
-        for key in expired_keys:
-            del self._cache[key]
-
-        return len(expired_keys)
-
     async def embed_one(self, text: str) -> list[float]:
         """Embed single text with caching and TTL support."""
         cache_key = self._text_to_cache_key(text)

@@ -123,26 +123,18 @@ This decoupling allows for easy testing (e.g., swapping PostgreSQL for an in-mem
 
 ---
 
-## ⚡ Vector Index: HNSW vs ivfflat
+## ⚡ Vector Index
 
-Migration `migrations/002_hnsw_index.sql` adds an **HNSW** index alongside the existing **ivfflat** index.  
-PostgreSQL's query planner automatically picks the cheaper plan; HNSW wins for small `top_k` and low concurrency.
+The schema creates two PostgreSQL ANN indexes on the `chunks.embedding` column:
 
-### Latency benchmark (pgvector 0.7, 100 k chunks, dim=768, top_k=5)
+- **ivfflat** — applied in `001_init.sql`, built at container startup (on an empty
+  table — for best recall, rebuild it after loading data).
+- **HNSW** — applied in `002_hnsw_index.sql` (`m=16, ef_construction=64`), lower
+  query latency at the cost of higher build time and memory.
 
-| Index | p50 | p95 | p99 | Build time |
-|-------|-----|-----|-----|------------|
-| No index (seq scan) | 420 ms | 510 ms | 560 ms | — |
-| ivfflat (lists=100) | 18 ms | 28 ms | 35 ms | ~12 s |
-| **HNSW (m=16, ef=64)** | **4 ms** | **7 ms** | **11 ms** | ~45 s |
-
-> Numbers are representative estimates from pgvector documentation and community benchmarks.  
-> Run `EXPLAIN (ANALYZE, BUFFERS)` on your dataset to get exact figures.
-
-To apply the migration:
-```bash
-psql $POSTGRES_DSN -f migrations/002_hnsw_index.sql
-```
+Run `EXPLAIN (ANALYZE, BUFFERS)` on your dataset to verify which index the query
+planner selects for your workload and top‑k. The HNSW migration is applied
+automatically by `docker compose up` and `make migrate`.
 
 ---
 
@@ -164,14 +156,21 @@ This eliminates brittle string parsing and makes downstream consumers type-safe.
 
 ## 🧪 RAG Evaluation
 
-`tests/test_rag_evaluation.py` runs a golden Q&A suite against the in-memory stack (no external services needed).
+`tests/test_rag_evaluation.py` demonstrates a methodology for measuring retrieval
+precision and faithfulness over a golden Q&A dataset. It runs against the
+in-memory stack (no external services) using deterministic fake embeddings and
+answers.
 
 | Metric | Definition | Threshold |
 |--------|-----------|-----------|
 | **Retrieval Precision** | Fraction of retrieved chunks containing a keyword relevant to the question | ≥ 0.50 |
 | **Faithfulness** | Fraction of answer keywords that appear in the retrieved context | ≥ 0.50 |
 
-Run the evaluation locally:
+> The evaluation uses keyword-based fake providers to illustrate metric
+> computation. For production use, replace them with real Ollama embeddings
+> and answers, and define a proper golden dataset.
+
+Run the evaluation:
 ```bash
 make test
 ```
