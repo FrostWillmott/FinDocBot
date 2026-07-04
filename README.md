@@ -46,7 +46,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/FrostWillmott/FinDocBot.git
-   cd findocbot
+   cd FinDocBot
    ```
 
 2. **Configure environment**:
@@ -179,8 +179,9 @@ make test
 
 ## 🧪 Testing & Code Quality
 
-- **Run tests**: `make test`
+- **Run tests**: `make test` (add `--integration` for PostgreSQL tests via Docker)
 - **Linting & Formatting**: `make lint` / `make fmt`
+- **Static type checking**: `uv run mypy src/findocbot` (strict mode, enforced in CI)
 
 ---
 

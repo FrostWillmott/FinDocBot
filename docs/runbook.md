@@ -45,8 +45,12 @@
   - `make lint`
 - Auto-fix formatting/lint:
   - `make fmt`
+- Static type checking:
+  - `uv run mypy src/findocbot`
 - Tests:
   - `make test`
+- Integration tests (requires Docker):
+  - `uv run pytest --integration`
 
 ## Pre-commit
 
