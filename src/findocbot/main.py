@@ -8,13 +8,21 @@ from fastapi import FastAPI
 
 from findocbot.adapters.api.routes import build_router
 from findocbot.config import load_settings
-from findocbot.infrastructure.container import create_container
+from findocbot.infrastructure.container import AppContainer, create_container
 
 
-def create_app() -> FastAPI:
-    """Create configured FastAPI app."""
-    settings = load_settings()
-    container = create_container(settings)
+def create_app(
+    container: AppContainer | None = None,
+) -> FastAPI:
+    """Create configured FastAPI app.
+
+    Args:
+        container: Optional pre-built container for testing. When ``None``,
+            a production container is created from settings.
+    """
+    if container is None:
+        settings = load_settings()
+        container = create_container(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -23,7 +31,6 @@ def create_app() -> FastAPI:
         await container.shutdown()
 
     app = FastAPI(title="FinDocBot API", version="0.1.0", lifespan=lifespan)
-    app.state.container = container
     app.include_router(build_router(container))
 
     return app

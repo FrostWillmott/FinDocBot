@@ -46,7 +46,7 @@ class AppContainer:
 
 def create_container(settings: Settings) -> AppContainer:
     """Wire use-cases with concrete infrastructure implementations."""
-    db = PostgresPool(settings.postgres_dsn)
+    db = PostgresPool(str(settings.postgres_dsn))
     parser = PyPDFParser()
     chunker = ParagraphTokenChunker(chunk_tokens=300, overlap_ratio=0.15)
 

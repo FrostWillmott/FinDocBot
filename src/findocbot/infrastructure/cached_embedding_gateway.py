@@ -145,3 +145,11 @@ class CachedEmbeddingGateway:
     async def generate(self, prompt: str) -> str:
         """Generate response (pass-through to underlying gateway)."""
         return await self._gateway.generate(prompt)
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        schema: dict,
+    ) -> dict:
+        """Generate structured response (pass-through to gateway)."""
+        return await self._gateway.generate_structured(prompt, schema)

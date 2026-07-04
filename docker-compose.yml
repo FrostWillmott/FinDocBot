@@ -11,6 +11,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ./migrations/002_hnsw_index.sql:/docker-entrypoint-initdb.d/002_hnsw_index.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d findocbot"]
       interval: 5s

@@ -34,3 +34,4 @@ logs:
 
 migrate:
 	docker compose exec db psql -U postgres -d findocbot -f /docker-entrypoint-initdb.d/001_init.sql
+	docker compose exec db psql -U postgres -d findocbot -f /docker-entrypoint-initdb.d/002_hnsw_index.sql
