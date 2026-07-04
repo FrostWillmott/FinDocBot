@@ -41,32 +41,39 @@ class PostgresChunkRepository:
         chunks: list[Chunk],
         embeddings: list[list[float]],
     ) -> None:
-        """Insert chunks and matching vectors."""
+        """Insert chunks and matching vectors in a single batch."""
         if len(chunks) != len(embeddings):
             raise ValueError("Chunks and embeddings count mismatch.")
 
+        if not chunks:
+            return
+
         async with self._db.pool.acquire() as conn:
             async with conn.transaction():
-                for chunk, embedding in zip(chunks, embeddings, strict=True):
-                    await conn.execute(
-                        """
-                        INSERT INTO chunks (
-                            id,
-                            document_id,
-                            chunk_index,
-                            section,
-                            content,
-                            embedding
-                        )
-                        VALUES ($1, $2, $3, $4, $5, $6::vector)
-                        """,
-                        chunk.id,
-                        chunk.document_id,
-                        chunk.chunk_index,
-                        chunk.section,
-                        chunk.text,
-                        _vector_literal(embedding),
+                await conn.executemany(
+                    """
+                    INSERT INTO chunks (
+                        id,
+                        document_id,
+                        chunk_index,
+                        section,
+                        content,
+                        embedding
                     )
+                    VALUES ($1, $2, $3, $4, $5, $6::vector)
+                    """,
+                    [
+                        (
+                            c.id,
+                            c.document_id,
+                            c.chunk_index,
+                            c.section,
+                            c.text,
+                            _vector_literal(e),
+                        )
+                        for c, e in zip(chunks, embeddings, strict=True)
+                    ],
+                )
 
     async def search_by_embedding(
         self,

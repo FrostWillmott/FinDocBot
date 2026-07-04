@@ -1,5 +1,7 @@
 """Upload PDF use case."""
 
+import asyncio
+
 from findocbot.domain.entities import Chunk, Document
 from findocbot.domain.exceptions import EmptyDocumentError
 from findocbot.use_cases.ports import (
@@ -30,15 +32,21 @@ class UploadPDFUseCase:
         self._chunks = chunks
 
     async def execute(self, filename: str, content: bytes) -> Document:
-        """Run upload pipeline and return created document."""
-        text = self._parser.extract_text(content).strip()
+        """Run upload pipeline and return created document.
+
+        CPU-bound PDF parsing and chunking are offloaded to a thread
+        so they do not block the event loop.
+        """
+        text = (
+            await asyncio.to_thread(self._parser.extract_text, content)
+        ).strip()
         if not text:
             raise EmptyDocumentError("Uploaded PDF does not contain text.")
 
         document = Document.create(filename=filename)
         await self._documents.create(document)
 
-        chunk_parts = self._chunker.split(text)
+        chunk_parts = await asyncio.to_thread(self._chunker.split, text)
         built_chunks = [
             Chunk.create(
                 document_id=document.id,

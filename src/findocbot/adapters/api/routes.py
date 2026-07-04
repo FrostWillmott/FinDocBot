@@ -13,6 +13,8 @@ from findocbot.domain.exceptions import FinDocBotError
 from findocbot.infrastructure.container import AppContainer
 
 PDF_UPLOAD_FILE = File(...)
+_MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+_MAX_UPLOAD_MB = _MAX_UPLOAD_BYTES // 1024 // 1024
 
 
 def build_router(container: AppContainer) -> APIRouter:
@@ -32,6 +34,11 @@ def build_router(container: AppContainer) -> APIRouter:
                 status_code=400, detail="Only PDF uploads are supported."
             )
         content = await file.read()
+        if len(content) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds {_MAX_UPLOAD_MB} MB limit.",
+            )
         try:
             document = await container.upload_pdf.execute(
                 filename=file.filename or "uploaded.pdf",
