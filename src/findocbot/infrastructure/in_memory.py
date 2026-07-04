@@ -7,9 +7,9 @@ from findocbot.use_cases.ports import ChunkWithScore
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    numerator = sum(x * y for x, y in zip(a, b, strict=True))
-    a_norm = sum(x * x for x in a) ** 0.5
-    b_norm = sum(y * y for y in b) ** 0.5
+    numerator = float(sum(x * y for x, y in zip(a, b, strict=True)))
+    a_norm: float = sum(x * x for x in a) ** 0.5
+    b_norm: float = sum(y * y for y in b) ** 0.5
     if a_norm == 0 or b_norm == 0:
         return 0.0
     return numerator / (a_norm * b_norm)

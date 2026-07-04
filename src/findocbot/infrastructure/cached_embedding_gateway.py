@@ -1,10 +1,16 @@
 """Caching wrapper for embedding gateway."""
 
+from __future__ import annotations
+
 import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from hashlib import sha256
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from findocbot.use_cases.ports import ModelProviderGateway
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +36,7 @@ class CachedEmbeddingGateway:
 
     def __init__(
         self,
-        gateway,
+        gateway: ModelProviderGateway,
         cache_size: int = 1000,
         ttl_seconds: int | None = None,
     ) -> None:
@@ -55,8 +61,7 @@ class CachedEmbeddingGateway:
 
     async def start(self) -> None:
         """Initialize underlying gateway."""
-        if hasattr(self._gateway, "start"):
-            await self._gateway.start()
+        await self._gateway.start()
 
     async def stop(self) -> None:
         """Shutdown underlying gateway and clear cache."""
@@ -66,8 +71,7 @@ class CachedEmbeddingGateway:
             f"hit rate: {stats.hit_rate:.2%}, final size: {stats.size}"
         )
         self._cache.clear()
-        if hasattr(self._gateway, "stop"):
-            await self._gateway.stop()
+        await self._gateway.stop()
 
     def _text_to_cache_key(self, text: str) -> str:
         """Convert text to deterministic cache key."""
@@ -149,7 +153,7 @@ class CachedEmbeddingGateway:
     async def generate_structured(
         self,
         prompt: str,
-        schema: dict,
-    ) -> dict:
+        schema: dict[str, Any],
+    ) -> dict[str, Any]:
         """Generate structured response (pass-through to gateway)."""
         return await self._gateway.generate_structured(prompt, schema)

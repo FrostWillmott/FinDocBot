@@ -1,6 +1,7 @@
 """Use-case data transfer objects."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -21,4 +22,4 @@ class AskResponseDTO:
 
     answer: str
     sources: list[SearchResultDTO]
-    confidence: str = "medium"
+    confidence: Literal["high", "medium", "low"] = "medium"

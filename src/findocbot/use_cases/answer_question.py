@@ -1,8 +1,10 @@
 """Answer question from retrieved context use case."""
 
+from typing import Literal
+
 from findocbot.domain.entities import ChatTurn
 from findocbot.domain.exceptions import InvalidQueryError
-from findocbot.use_cases.dto import AskResponseDTO
+from findocbot.use_cases.dto import AskResponseDTO, SearchResultDTO
 from findocbot.use_cases.ports import (
     ChatHistoryRepositoryPort,
     ModelProviderGateway,
@@ -12,7 +14,7 @@ from findocbot.use_cases.search_similar_chunks import (
 )
 
 # JSON Schema for the structured answer returned by the LLM.
-_ANSWER_SCHEMA: dict = {
+_ANSWER_SCHEMA: dict[str, object] = {
     "type": "object",
     "properties": {
         "answer": {
@@ -77,7 +79,9 @@ class AnswerQuestionUseCase:
             prompt, _ANSWER_SCHEMA
         )
         answer: str = structured["answer"]
-        confidence: str = structured.get("confidence", "medium")
+        confidence: Literal["high", "medium", "low"] = structured.get(
+            "confidence", "medium"
+        )
 
         await self._history.add_turn(
             ChatTurn.create(
@@ -93,7 +97,7 @@ class AnswerQuestionUseCase:
     @staticmethod
     def _build_prompt(
         question: str,
-        sources: list,
+        sources: list[SearchResultDTO],
         recent_turns: list[ChatTurn],
     ) -> str:
         """Build RAG prompt that requests a structured JSON response."""

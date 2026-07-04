@@ -44,6 +44,12 @@ class _FakeDB:
 class _FakeModelProvider:
     """In-memory provider that returns deterministic embeddings and answers."""
 
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
+
     async def embed_one(self, text: str) -> list[float]:
         return self._encode(text)
 

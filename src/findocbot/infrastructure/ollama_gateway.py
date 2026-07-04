@@ -85,8 +85,8 @@ class OllamaGateway:
             },
         )
         response.raise_for_status()
-        payload = response.json()
-        return payload["response"].strip()
+        payload: dict[str, object] = response.json()
+        return str(payload["response"]).strip()
 
     async def generate_structured(
         self,
@@ -109,5 +109,6 @@ class OllamaGateway:
             },
         )
         response.raise_for_status()
-        payload = response.json()
-        return json.loads(payload["response"])
+        payload: dict[str, object] = response.json()
+        result: dict[str, Any] = json.loads(str(payload["response"]))
+        return result

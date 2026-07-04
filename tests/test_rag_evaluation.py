@@ -73,6 +73,12 @@ QA_DATASET: list[QAPair] = [
 class _FakeProvider:
     """Deterministic provider for evaluation tests."""
 
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
+
     async def embed_one(self, text: str) -> list[float]:
         return self._encode(text)
 

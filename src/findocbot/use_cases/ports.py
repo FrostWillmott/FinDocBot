@@ -31,6 +31,12 @@ class ChunkerPort(Protocol):
 class ModelProviderGateway(Protocol):
     """Model provider abstraction for embeddings and generation."""
 
+    async def start(self) -> None:
+        """Initialize resources (optional no-op for stateless providers)."""
+
+    async def stop(self) -> None:
+        """Release resources (optional no-op for stateless providers)."""
+
     async def embed_one(self, text: str) -> list[float]:
         """Embed single text query."""
 

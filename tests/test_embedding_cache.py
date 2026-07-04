@@ -40,6 +40,10 @@ class MockGateway:
         """Mock generate method."""
         return "mock response"
 
+    async def generate_structured(self, prompt: str, schema: dict) -> dict:
+        """Mock generate_structured method."""
+        return {"answer": "mock response", "confidence": "high"}
+
 
 @pytest.mark.asyncio
 async def test_cached_gateway_caches_identical_queries() -> None:

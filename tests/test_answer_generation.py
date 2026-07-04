@@ -15,6 +15,12 @@ from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 
 
 class FakeProviderGateway:
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
+
     async def embed_one(self, text: str) -> list[float]:
         return self._encode(text)
 

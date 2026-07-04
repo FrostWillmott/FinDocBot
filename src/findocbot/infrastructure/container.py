@@ -16,6 +16,7 @@ from findocbot.infrastructure.postgres_repositories import (
     PostgresDocumentRepository,
 )
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.ports import ModelProviderGateway
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
@@ -28,7 +29,7 @@ class AppContainer:
 
     settings: Settings
     db: PostgresPool
-    provider: CachedEmbeddingGateway
+    provider: ModelProviderGateway
     upload_pdf: UploadPDFUseCase
     search_chunks: SearchSimilarChunksUseCase
     answer_question: AnswerQuestionUseCase
