@@ -126,6 +126,9 @@ async def test_chunk_insert_and_search(db_pool: PostgresPool) -> None:
 
     assert len(results) == 2
     assert results[0].chunk.chunk_index == 1
+    # asyncpg returns UUID objects — verify they are converted to str.
+    assert isinstance(results[0].chunk.id, str)
+    assert isinstance(results[0].chunk.document_id, str)
 
 
 @pytest.mark.asyncio
@@ -143,6 +146,7 @@ async def test_chat_history_add_and_list(db_pool: PostgresPool) -> None:
     assert len(recent) == 2
     assert recent[0].question == "Q1"
     assert recent[1].question == "Q2"
+    assert isinstance(recent[0].id, str)
 
 
 @pytest.mark.asyncio

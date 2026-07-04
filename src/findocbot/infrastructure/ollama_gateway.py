@@ -5,6 +5,8 @@ from typing import Any
 
 import httpx
 
+from findocbot.domain.exceptions import ModelProviderError
+
 
 class OllamaGateway:
     """Call Ollama chat and embedding endpoints."""
@@ -44,6 +46,26 @@ class OllamaGateway:
             )
         return self._client
 
+    async def _post(
+        self, path: str, json_body: dict[str, object]
+    ) -> dict[str, object]:
+        """POST to Ollama; transport errors become ModelProviderError."""
+        client = self._get_client()
+        try:
+            response = await client.post(
+                f"{self._base_url}{path}", json=json_body
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise ModelProviderError(
+                f"Ollama returned HTTP {exc.response.status_code}"
+            ) from exc
+        except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            raise ModelProviderError(
+                f"Ollama unreachable at {self._base_url}"
+            ) from exc
+        return response.json()  # type: ignore[no-any-return]
+
     async def embed_one(self, text: str) -> list[float]:
         """Embed single query text."""
         embeddings = await self.embed_many([text])
@@ -54,38 +76,24 @@ class OllamaGateway:
         if not texts:
             return []
 
-        # Process in batches to avoid timeout on large documents
         all_embeddings: list[list[float]] = []
-        client = self._get_client()
 
         for i in range(0, len(texts), self._batch_size):
             batch = texts[i : i + self._batch_size]
-            response = await client.post(
-                f"{self._base_url}/api/embed",
-                json={
-                    "model": self._embed_model,
-                    "input": batch,
-                },
+            payload = await self._post(
+                "/api/embed",
+                {"model": self._embed_model, "input": batch},
             )
-            response.raise_for_status()
-            payload = response.json()
-            all_embeddings.extend(payload["embeddings"])
+            all_embeddings.extend(payload["embeddings"])  # type: ignore[arg-type]
 
         return all_embeddings
 
     async def generate(self, prompt: str) -> str:
         """Generate answer from context-aware prompt."""
-        client = self._get_client()
-        response = await client.post(
-            f"{self._base_url}/api/generate",
-            json={
-                "model": self._chat_model,
-                "prompt": prompt,
-                "stream": False,
-            },
+        payload = await self._post(
+            "/api/generate",
+            {"model": self._chat_model, "prompt": prompt, "stream": False},
         )
-        response.raise_for_status()
-        payload: dict[str, object] = response.json()
         return str(payload["response"]).strip()
 
     async def generate_structured(
@@ -98,17 +106,19 @@ class OllamaGateway:
         Uses Ollama's ``format`` field to enforce structured output so the
         caller receives a parsed dict rather than raw text.
         """
-        client = self._get_client()
-        response = await client.post(
-            f"{self._base_url}/api/generate",
-            json={
+        payload = await self._post(
+            "/api/generate",
+            {
                 "model": self._chat_model,
                 "prompt": prompt,
                 "stream": False,
                 "format": schema,
             },
         )
-        response.raise_for_status()
-        payload: dict[str, object] = response.json()
-        result: dict[str, Any] = json.loads(str(payload["response"]))
+        try:
+            result: dict[str, Any] = json.loads(str(payload["response"]))
+        except (json.JSONDecodeError, KeyError) as exc:
+            raise ModelProviderError(
+                "Ollama returned malformed structured output"
+            ) from exc
         return result

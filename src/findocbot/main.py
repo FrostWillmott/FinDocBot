@@ -36,9 +36,12 @@ def create_app(
     return app
 
 
-app = create_app()
-
-
 def run() -> None:
     """Run the application with the default host and port."""
-    uvicorn.run("findocbot.main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(
+        "findocbot.main:create_app",
+        factory=True,
+        host="0.0.0.0",
+        port=8000,
+        reload=False,
+    )

@@ -2,6 +2,8 @@
 
 from typing import Literal
 
+from pydantic import BaseModel, ValidationError
+
 from findocbot.domain.entities import ChatTurn
 from findocbot.domain.exceptions import InvalidQueryError
 from findocbot.use_cases.dto import AskResponseDTO, SearchResultDTO
@@ -12,6 +14,14 @@ from findocbot.use_cases.ports import (
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
+
+
+class _AnswerValidation(BaseModel):
+    """Validate and coerce the structured response returned by the LLM."""
+
+    answer: str
+    confidence: Literal["high", "medium", "low"] = "medium"
+
 
 # JSON Schema for the structured answer returned by the LLM.
 _ANSWER_SCHEMA: dict[str, object] = {
@@ -78,20 +88,26 @@ class AnswerQuestionUseCase:
         structured = await self._provider.generate_structured(
             prompt, _ANSWER_SCHEMA
         )
-        answer: str = structured["answer"]
-        confidence: Literal["high", "medium", "low"] = structured.get(
-            "confidence", "medium"
-        )
+        try:
+            validated = _AnswerValidation(**structured)
+        except ValidationError:
+            # Malformed LLM output — fall back to a safe default so the
+            # caller gets a valid response rather than a 500.
+            validated = _AnswerValidation(
+                answer=structured.get("answer", "") or "",
+            )
 
         await self._history.add_turn(
             ChatTurn.create(
                 session_id=session_id,
                 question=clean_question,
-                answer=answer,
+                answer=validated.answer,
             )
         )
         return AskResponseDTO(
-            answer=answer, confidence=confidence, sources=sources
+            answer=validated.answer,
+            confidence=validated.confidence,
+            sources=sources,
         )
 
     @staticmethod

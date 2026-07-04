@@ -1,7 +1,6 @@
--- Add HNSW index for faster approximate nearest-neighbour search.
--- HNSW offers lower query latency than ivfflat at the cost of higher
--- build time and memory usage.  Both indexes coexist; the query planner
--- picks the cheaper one (HNSW wins for small top_k / low-concurrency).
+-- Add HNSW index for fast approximate nearest-neighbour search.
+-- HNSW offers lower query latency and better recall than ivfflat
+-- without requiring training data; ivfflat has been removed in favour of HNSW.
 
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw
     ON chunks USING hnsw (embedding vector_cosine_ops)

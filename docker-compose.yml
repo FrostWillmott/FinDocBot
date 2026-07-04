@@ -25,6 +25,24 @@ services:
       - "11434:11434"
     volumes:
       - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama serve &
+        sleep 5
+        for model in $$OLLAMA_MODELS; do
+          echo "Pulling $$model ..."
+          ollama pull "$$model"
+        done
+        wait
+    environment:
+      OLLAMA_MODELS: "qwen2.5:7b nomic-embed-text:latest"
 
   api:
     build:
@@ -32,7 +50,7 @@ services:
       dockerfile: Dockerfile
     container_name: findocbot-api
     env_file:
-      - .env.example
+      - .env
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       POSTGRES_DSN: postgresql://postgres:postgres@db:5432/findocbot
@@ -42,7 +60,7 @@ services:
       db:
         condition: service_healthy
       ollama:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   pgdata:

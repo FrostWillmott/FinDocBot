@@ -6,6 +6,7 @@ import httpx
 import pytest
 import respx
 
+from findocbot.domain.exceptions import ModelProviderError
 from findocbot.infrastructure.ollama_gateway import OllamaGateway
 
 BASE_URL = "http://ollama.test:11434"
@@ -105,11 +106,11 @@ async def test_generate_structured_parses_json(
 async def test_generate_raises_on_http_error(
     gateway: OllamaGateway,
 ) -> None:
-    """generate() propagates httpx errors (no retry)."""
+    """generate() wraps transport errors as ModelProviderError."""
     respx.post(f"{BASE_URL}/api/generate").mock(
         return_value=httpx.Response(503, text="Service Unavailable")
     )
-    with pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(ModelProviderError):
         await gateway.generate("What is the revenue?")
 
 

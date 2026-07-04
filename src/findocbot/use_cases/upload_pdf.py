@@ -44,7 +44,6 @@ class UploadPDFUseCase:
             raise EmptyDocumentError("Uploaded PDF does not contain text.")
 
         document = Document.create(filename=filename)
-        await self._documents.create(document)
 
         chunk_parts = await asyncio.to_thread(self._chunker.split, text)
         built_chunks = [
@@ -61,5 +60,8 @@ class UploadPDFUseCase:
         embeddings = await self._provider.embed_many([
             c.text for c in built_chunks
         ])
+        # Persist the document only after embedding succeeds so that
+        # a provider failure does not leave an orphan document row.
+        await self._documents.create(document)
         await self._chunks.add_chunks_with_embeddings(built_chunks, embeddings)
         return document

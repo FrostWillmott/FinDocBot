@@ -51,7 +51,6 @@ class CachedEmbeddingGateway:
         self._hits = 0
         self._misses = 0
 
-        # Warn about large cache sizes
         if cache_size > 10000:
             logger.warning(
                 f"Large cache size configured: {cache_size}. "
@@ -87,13 +86,10 @@ class CachedEmbeddingGateway:
         """Embed single text with caching and TTL support."""
         cache_key = self._text_to_cache_key(text)
 
-        # Check if result is in cache
         if cache_key in self._cache:
             embedding, timestamp = self._cache[cache_key]
 
-            # Check if entry has expired
             if self._is_expired(timestamp):
-                # Remove expired entry
                 del self._cache[cache_key]
             else:
                 # Move to end (mark as recently used)
@@ -101,14 +97,11 @@ class CachedEmbeddingGateway:
                 self._hits += 1
                 return embedding
 
-        # Compute embedding
         self._misses += 1
         result = await self._gateway.embed_one(text)
 
-        # Add to cache with current timestamp
         self._cache[cache_key] = (result, time.time())
 
-        # Evict oldest if cache is full
         if len(self._cache) > self._cache_size:
             self._cache.popitem(last=False)
 

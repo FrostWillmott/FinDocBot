@@ -56,19 +56,12 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
    ```
 
 3. **Start infrastructure**:
-   Spin up PostgreSQL and Ollama via Docker Compose:
+   Spin up PostgreSQL and Ollama via Docker Compose (models are pulled automatically):
    ```bash
    make up
    ```
 
-4. **Pull models in Ollama**:
-   If you are using Ollama in Docker or locally, ensure the models are downloaded:
-   ```bash
-   docker exec -it findocbot-ollama ollama pull qwen2.5:7b
-   docker exec -it findocbot-ollama ollama pull nomic-embed-text
-   ```
-
-5. **Run the API**:
+4. **Run the API**:
    ```bash
    make dev
    ```
@@ -125,23 +118,18 @@ This decoupling allows for easy testing (e.g., swapping PostgreSQL for an in-mem
 
 ## ⚡ Vector Index
 
-The schema creates two PostgreSQL ANN indexes on the `chunks.embedding` column:
-
-- **ivfflat** — applied in `001_init.sql`, built at container startup (on an empty
-  table — for best recall, rebuild it after loading data).
-- **HNSW** — applied in `002_hnsw_index.sql` (`m=16, ef_construction=64`), lower
-  query latency at the cost of higher build time and memory.
-
-Run `EXPLAIN (ANALYZE, BUFFERS)` on your dataset to verify which index the query
-planner selects for your workload and top‑k. The HNSW migration is applied
-automatically by `docker compose up` and `make migrate`.
+PostgreSQL uses an **HNSW** index (`m=16, ef_construction=64`) over the
+`chunks.embedding` column for fast approximate nearest-neighbour search.
+The migration is applied automatically by `docker compose up` and
+`make migrate`.
 
 ---
 
 ## 🗂️ Structured Output
 
-`POST /ask` now returns a `confidence` field (`high` / `medium` / `low`) alongside the answer.  
-The LLM is constrained via Ollama's `format` parameter to emit a JSON object matching the schema:
+`POST /ask` returns a `confidence` field (`high` / `medium` / `low`) alongside the answer.
+The LLM is constrained via Ollama's `format` parameter to emit a JSON object matching the
+schema, and the response is validated with Pydantic before reaching the client:
 
 ```json
 {
@@ -149,8 +137,6 @@ The LLM is constrained via Ollama's `format` parameter to emit a JSON object mat
   "confidence": "high"
 }
 ```
-
-This eliminates brittle string parsing and makes downstream consumers type-safe.
 
 ---
 

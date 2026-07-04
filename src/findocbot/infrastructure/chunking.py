@@ -44,6 +44,23 @@ class ParagraphTokenChunker:
                 # (current_section has not been updated yet).
                 chunks.append((chunk_text, current_section))
                 current_parts = self._build_overlap(chunk_text)
+
+                # If the incoming paragraph does not fit within the
+                # remaining token budget, split it immediately and
+                # merge the overlap into the first piece.  This avoids
+                # flushing a duplicate overlap-only chunk and prevents
+                # an oversized final chunk.
+                handled = self._try_split_oversized_after_flush(
+                    paragraph=paragraph,
+                    maybe_section=maybe_section,
+                    current_parts=current_parts,
+                    current_section=current_section,
+                )
+                if handled is not None:
+                    chunks.extend(handled[0])
+                    current_parts = handled[1]
+                    current_section = handled[2]
+                    continue
             else:
                 if maybe_section is not None:
                     current_section = maybe_section
@@ -53,10 +70,12 @@ class ParagraphTokenChunker:
                 continue
 
             # Only now update the section for the new paragraph being added.
-            if maybe_section is not None:
-                current_section = maybe_section
-            if paragraph not in current_parts:
-                current_parts.append(paragraph)
+            current_section, current_parts = self._append_to_current(
+                paragraph=paragraph,
+                maybe_section=maybe_section,
+                current_parts=current_parts,
+                current_section=current_section,
+            )
 
         if current_parts:
             last_chunk = "\n\n".join(current_parts).strip()
@@ -69,6 +88,54 @@ class ParagraphTokenChunker:
                 merged_text = "\n\n".join([chunks[-1][0], last_chunk]).strip()
                 chunks[-1] = (merged_text, chunks[-1][1])
         return chunks
+
+    @staticmethod
+    def _append_to_current(
+        paragraph: str,
+        maybe_section: str | None,
+        current_parts: list[str],
+        current_section: str | None,
+    ) -> tuple[str | None, list[str]]:
+        """Update section and append *paragraph* to *current_parts*."""
+        section = (
+            maybe_section if maybe_section is not None else current_section
+        )
+        if paragraph not in current_parts:
+            current_parts.append(paragraph)
+        return section, current_parts
+
+    def _try_split_oversized_after_flush(
+        self,
+        paragraph: str,
+        maybe_section: str | None,
+        current_parts: list[str],
+        current_section: str | None,
+    ) -> tuple[list[tuple[str, str | None]], list[str], str | None] | None:
+        """Split *paragraph* if it exceeds the remaining token budget.
+
+        Called right after flushing *current_parts* and building the
+        overlap.  Returns new pieces, updated *current_parts*, and
+        updated *current_section* when a split was performed, or
+        ``None`` when the paragraph fits and should be appended normally.
+        """
+        overlap_size = (
+            self._count_tokens("\n\n".join(current_parts))
+            if current_parts
+            else 0
+        )
+        if self._count_tokens(paragraph) <= self._chunk_tokens - overlap_size:
+            return None
+
+        section = (
+            maybe_section if maybe_section is not None else current_section
+        )
+        pieces = self._split_long_paragraph(paragraph, section)
+        if pieces and current_parts:
+            first_text, first_section = pieces[0]
+            merged = "\n\n".join([*current_parts, first_text]).strip()
+            pieces[0] = (merged, first_section)
+            current_parts = []
+        return pieces, current_parts, section
 
     def _split_long_paragraph(
         self,

@@ -51,7 +51,6 @@ def create_container(settings: Settings) -> AppContainer:
     parser = PyPDFParser()
     chunker = ParagraphTokenChunker(chunk_tokens=300, overlap_ratio=0.15)
 
-    # Create Ollama gateway and wrap with caching layer
     ollama_gateway = OllamaGateway(
         base_url=settings.ollama_base_url,
         chat_model=settings.ollama_chat_model,
