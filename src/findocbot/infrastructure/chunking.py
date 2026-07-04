@@ -31,23 +31,30 @@ class ParagraphTokenChunker:
 
         for paragraph in paragraphs:
             maybe_section = self._extract_section(paragraph)
-            if maybe_section is not None:
-                current_section = maybe_section
             candidate = "\n\n".join([*current_parts, paragraph]).strip()
             if self._count_tokens(candidate) <= self._chunk_tokens:
                 current_parts.append(paragraph)
+                if maybe_section is not None:
+                    current_section = maybe_section
                 continue
 
             if current_parts:
                 chunk_text = "\n\n".join(current_parts).strip()
+                # Use the section that was active *before* this paragraph
+                # (current_section has not been updated yet).
                 chunks.append((chunk_text, current_section))
                 current_parts = self._build_overlap(chunk_text)
             else:
+                if maybe_section is not None:
+                    current_section = maybe_section
                 chunks.extend(
                     self._split_long_paragraph(paragraph, current_section)
                 )
                 continue
 
+            # Only now update the section for the new paragraph being added.
+            if maybe_section is not None:
+                current_section = maybe_section
             if paragraph not in current_parts:
                 current_parts.append(paragraph)
 
