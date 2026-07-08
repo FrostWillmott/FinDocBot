@@ -27,11 +27,6 @@ class FakeProviderGateway:
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         return [self._encode(text) for text in texts]
 
-    async def generate(self, prompt: str) -> str:
-        if "revenue" in prompt.lower():
-            return "Revenue growth is 20 percent according to the report."
-        return "Insufficient context."
-
     async def generate_structured(self, prompt: str, schema: dict) -> dict:
         if "revenue" in prompt.lower():
             return {

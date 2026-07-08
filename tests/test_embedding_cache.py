@@ -36,10 +36,6 @@ class MockGateway:
         self.embed_many_calls += 1
         return [[float(len(t)), 1.0, 2.0] for t in texts]
 
-    async def generate(self, prompt: str) -> str:
-        """Mock generate method."""
-        return "mock response"
-
     async def generate_structured(self, prompt: str, schema: dict) -> dict:
         """Mock generate_structured method."""
         return {"answer": "mock response", "confidence": "high"}

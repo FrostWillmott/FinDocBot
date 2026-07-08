@@ -53,16 +53,20 @@ def build_router(container: AppContainer) -> APIRouter:
             raise HTTPException(
                 status_code=400, detail="Only PDF uploads are supported."
             )
-        content = await file.read()
-        if len(content) > _MAX_UPLOAD_BYTES:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File exceeds {_MAX_UPLOAD_MB} MB limit.",
-            )
+        # Read in bounded chunks and abort early so an oversized upload
+        # cannot be fully buffered in memory before the limit is enforced.
+        content = bytearray()
+        while data := await file.read(1024 * 1024):
+            content.extend(data)
+            if len(content) > _MAX_UPLOAD_BYTES:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File exceeds {_MAX_UPLOAD_MB} MB limit.",
+                )
         with _map_use_case_errors():
             document = await container.upload_pdf.execute(
                 filename=file.filename or "uploaded.pdf",
-                content=content,
+                content=bytes(content),
             )
         return UploadResponse(
             document_id=document.id, filename=document.filename

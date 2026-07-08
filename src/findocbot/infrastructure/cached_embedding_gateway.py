@@ -92,12 +92,14 @@ class CachedEmbeddingGateway:
             if self._is_expired(timestamp):
                 del self._cache[cache_key]
             else:
-                # Move to end (mark as recently used)
                 self._cache.move_to_end(cache_key)
                 self._hits += 1
                 return embedding
 
         self._misses += 1
+        # No single-flight lock here: concurrent identical misses may each
+        # call the backend. Embeddings are idempotent, so the only cost is a
+        # duplicate request — an accepted trade-off vs. per-key locking.
         result = await self._gateway.embed_one(text)
 
         self._cache[cache_key] = (result, time.time())
@@ -119,10 +121,6 @@ class CachedEmbeddingGateway:
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         """Embed many texts without caching (used for document chunks)."""
         return await self._gateway.embed_many(texts)
-
-    async def generate(self, prompt: str) -> str:
-        """Generate response (pass-through to underlying gateway)."""
-        return await self._gateway.generate(prompt)
 
     async def generate_structured(
         self,

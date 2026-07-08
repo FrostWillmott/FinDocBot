@@ -43,9 +43,6 @@ class ModelProviderGateway(Protocol):
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         """Embed many texts in one call."""
 
-    async def generate(self, prompt: str) -> str:
-        """Generate model response from prompt."""
-
     async def generate_structured(
         self, prompt: str, schema: dict[str, Any]
     ) -> dict[str, Any]:
@@ -57,6 +54,9 @@ class DocumentRepositoryPort(Protocol):
 
     async def create(self, document: Document) -> None:
         """Persist a document."""
+
+    async def delete(self, document_id: str) -> None:
+        """Remove a document by id."""
 
 
 class ChunkRepositoryPort(Protocol):

@@ -86,15 +86,13 @@ class OllamaGateway:
             )
             all_embeddings.extend(payload["embeddings"])  # type: ignore[arg-type]
 
-        return all_embeddings
+        if len(all_embeddings) != len(texts):
+            raise ModelProviderError(
+                f"Ollama returned {len(all_embeddings)} embeddings "
+                f"for {len(texts)} inputs"
+            )
 
-    async def generate(self, prompt: str) -> str:
-        """Generate answer from context-aware prompt."""
-        payload = await self._post(
-            "/api/generate",
-            {"model": self._chat_model, "prompt": prompt, "stream": False},
-        )
-        return str(payload["response"]).strip()
+        return all_embeddings
 
     async def generate_structured(
         self,

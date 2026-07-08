@@ -25,9 +25,6 @@ class FakeProviderGateway:
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         return [self._encode(text) for text in texts]
 
-    async def generate(self, prompt: str) -> str:
-        return prompt
-
     @staticmethod
     def _encode(text: str) -> list[float]:
         lower = text.lower()

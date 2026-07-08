@@ -63,5 +63,13 @@ class UploadPDFUseCase:
         # Persist the document only after embedding succeeds so that
         # a provider failure does not leave an orphan document row.
         await self._documents.create(document)
-        await self._chunks.add_chunks_with_embeddings(built_chunks, embeddings)
+        try:
+            await self._chunks.add_chunks_with_embeddings(
+                built_chunks, embeddings
+            )
+        except Exception:
+            # Remove the orphan document row if chunk persistence fails,
+            # since document + chunks are not written in one transaction.
+            await self._documents.delete(document.id)
+            raise
         return document

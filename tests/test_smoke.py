@@ -56,11 +56,6 @@ class _FakeModelProvider:
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         return [self._encode(t) for t in texts]
 
-    async def generate(self, prompt: str) -> str:
-        if "revenue" in prompt.lower():
-            return "Revenue grew by 20 percent."
-        return "No relevant context found."
-
     async def generate_structured(self, prompt: str, schema: dict) -> dict:
         if "revenue" in prompt.lower():
             return {

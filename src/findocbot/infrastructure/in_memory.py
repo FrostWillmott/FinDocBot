@@ -26,6 +26,10 @@ class InMemoryDocumentRepository:
         """Store document entity."""
         self.items[document.id] = document
 
+    async def delete(self, document_id: str) -> None:
+        """Remove document entity by id."""
+        self.items.pop(document_id, None)
+
 
 @dataclass
 class _StoredChunk:

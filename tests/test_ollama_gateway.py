@@ -26,21 +26,6 @@ async def gateway() -> OllamaGateway:
 
 
 @respx.mock
-async def test_generate_returns_text(
-    gateway: OllamaGateway,
-) -> None:
-    """generate() calls /api/generate and returns the response text."""
-    respx.post(f"{BASE_URL}/api/generate").mock(
-        return_value=httpx.Response(
-            200,
-            json={"response": "Revenue grew by 20%.", "done": True},
-        )
-    )
-    result = await gateway.generate("What is the revenue?")
-    assert result == "Revenue grew by 20%."
-
-
-@respx.mock
 async def test_embed_many_batches_correctly(
     gateway: OllamaGateway,
 ) -> None:
@@ -103,15 +88,16 @@ async def test_generate_structured_parses_json(
 
 
 @respx.mock
-async def test_generate_raises_on_http_error(
+async def test_generate_structured_raises_on_http_error(
     gateway: OllamaGateway,
 ) -> None:
-    """generate() wraps transport errors as ModelProviderError."""
+    """_post wraps transport errors as ModelProviderError."""
+    schema = {"type": "object", "properties": {"answer": {"type": "string"}}}
     respx.post(f"{BASE_URL}/api/generate").mock(
         return_value=httpx.Response(503, text="Service Unavailable")
     )
     with pytest.raises(ModelProviderError):
-        await gateway.generate("What is the revenue?")
+        await gateway.generate_structured("What is the revenue?", schema)
 
 
 @respx.mock
@@ -127,11 +113,11 @@ async def test_embed_one_uses_embed_many(
 
 
 async def test_gateway_raises_if_not_started() -> None:
-    """Calling generate() before start() raises RuntimeError."""
+    """Calling the gateway before start() raises RuntimeError."""
     gw = OllamaGateway(
         base_url=BASE_URL,
         chat_model="test",
         embed_model="test",
     )
     with pytest.raises(RuntimeError, match="not started"):
-        await gw.generate("prompt")
+        await gw.embed_one("prompt")

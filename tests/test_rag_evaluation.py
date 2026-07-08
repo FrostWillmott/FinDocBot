@@ -85,9 +85,6 @@ class _FakeProvider:
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         return [self._encode(t) for t in texts]
 
-    async def generate(self, prompt: str) -> str:
-        return self._answer_from_prompt(prompt)
-
     async def generate_structured(self, prompt: str, schema: dict) -> dict:
         return {
             "answer": self._answer_from_prompt(prompt),

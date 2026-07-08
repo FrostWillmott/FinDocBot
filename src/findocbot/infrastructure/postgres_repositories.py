@@ -34,6 +34,16 @@ class PostgresDocumentRepository:
         except asyncpg.PostgresError as exc:
             raise StorageError("Failed to persist document") from exc
 
+    async def delete(self, document_id: str) -> None:
+        """Delete document row by id."""
+        try:
+            await self._db.pool.execute(
+                "DELETE FROM documents WHERE id = $1",
+                document_id,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to delete document") from exc
+
 
 class PostgresChunkRepository:
     """Persist and search chunks with pgvector."""
