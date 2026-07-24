@@ -1,6 +1,7 @@
 # 🤖 FinDocBot
 
 [![CI](https://github.com/FrostWillmott/FinDocBot/actions/workflows/ci.yml/badge.svg)](https://github.com/FrostWillmott/FinDocBot/actions)
+[![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen)](https://github.com/FrostWillmott/FinDocBot/actions)
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
