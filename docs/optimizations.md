@@ -194,7 +194,11 @@ All tests pass successfully.
 
 ## Performance Metrics
 
-### Expected Improvements:
+### Expected Improvements
+
+> The numbers below are estimates from first principles (cache hit = memory
+> read vs. an Ollama API round-trip), not benchmark results — no load testing
+> has been performed yet.
 
 1. **Repeating Queries:**
    - Without cache: ~200-500ms (Ollama API call).

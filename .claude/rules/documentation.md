@@ -14,7 +14,7 @@ step.
   work later. A README describing a removed feature or an old command is
   worse than no README.
 - Keep it for humans: no walls of prose. Prefer short sections, code blocks
-  for commands, tables for reference data (mirrors this repo's own README.md).
+  for commands, tables for reference data.
 
 ## `DECISIONS.md`  [MUST-UNLESS]
 - Create it if missing; every repo needs one.
