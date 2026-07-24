@@ -173,6 +173,17 @@ make test
 
 ---
 
+## 📚 Documentation
+
+- [Runbook](docs/runbook.md) — bring-up/teardown, quality checks, migrations.
+- [Manual testing checklist](docs/manual-testing.md) — full E2E pass, including failure modes (Ollama down → 502, Postgres down → 503).
+- [Optimizations](docs/optimizations.md) — embedding and vector-search performance notes.
+- [DECISIONS.md](DECISIONS.md) — append-only log of non-obvious technical decisions.
+
+Coding conventions (typing, error handling, testing, pgvector and LLM-integration rules) are codified in [`.claude/rules/`](.claude/rules/) as small binding modules with explicit rule levels (see `_LEVELS.md`); they serve both human contributors and AI-assisted tooling.
+
+---
+
 ## 📄 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

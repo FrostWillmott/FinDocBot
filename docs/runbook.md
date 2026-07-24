@@ -53,6 +53,7 @@
   - `make cover`
 - Integration tests (requires Docker; CI runs them in a separate job):
   - `uv run pytest --integration`
+- Full manual E2E pass: see [manual-testing.md](manual-testing.md)
 
 ## Pre-commit
 
