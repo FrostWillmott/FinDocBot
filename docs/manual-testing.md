@@ -45,7 +45,7 @@ To run them too (spins up a temporary Postgres via testcontainers):
 uv run pytest --integration -q
 ```
 
-Coverage report (CI enforces ≥80%):
+Coverage report (CI enforces ≥90%):
 
 ```bash
 make cover

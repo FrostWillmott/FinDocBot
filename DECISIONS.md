@@ -29,6 +29,9 @@ later reversed, add a superseding entry instead of editing the old one.
   headroom below the current ~92% so a small refactor doesn't break the build.
   Integration tests run in a separate CI job (fast unit feedback; Docker pulls
   isolated), so their coverage does not count toward the threshold.
+- **Coverage threshold raised to ≥90%** (supersedes the ≥80% entry above) —
+  pinned to the current 92% rounded down to the nearest ten, keeping the gate
+  close to reality while leaving a small refactor margin.
 - **Static coverage badge (shields.io) instead of Codecov** — no external
   service or token for a small personal project; the number is updated
   manually when it moves materially.
