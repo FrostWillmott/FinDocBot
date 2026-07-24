@@ -128,6 +128,40 @@ def _build_test_container() -> AppContainer:
     )
 
 
+async def test_app_lifespan_starts_and_stops_container_resources() -> None:
+    """Smoke: app lifespan drives db/provider start and stop."""
+    events: list[str] = []
+
+    class _RecordingDB(_FakeDB):
+        async def start(self) -> None:
+            events.append("db.start")
+
+        async def stop(self) -> None:
+            events.append("db.stop")
+
+    class _RecordingProvider(_FakeModelProvider):
+        async def start(self) -> None:
+            events.append("provider.start")
+
+        async def stop(self) -> None:
+            events.append("provider.stop")
+
+    container = _build_test_container()
+    container.db = _RecordingDB()  # type: ignore[assignment]
+    container.provider = _RecordingProvider()
+    app = create_app(container=container)
+
+    async with app.router.lifespan_context(app):
+        assert events == ["db.start", "provider.start"]
+    assert events[2:] == ["provider.stop", "db.stop"]
+
+
+def test_create_app_without_container_builds_production_wiring() -> None:
+    """Smoke: default create_app() wires the production container."""
+    app = create_app()
+    assert app.title == "FinDocBot API"
+
+
 async def test_health_endpoint_returns_ok() -> None:
     """Smoke: /health responds with status ok."""
     app = create_app(container=_build_test_container())

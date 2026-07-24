@@ -68,7 +68,9 @@ def pg_dsn() -> str:
         image="pgvector/pgvector:pg16",
         dbname="findocbot",
     ) as postgres:
-        dsn = postgres.get_connection_url()
+        # driver=None yields a plain postgresql:// DSN; the default appends
+        # +psycopg2, which asyncpg rejects.
+        dsn = postgres.get_connection_url(driver=None)
         _run_migration_sync(dsn)
         yield dsn
 
@@ -78,6 +80,8 @@ async def db_pool(pg_dsn: str) -> PostgresPool:
     """Create a pool connected to the test PostgreSQL."""
     pool = PostgresPool(pg_dsn)
     await pool.start()
+    # The container is module-scoped; wipe data so tests stay independent.
+    await pool.pool.execute("TRUNCATE chunks, documents, chat_turns")
     yield pool
     await pool.stop()
 

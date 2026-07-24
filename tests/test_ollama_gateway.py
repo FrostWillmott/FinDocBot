@@ -112,6 +112,61 @@ async def test_embed_one_uses_embed_many(
     assert result == [0.42, 0.73]
 
 
+@respx.mock
+async def test_embed_connect_error_raises_model_provider_error(
+    gateway: OllamaGateway,
+) -> None:
+    """Transport-level failures surface as ModelProviderError."""
+    respx.post(f"{BASE_URL}/api/embed").mock(
+        side_effect=httpx.ConnectError("connection refused")
+    )
+    with pytest.raises(ModelProviderError, match="unreachable"):
+        await gateway.embed_one("query")
+
+
+@respx.mock
+async def test_embed_many_count_mismatch_raises_model_provider_error(
+    gateway: OllamaGateway,
+) -> None:
+    """Fewer embeddings than inputs is an error, not silent truncation."""
+    respx.post(f"{BASE_URL}/api/embed").mock(
+        return_value=httpx.Response(200, json={"embeddings": [[0.1, 0.2]]})
+    )
+    with pytest.raises(ModelProviderError, match="for 2 inputs"):
+        await gateway.embed_many(["a", "b"])
+
+
+@respx.mock
+async def test_generate_structured_malformed_json_raises(
+    gateway: OllamaGateway,
+) -> None:
+    """Non-JSON response payload raises ModelProviderError."""
+    respx.post(f"{BASE_URL}/api/generate").mock(
+        return_value=httpx.Response(
+            200, json={"response": "not-json", "done": True}
+        )
+    )
+    with pytest.raises(ModelProviderError, match="malformed"):
+        await gateway.generate_structured("question", {})
+
+
+async def test_start_is_idempotent_and_stop_without_start_is_noop() -> None:
+    """Repeated start() reuses the client; stop() twice does not fail."""
+    gw = OllamaGateway(
+        base_url=BASE_URL,
+        chat_model="test",
+        embed_model="test",
+    )
+    await gw.stop()  # No-op before start.
+    await gw.start()
+    client = gw._client
+    await gw.start()
+    assert gw._client is client
+    await gw.stop()
+    await gw.stop()
+    assert gw._client is None
+
+
 async def test_gateway_raises_if_not_started() -> None:
     """Calling the gateway before start() raises RuntimeError."""
     gw = OllamaGateway(

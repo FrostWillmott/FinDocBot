@@ -102,6 +102,38 @@ class TestParagraphTokenChunker:
         for chunk_text, _ in result:
             assert len(chunk_text) > 0
 
+    def test_oversized_paragraph_after_flush_merges_overlap(self) -> None:
+        """A paragraph too big for the remaining budget after a flush is
+        split immediately, with the overlap merged into its first piece
+        instead of flushed as a duplicate overlap-only chunk."""
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=10, overlap_ratio=0.5, min_chunk_tokens=1
+        )
+        para1 = "alpha beta gamma delta epsilon zeta eta theta"  # 8 tokens
+        para2 = "one two three four five six seven eight nine"  # 9 tokens
+        result = chunker.split(para1 + "\n\n" + para2)
+
+        texts = _chunk_texts(result)
+        assert len(texts) == 2
+        assert texts[0] == para1
+        # Second chunk = 5-token overlap from chunk 1 + the new paragraph.
+        assert texts[1].startswith("delta epsilon zeta eta theta")
+        assert texts[1].endswith(para2)
+
+    def test_oversized_first_paragraph_keeps_section_label(self) -> None:
+        """A first paragraph exceeding chunk_tokens is split into pieces
+        that all carry its own section header."""
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=8, overlap_ratio=0.25, min_chunk_tokens=1
+        )
+        text = "Section 9\n" + "word " * 20
+        result = chunker.split(text)
+
+        assert len(result) >= 2
+        assert all(
+            section == "Section 9" for section in _chunk_sections(result)
+        )
+
     def test_strip_whitespace_only_paragraphs(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=100)
         text = "Real content here.\n\n   \n\nMore content."

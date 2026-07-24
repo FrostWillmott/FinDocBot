@@ -1,6 +1,7 @@
 """Test embedding cache functionality."""
 
 import asyncio
+import logging
 
 import pytest
 
@@ -231,6 +232,15 @@ async def test_cached_gateway_without_ttl() -> None:
     assert mock.embed_one_calls == 1  # Still cached
 
     await cached.stop()
+
+
+def test_cache_size_above_threshold_logs_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Configuring an oversized cache emits a memory warning."""
+    with caplog.at_level(logging.WARNING):
+        CachedEmbeddingGateway(gateway=MockGateway(), cache_size=10_001)
+    assert "Large cache size" in caplog.text
 
 
 @pytest.mark.asyncio

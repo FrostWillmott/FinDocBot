@@ -34,7 +34,17 @@ dev = [
     "fpdf2>=2.8.4",
     "respx>=0.22",
     "testcontainers[postgres]>=4.13",
+    "pytest-cov>=7.1.0",
 ]
+
+[tool.coverage.run]
+source = ["src/findocbot"]
+branch = true
+
+[tool.coverage.report]
+omit = ["*/__init__.py"]
+show_missing = true
+exclude_also = ["if TYPE_CHECKING:"]
 
 [project.scripts]
 findocbot = "findocbot.main:run"

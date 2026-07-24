@@ -2,7 +2,7 @@ UV := uv
 APP_MODULE := findocbot.main:create_app
 APP_FLAGS := --factory
 
-.PHONY: sync dev lint fmt test precommit-install up down logs migrate
+.PHONY: sync dev lint fmt test cover precommit-install up down logs migrate
 
 sync:
 	$(UV) sync --all-groups
@@ -20,6 +20,9 @@ fmt:
 
 test:
 	$(UV) run pytest -q
+
+cover:
+	$(UV) run pytest -q --cov --cov-report=term-missing
 
 precommit-install:
 	$(UV) run pre-commit install

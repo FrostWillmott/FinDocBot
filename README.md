@@ -165,7 +165,8 @@ make test
 
 ## 🧪 Testing & Code Quality
 
-- **Run tests**: `make test` (add `--integration` for PostgreSQL tests via Docker)
+- **Run tests**: `make test` (add `--integration` for PostgreSQL tests via Docker; CI runs them in a separate job)
+- **Coverage report**: `make cover` (pytest-cov, terminal report with missing lines; CI enforces ≥80%)
 - **Linting & Formatting**: `make lint` / `make fmt`
 - **Static type checking**: `uv run mypy src/findocbot` (strict mode, enforced in CI)
 
