@@ -49,7 +49,7 @@
   - `uv run mypy src/findocbot`
 - Tests:
   - `make test`
-- Coverage (CI enforces ≥80%):
+- Coverage (CI enforces ≥90%):
   - `make cover`
 - Integration tests (requires Docker; CI runs them in a separate job):
   - `uv run pytest --integration`

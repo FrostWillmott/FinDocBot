@@ -87,22 +87,17 @@ async def db_pool(pg_dsn: str) -> PostgresPool:
 
 
 @pytest.mark.asyncio
-async def test_document_create_and_retrieve(pg_dsn: str) -> None:
+async def test_document_create_and_retrieve(db_pool: PostgresPool) -> None:
     """Document row can be persisted via the repository."""
-    pool = PostgresPool(pg_dsn)
-    await pool.start()
-    try:
-        repo = PostgresDocumentRepository(pool)
-        doc = Document.create(filename="test.pdf")
-        await repo.create(doc)
+    repo = PostgresDocumentRepository(db_pool)
+    doc = Document.create(filename="test.pdf")
+    await repo.create(doc)
 
-        row = await pool.pool.fetchrow(
-            "SELECT id, filename FROM documents WHERE id = $1", doc.id
-        )
-        assert row is not None
-        assert row["filename"] == "test.pdf"
-    finally:
-        await pool.stop()
+    row = await db_pool.pool.fetchrow(
+        "SELECT id, filename FROM documents WHERE id = $1", doc.id
+    )
+    assert row is not None
+    assert row["filename"] == "test.pdf"
 
 
 @pytest.mark.asyncio
