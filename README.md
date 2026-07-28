@@ -1,7 +1,7 @@
 # 🤖 FinDocBot
 
 [![CI](https://github.com/FrostWillmott/FinDocBot/actions/workflows/ci.yml/badge.svg)](https://github.com/FrostWillmott/FinDocBot/actions)
-[![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen)](https://github.com/FrostWillmott/FinDocBot/actions)
+[![Coverage](https://raw.githubusercontent.com/FrostWillmott/FinDocBot/python-coverage-comment-action-data/badge.svg)](https://github.com/FrostWillmott/FinDocBot/tree/python-coverage-comment-action-data)
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -167,7 +167,7 @@ make test
 ## 🧪 Testing & Code Quality
 
 - **Run tests**: `make test` (add `--integration` for PostgreSQL tests via Docker; CI runs them in a separate job)
-- **Coverage report**: `make cover` (pytest-cov, terminal report with missing lines; CI enforces ≥90%)
+- **Coverage report**: `make cover` (pytest-cov, terminal report with missing lines; CI enforces ≥90% and refreshes the badge above on every push to `master`)
 - **Linting & Formatting**: `make lint` / `make fmt`
 - **Static type checking**: `uv run mypy src/findocbot` (strict mode, enforced in CI)
 

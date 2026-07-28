@@ -8,6 +8,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      # python-coverage-comment-action pushes the badge to a data branch
+      # and posts the coverage diff as a PR comment.
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -21,6 +26,13 @@ jobs:
         run: uv run mypy src/findocbot
       - name: Run tests
         run: uv run pytest -q --cov=src/findocbot --cov-report=term --cov-fail-under=90
+
+      - name: Coverage badge and PR comment
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 90
+          MINIMUM_ORANGE: 80
 
   integration:
     runs-on: ubuntu-latest

@@ -40,6 +40,9 @@ dev = [
 [tool.coverage.run]
 source = ["src/findocbot"]
 branch = true
+# python-coverage-comment-action resolves paths against the repo root,
+# so absolute paths from the CI runner would not match.
+relative_files = true
 
 [tool.coverage.report]
 omit = ["*/__init__.py"]
