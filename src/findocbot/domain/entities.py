@@ -1,5 +1,7 @@
 """Domain entities and value objects."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -16,7 +18,7 @@ class Document:
     )
 
     @staticmethod
-    def create(filename: str) -> "Document":
+    def create(filename: str) -> Document:
         """Create a document with generated identifier."""
         return Document(id=str(uuid4()), filename=filename)
 
@@ -37,7 +39,7 @@ class Chunk:
         chunk_index: int,
         text: str,
         section: str | None = None,
-    ) -> "Chunk":
+    ) -> Chunk:
         """Create chunk with generated identifier."""
         return Chunk(
             id=str(uuid4()),
@@ -61,7 +63,7 @@ class ChatTurn:
     )
 
     @staticmethod
-    def create(session_id: str, question: str, answer: str) -> "ChatTurn":
+    def create(session_id: str, question: str, answer: str) -> ChatTurn:
         """Create chat turn with generated identifier."""
         return ChatTurn(
             id=str(uuid4()),

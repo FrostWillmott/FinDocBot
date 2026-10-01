@@ -1,5 +1,7 @@
 """PostgreSQL repository implementations."""
 
+from __future__ import annotations
+
 import asyncpg
 
 from findocbot.domain.entities import ChatTurn, Chunk, Document

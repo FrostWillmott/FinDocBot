@@ -4,6 +4,8 @@ Catches regressions like forgotten pass-through methods (C2) and ensures
 the container can be built with fake dependencies.
 """
 
+from __future__ import annotations
+
 import httpx
 from fpdf import FPDF
 

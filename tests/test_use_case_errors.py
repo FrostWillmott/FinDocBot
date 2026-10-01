@@ -1,5 +1,7 @@
 """Use-case error paths: rollback, LLM-output fallback, empty inputs."""
 
+from __future__ import annotations
+
 import pytest
 from fpdf import FPDF
 

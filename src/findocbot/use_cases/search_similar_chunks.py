@@ -1,5 +1,7 @@
 """Search chunks by query use case."""
 
+from __future__ import annotations
+
 from findocbot.domain.exceptions import InvalidQueryError
 from findocbot.use_cases.dto import SearchResultDTO
 from findocbot.use_cases.ports import ChunkRepositoryPort, ModelProviderGateway

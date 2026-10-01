@@ -1,5 +1,7 @@
 """In-memory adapters used in tests and local dry runs."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from findocbot.domain.entities import ChatTurn, Chunk, Document

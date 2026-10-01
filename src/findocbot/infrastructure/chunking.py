@@ -1,5 +1,7 @@
 """Token-oriented chunking with paragraph awareness."""
 
+from __future__ import annotations
+
 import re
 
 TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)

@@ -1,5 +1,7 @@
 """Use-case exports."""
 
+from __future__ import annotations
+
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,

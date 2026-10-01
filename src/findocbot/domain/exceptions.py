@@ -1,5 +1,7 @@
 """Domain and use-case exceptions."""
 
+from __future__ import annotations
+
 
 class FinDocBotError(Exception):
     """Base project exception."""

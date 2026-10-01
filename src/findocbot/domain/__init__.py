@@ -1,5 +1,7 @@
 """Domain layer exports."""
 
+from __future__ import annotations
+
 from findocbot.domain.entities import ChatTurn, Chunk, Document
 from findocbot.domain.exceptions import (
     EmptyDocumentError,

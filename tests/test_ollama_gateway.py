@@ -1,5 +1,7 @@
 """Tests for OllamaGateway with httpx mocked via respx."""
 
+from __future__ import annotations
+
 import json
 
 import httpx

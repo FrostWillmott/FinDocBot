@@ -4,6 +4,8 @@ Requires Docker (testcontainers spins up pgvector/pgvector:pg16).
 Run with: pytest --integration
 """
 
+from __future__ import annotations
+
 import asyncio
 
 import asyncpg

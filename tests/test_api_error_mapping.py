@@ -1,5 +1,7 @@
 """API error-path tests: use-case exceptions map to HTTP status codes."""
 
+from __future__ import annotations
+
 import httpx
 from fpdf import FPDF
 

@@ -1,5 +1,7 @@
 """Edge cases for in-memory repository adapters."""
 
+from __future__ import annotations
+
 from findocbot.domain.entities import Chunk
 from findocbot.infrastructure.in_memory import InMemoryChunkRepository
 

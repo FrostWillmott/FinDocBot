@@ -1,5 +1,7 @@
 """PostgreSQL connection management."""
 
+from __future__ import annotations
+
 import asyncpg
 
 

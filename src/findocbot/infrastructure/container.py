@@ -1,5 +1,7 @@
 """Dependency container wiring."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from findocbot.config import Settings

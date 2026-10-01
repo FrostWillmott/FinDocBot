@@ -1,5 +1,7 @@
 """Application configuration."""
 
+from __future__ import annotations
+
 from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

@@ -1,5 +1,7 @@
 """Direct tests for ParagraphTokenChunker — the most complex logic."""
 
+from __future__ import annotations
+
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 
 

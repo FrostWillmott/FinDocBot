@@ -1,5 +1,7 @@
 """Use-case data transfer objects."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Literal
 
