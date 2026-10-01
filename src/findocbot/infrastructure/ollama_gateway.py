@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import Any
+import logging
+import random
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from findocbot.domain.exceptions import ModelProviderError
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+logger = logging.getLogger(__name__)
+
+_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
 class _EmbedResponse(BaseModel):
@@ -29,13 +39,21 @@ class OllamaGateway:
         embed_model: str,
         timeout_seconds: float = 120.0,
         batch_size: int = 50,
+        max_attempts: int = 3,
+        backoff_seconds: float = 0.5,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
-        """Store Ollama endpoint settings and model names."""
+        """Store Ollama endpoint settings, model names and retry policy."""
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1.")
         self._base_url = base_url.rstrip("/")
         self._chat_model = chat_model
         self._embed_model = embed_model
         self._timeout = timeout_seconds
         self._batch_size = batch_size
+        self._max_attempts = max_attempts
+        self._backoff_seconds = backoff_seconds
+        self._sleep = sleep
         self._client: httpx.AsyncClient | None = None
 
     async def start(self) -> None:
@@ -60,22 +78,51 @@ class OllamaGateway:
     async def _post(
         self, path: str, json_body: dict[str, object]
     ) -> httpx.Response:
-        """POST to Ollama; transport errors become ModelProviderError."""
+        """POST to Ollama, retrying transient failures with backoff.
+
+        429/5xx and connection errors are retried; other HTTP errors fail
+        at once. The bounded attempts double as the circuit breaker for
+        batch loops, which abort on the first call that exhausts them.
+        Timeouts are not retried: a slow generation would otherwise hold
+        the request for several timeout periods.
+        """
         client = self._get_client()
-        try:
-            response = await client.post(
-                f"{self._base_url}{path}", json=json_body
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                response = await client.post(
+                    f"{self._base_url}{path}", json=json_body
+                )
+                response.raise_for_status()
+                return response
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                if (
+                    status not in _RETRYABLE_STATUS
+                    or attempt == self._max_attempts
+                ):
+                    raise ModelProviderError(
+                        f"Ollama returned HTTP {status}"
+                    ) from exc
+                reason = f"HTTP {status}"
+            except httpx.ConnectError as exc:
+                if attempt == self._max_attempts:
+                    raise ModelProviderError(
+                        f"Ollama unreachable at {self._base_url}"
+                    ) from exc
+                reason = "connection error"
+            except httpx.TimeoutException as exc:
+                raise ModelProviderError(
+                    f"Ollama timed out at {self._base_url}"
+                ) from exc
+            delay = self._backoff_seconds * 2 ** (attempt - 1)
+            delay += random.uniform(0, delay / 2)
+            logger.warning(
+                f"Ollama {path} failed ({reason}); retry "
+                f"{attempt}/{self._max_attempts - 1} in {delay:.2f}s"
             )
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise ModelProviderError(
-                f"Ollama returned HTTP {exc.response.status_code}"
-            ) from exc
-        except (httpx.ConnectError, httpx.TimeoutException) as exc:
-            raise ModelProviderError(
-                f"Ollama unreachable at {self._base_url}"
-            ) from exc
-        return response
+            await self._sleep(delay)
 
     async def embed_one(self, text: str) -> list[float]:
         """Embed single query text."""

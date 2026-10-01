@@ -15,12 +15,21 @@ BASE_URL = "http://ollama.test:11434"
 
 
 @pytest.fixture
-async def gateway() -> OllamaGateway:
+def sleeps() -> list[float]:
+    return []
+
+
+@pytest.fixture
+async def gateway(sleeps: list[float]) -> OllamaGateway:
+    async def record_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
     gw = OllamaGateway(
         base_url=BASE_URL,
         chat_model="qwen2.5:7b",
         embed_model="nomic-embed-text",
         batch_size=10,
+        sleep=record_sleep,
     )
     await gw.start()
     yield gw
@@ -202,3 +211,121 @@ async def test_gateway_raises_if_not_started() -> None:
     )
     with pytest.raises(RuntimeError, match="not started"):
         await gw.embed_one("prompt")
+
+
+_EMBED_OK = httpx.Response(200, json={"embeddings": [[0.1, 0.2]]})
+
+
+@respx.mock
+async def test_post_transient_503_is_retried_then_succeeds(
+    gateway: OllamaGateway, sleeps: list[float]
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/embed").mock(
+        side_effect=[httpx.Response(503), _EMBED_OK]
+    )
+
+    result = await gateway.embed_one("query")
+
+    assert (result, route.call_count, len(sleeps)) == ([0.1, 0.2], 2, 1)
+
+
+@respx.mock
+async def test_post_persistent_503_stops_after_max_attempts(
+    gateway: OllamaGateway, sleeps: list[float]
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/embed").mock(
+        return_value=httpx.Response(503)
+    )
+
+    with pytest.raises(ModelProviderError, match="HTTP 503"):
+        await gateway.embed_one("query")
+
+    assert route.call_count == 3
+
+
+@respx.mock
+async def test_post_backoff_delay_grows_exponentially_with_jitter(
+    gateway: OllamaGateway, sleeps: list[float]
+) -> None:
+    respx.post(f"{BASE_URL}/api/embed").mock(return_value=httpx.Response(429))
+
+    with pytest.raises(ModelProviderError):
+        await gateway.embed_one("query")
+
+    first, second = sleeps
+    assert 0.5 <= first <= 0.75 and 1.0 <= second <= 1.5
+
+
+@respx.mock
+async def test_post_client_error_is_not_retried(
+    gateway: OllamaGateway,
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/embed").mock(
+        return_value=httpx.Response(400)
+    )
+
+    with pytest.raises(ModelProviderError, match="HTTP 400"):
+        await gateway.embed_one("query")
+
+    assert route.call_count == 1
+
+
+@respx.mock
+async def test_post_timeout_is_not_retried(gateway: OllamaGateway) -> None:
+    route = respx.post(f"{BASE_URL}/api/generate").mock(
+        side_effect=httpx.ReadTimeout("slow")
+    )
+
+    with pytest.raises(ModelProviderError, match="timed out"):
+        await gateway.generate_structured("question", {})
+
+    assert route.call_count == 1
+
+
+@respx.mock
+async def test_post_connect_error_is_retried_then_succeeds(
+    gateway: OllamaGateway,
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/embed").mock(
+        side_effect=[httpx.ConnectError("refused"), _EMBED_OK]
+    )
+
+    await gateway.embed_one("query")
+
+    assert route.call_count == 2
+
+
+@respx.mock
+async def test_embed_many_exhausted_batch_aborts_remaining_batches(
+    sleeps: list[float],
+) -> None:
+    async def no_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    gw = OllamaGateway(
+        base_url=BASE_URL,
+        chat_model="test",
+        embed_model="test",
+        batch_size=1,
+        sleep=no_sleep,
+    )
+    await gw.start()
+    route = respx.post(f"{BASE_URL}/api/embed").mock(
+        return_value=httpx.Response(503)
+    )
+
+    with pytest.raises(ModelProviderError):
+        await gw.embed_many(["a", "b", "c"])
+    await gw.stop()
+
+    assert route.call_count == 3  # first batch's attempts only
+
+
+def test_gateway_zero_max_attempts_is_rejected() -> None:
+    with pytest.raises(ValueError, match="max_attempts"):
+        OllamaGateway(
+            base_url=BASE_URL,
+            chat_model="test",
+            embed_model="test",
+            max_attempts=0,
+        )

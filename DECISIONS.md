@@ -74,3 +74,9 @@ later reversed, add a superseding entry instead of editing the old one.
   forge or close a tag; role markers (`SYSTEM:` at line start) and
   "ignore previous"-style phrases are wrapped as `[quoted: ...]` rather than
   deleted, keeping them inspectable. Defence in depth, not a guarantee.
+- **Ollama calls retry 429/5xx and connection errors, not timeouts** — up to
+  3 attempts with exponential backoff from 0.5 s plus up to 50% jitter
+  (tuning, not law). Bounded attempts serve as the circuit breaker for the
+  embedding batch loop, which aborts on the first call that exhausts them.
+  Timeouts are not retried because a 120 s generation timeout would turn
+  into minutes of waiting.
