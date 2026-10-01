@@ -105,7 +105,8 @@ curl -X POST "http://localhost:8000/ask" \
 Example `/ask` call in Swagger UI against a
 [sample annual report](docs/samples/aurora-ridge-annual-report-2025.pdf) of a
 fictional company: the answer comes back with its confidence level and the retrieved
-source chunks, each with its similarity score and document section.
+source chunks, each with its similarity score and document section. The screenshot
+comes from a local run on port 8001; the default is 8000.
 
 ![POST /ask in Swagger UI: answer with confidence and cited source chunks](docs/images/ask-swagger.png)
 
