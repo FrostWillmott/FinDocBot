@@ -37,7 +37,7 @@ async def gateway(sleeps: list[float]) -> OllamaGateway:
 
 
 @respx.mock
-async def test_embed_many_batches_correctly(
+async def test_embed_many_over_batch_size_sends_several_requests(
     gateway: OllamaGateway,
 ) -> None:
     """embed_many() batches large text lists into multiple requests."""
@@ -66,7 +66,7 @@ async def test_embed_many_batches_correctly(
 
 
 @respx.mock
-async def test_embed_empty_list_returns_empty(
+async def test_embed_many_empty_list_returns_empty_without_request(
     gateway: OllamaGateway,
 ) -> None:
     """embed_many with empty list returns [] without calling the API."""
@@ -77,7 +77,7 @@ async def test_embed_empty_list_returns_empty(
 
 
 @respx.mock
-async def test_generate_structured_parses_json(
+async def test_generate_structured_valid_json_returns_parsed_dict(
     gateway: OllamaGateway,
 ) -> None:
     """generate_structured() constrains output with format and parses JSON."""
@@ -99,7 +99,7 @@ async def test_generate_structured_parses_json(
 
 
 @respx.mock
-async def test_generate_structured_raises_on_http_error(
+async def test_generate_structured_http_503_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:
     """_post wraps transport errors as ModelProviderError."""
@@ -112,7 +112,7 @@ async def test_generate_structured_raises_on_http_error(
 
 
 @respx.mock
-async def test_embed_one_uses_embed_many(
+async def test_embed_one_single_text_returns_its_embedding(
     gateway: OllamaGateway,
 ) -> None:
     """embed_one() delegates to embed_many and returns single embedding."""
@@ -124,7 +124,7 @@ async def test_embed_one_uses_embed_many(
 
 
 @respx.mock
-async def test_embed_connect_error_raises_model_provider_error(
+async def test_embed_one_persistent_connect_error_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:
     """Transport-level failures surface as ModelProviderError."""
@@ -136,7 +136,7 @@ async def test_embed_connect_error_raises_model_provider_error(
 
 
 @respx.mock
-async def test_embed_many_count_mismatch_raises_model_provider_error(
+async def test_embed_many_count_mismatch_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:
     """Fewer embeddings than inputs is an error, not silent truncation."""
@@ -148,7 +148,7 @@ async def test_embed_many_count_mismatch_raises_model_provider_error(
 
 
 @respx.mock
-async def test_generate_structured_malformed_json_raises(
+async def test_generate_structured_non_json_text_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:
     """Non-JSON response payload raises ModelProviderError."""
@@ -162,7 +162,7 @@ async def test_generate_structured_malformed_json_raises(
 
 
 @respx.mock
-async def test_generate_structured_non_object_json_raises(
+async def test_generate_structured_json_array_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:
     respx.post(f"{BASE_URL}/api/generate").mock(
@@ -175,7 +175,7 @@ async def test_generate_structured_non_object_json_raises(
 
 
 @respx.mock
-async def test_embed_many_malformed_payload_raises_model_provider_error(
+async def test_embed_many_non_numeric_payload_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:
     respx.post(f"{BASE_URL}/api/embed").mock(
@@ -185,7 +185,7 @@ async def test_embed_many_malformed_payload_raises_model_provider_error(
         await gateway.embed_many(["text"])
 
 
-async def test_start_is_idempotent_and_stop_without_start_is_noop() -> None:
+async def test_start_and_stop_repeated_calls_are_idempotent() -> None:
     """Repeated start() reuses the client; stop() twice does not fail."""
     gw = OllamaGateway(
         base_url=BASE_URL,
@@ -202,7 +202,7 @@ async def test_start_is_idempotent_and_stop_without_start_is_noop() -> None:
     assert gw._client is None
 
 
-async def test_gateway_raises_if_not_started() -> None:
+async def test_embed_one_before_start_raises_runtime_error() -> None:
     """Calling the gateway before start() raises RuntimeError."""
     gw = OllamaGateway(
         base_url=BASE_URL,
@@ -217,7 +217,7 @@ _EMBED_OK = httpx.Response(200, json={"embeddings": [[0.1, 0.2]]})
 
 
 @respx.mock
-async def test_post_transient_503_is_retried_then_succeeds(
+async def test_post_transient_503_retries_then_succeeds(
     gateway: OllamaGateway, sleeps: list[float]
 ) -> None:
     route = respx.post(f"{BASE_URL}/api/embed").mock(
@@ -244,7 +244,7 @@ async def test_post_persistent_503_stops_after_max_attempts(
 
 
 @respx.mock
-async def test_post_backoff_delay_grows_exponentially_with_jitter(
+async def test_post_repeated_429_backoff_grows_exponentially(
     gateway: OllamaGateway, sleeps: list[float]
 ) -> None:
     respx.post(f"{BASE_URL}/api/embed").mock(return_value=httpx.Response(429))
@@ -257,7 +257,7 @@ async def test_post_backoff_delay_grows_exponentially_with_jitter(
 
 
 @respx.mock
-async def test_post_client_error_is_not_retried(
+async def test_post_client_error_400_is_not_retried(
     gateway: OllamaGateway,
 ) -> None:
     route = respx.post(f"{BASE_URL}/api/embed").mock(
@@ -283,7 +283,7 @@ async def test_post_timeout_is_not_retried(gateway: OllamaGateway) -> None:
 
 
 @respx.mock
-async def test_post_connect_error_is_retried_then_succeeds(
+async def test_post_transient_connect_error_retries_then_succeeds(
     gateway: OllamaGateway,
 ) -> None:
     route = respx.post(f"{BASE_URL}/api/embed").mock(
@@ -321,7 +321,7 @@ async def test_embed_many_exhausted_batch_aborts_remaining_batches(
     assert route.call_count == 3  # first batch's attempts only
 
 
-def test_gateway_zero_max_attempts_is_rejected() -> None:
+def test_init_zero_max_attempts_raises_value_error() -> None:
     with pytest.raises(ValueError, match="max_attempts"):
         OllamaGateway(
             base_url=BASE_URL,

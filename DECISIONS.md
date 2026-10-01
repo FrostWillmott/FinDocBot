@@ -88,3 +88,9 @@ later reversed, add a superseding entry instead of editing the old one.
   repository checks each vector's length, so a model/schema mismatch fails
   with a message naming the setting instead of an opaque pgvector error.
   Changing the dimension of an existing database still needs a migration.
+- **Tests mirror the source tree and are packages** — `tests/infrastructure/`,
+  `tests/use_cases/`, `tests/adapters/api/` follow `src/findocbot/`; app-level
+  smoke tests map to `main.py` (`tests/test_main.py`) and the cross-cutting
+  RAG evaluation stays at the root. `__init__.py` files make same-named
+  modules safe across directories and let shared helpers import as
+  `tests.factories` / `tests.use_cases.fakes` instead of being copied.

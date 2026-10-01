@@ -22,10 +22,8 @@ from findocbot.infrastructure.postgres_repositories import (
     PostgresDocumentRepository,
 )
 
-pytestmark = pytest.mark.integration
-
 EMBEDDING_DIM = 768
-_MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 
 
 def _migration_sql(embedding_dim: int) -> str:
@@ -74,8 +72,11 @@ async def db_pool(pg_dsn: str) -> PostgresPool:
     await pool.stop()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_document_create_and_retrieve(db_pool: PostgresPool) -> None:
+async def test_document_create_new_document_persists_row(
+    db_pool: PostgresPool,
+) -> None:
     """Document row can be persisted via the repository."""
     repo = PostgresDocumentRepository(db_pool)
     doc = Document.create(filename="test.pdf")
@@ -88,8 +89,11 @@ async def test_document_create_and_retrieve(db_pool: PostgresPool) -> None:
     assert row["filename"] == "test.pdf"
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_chunk_insert_and_search(db_pool: PostgresPool) -> None:
+async def test_chunk_search_after_insert_returns_closest_first(
+    db_pool: PostgresPool,
+) -> None:
     """Chunks with embeddings can be persisted and searched by vector."""
     repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
     doc = Document.create(filename="report.pdf")
@@ -121,8 +125,11 @@ async def test_chunk_insert_and_search(db_pool: PostgresPool) -> None:
     assert isinstance(results[0].chunk.document_id, str)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_chat_history_add_and_list(db_pool: PostgresPool) -> None:
+async def test_history_list_recent_after_adds_returns_oldest_first(
+    db_pool: PostgresPool,
+) -> None:
     """Chat turns are persisted and listed in chronological order."""
     repo = PostgresChatHistoryRepository(db_pool)
 
@@ -139,8 +146,9 @@ async def test_chat_history_add_and_list(db_pool: PostgresPool) -> None:
     assert isinstance(recent[0].id, str)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_search_empty_when_no_chunks(
+async def test_chunk_search_empty_table_returns_empty_list(
     db_pool: PostgresPool,
 ) -> None:
     """Search with no indexed chunks returns empty list."""
@@ -149,7 +157,8 @@ async def test_search_empty_when_no_chunks(
     assert results == []
 
 
-async def test_verify_schema_matching_dim_passes(
+@pytest.mark.integration
+async def test_verify_schema_matching_dim_returns_none(
     db_pool: PostgresPool,
 ) -> None:
     repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
@@ -157,7 +166,8 @@ async def test_verify_schema_matching_dim_passes(
     assert await repo.verify_schema() is None
 
 
-async def test_verify_schema_mismatched_dim_raises(
+@pytest.mark.integration
+async def test_verify_schema_mismatched_dim_raises_dimension_error(
     db_pool: PostgresPool,
 ) -> None:
     repo = PostgresChunkRepository(db_pool, 1024)
@@ -166,6 +176,7 @@ async def test_verify_schema_mismatched_dim_raises(
         await repo.verify_schema()
 
 
+@pytest.mark.integration
 async def test_chunk_insert_wrong_dim_raises_before_writing(
     db_pool: PostgresPool,
 ) -> None:
@@ -180,8 +191,23 @@ async def test_chunk_insert_wrong_dim_raises_before_writing(
     assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
 
 
-async def test_search_wrong_dim_raises(db_pool: PostgresPool) -> None:
-    repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+@pytest.fixture
+def unstarted_repo() -> PostgresChunkRepository:
+    # The pool is never started: the check must fire before any DB access.
+    return PostgresChunkRepository(PostgresPool("postgresql://unused"), 3)
 
-    with pytest.raises(EmbeddingDimensionError):
-        await repo.search_by_embedding([1.0, 0.0], top_k=1)
+
+async def test_chunk_insert_wrong_dim_raises_without_db_access(
+    unstarted_repo: PostgresChunkRepository,
+) -> None:
+    chunk = Chunk.create(document_id="d", chunk_index=0, text="x")
+
+    with pytest.raises(EmbeddingDimensionError, match="has 2 dimensions"):
+        await unstarted_repo.add_chunks_with_embeddings([chunk], [[0.1, 0.2]])
+
+
+async def test_chunk_search_wrong_dim_raises_without_db_access(
+    unstarted_repo: PostgresChunkRepository,
+) -> None:
+    with pytest.raises(EmbeddingDimensionError, match="EMBEDDING_DIM is 3"):
+        await unstarted_repo.search_by_embedding([0.1] * 4, top_k=1)

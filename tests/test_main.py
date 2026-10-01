@@ -7,7 +7,6 @@ the container can be built with fake dependencies.
 from __future__ import annotations
 
 import httpx
-from fpdf import FPDF
 
 from findocbot.config import Settings
 from findocbot.infrastructure.cached_embedding_gateway import (
@@ -27,6 +26,7 @@ from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
+from tests.factories import build_pdf_bytes
 
 
 class _FakeDB:
@@ -76,19 +76,6 @@ class _FakeModelProvider:
         ]
 
 
-def _build_pdf_bytes(text: str) -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", size=12)
-    pdf.multi_cell(0, 10, text=text)
-    data = pdf.output()
-    if isinstance(data, bytearray):
-        return bytes(data)
-    if isinstance(data, bytes):
-        return data
-    return data.encode("latin-1")
-
-
 def _build_test_container() -> AppContainer:
     """Wire an AppContainer with in-memory dependencies for smoke testing."""
     settings = Settings()
@@ -130,7 +117,7 @@ def _build_test_container() -> AppContainer:
     )
 
 
-async def test_app_lifespan_starts_and_stops_container_resources() -> None:
+async def test_lifespan_startup_and_shutdown_run_hooks_in_order() -> None:
     """Smoke: app lifespan drives db/provider start and stop."""
     events: list[str] = []
 
@@ -162,13 +149,13 @@ async def test_app_lifespan_starts_and_stops_container_resources() -> None:
     assert events[3:] == ["provider.stop", "db.stop"]
 
 
-def test_create_app_without_container_builds_production_wiring() -> None:
+def test_create_app_without_container_builds_production_app() -> None:
     """Smoke: default create_app() wires the production container."""
     app = create_app()
     assert app.title == "FinDocBot API"
 
 
-async def test_health_endpoint_returns_ok() -> None:
+async def test_health_request_returns_status_ok() -> None:
     """Smoke: /health responds with status ok."""
     app = create_app(container=_build_test_container())
     transport = httpx.ASGITransport(app=app)
@@ -180,7 +167,7 @@ async def test_health_endpoint_returns_ok() -> None:
         assert resp.json() == {"status": "ok"}
 
 
-async def test_ask_endpoint_with_uploaded_pdf() -> None:
+async def test_ask_after_pdf_upload_returns_answer_with_sources() -> None:
     """Smoke: upload a PDF then ask a question — full use-case wiring."""
     container = _build_test_container()
     app = create_app(container=container)
@@ -190,7 +177,7 @@ async def test_ask_endpoint_with_uploaded_pdf() -> None:
         transport=transport, base_url="http://test"
     ) as client:
         # Upload a PDF first to have chunks indexed.
-        pdf_bytes = _build_pdf_bytes(
+        pdf_bytes = build_pdf_bytes(
             "Revenue grew by 20 percent in the last quarter. "
             "Operating profit remained stable."
         )
@@ -218,7 +205,7 @@ async def test_ask_endpoint_with_uploaded_pdf() -> None:
         assert len(ask_data["sources"]) > 0
 
 
-async def test_upload_rejects_non_pdf_content_type() -> None:
+async def test_upload_non_pdf_content_type_returns_400() -> None:
     """Smoke: non-PDF content type returns a client error."""
     app = create_app(container=_build_test_container())
     transport = httpx.ASGITransport(app=app)
@@ -232,7 +219,7 @@ async def test_upload_rejects_non_pdf_content_type() -> None:
         assert resp.status_code == 400
 
 
-async def test_ask_rejects_empty_question() -> None:
+async def test_ask_empty_question_returns_422() -> None:
     """Smoke: empty question returns a client error."""
     app = create_app(container=_build_test_container())
     transport = httpx.ASGITransport(app=app)

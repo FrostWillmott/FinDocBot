@@ -9,24 +9,12 @@ from findocbot.infrastructure.pdf_parser import (
     TextLine,
     join_lines,
 )
+from tests.factories import build_pdf_bytes
 
 
-def _build_pdf_bytes(text: str) -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", size=12)
-    pdf.multi_cell(0, 10, text=text)
-    data = pdf.output()
-    if isinstance(data, bytearray):
-        return bytes(data)
-    if isinstance(data, bytes):
-        return data
-    return data.encode("latin-1")
-
-
-def test_pdf_parser_extracts_text() -> None:
+def test_extract_text_single_line_pdf_returns_its_text() -> None:
     parser = PyPDFParser()
-    pdf_bytes = _build_pdf_bytes("Revenue increased by 12% in Q4.")
+    pdf_bytes = build_pdf_bytes("Revenue increased by 12% in Q4.")
 
     extracted = parser.extract_text(pdf_bytes)
 
@@ -46,7 +34,7 @@ def _paragraph(pdf: FPDF, text: str, gap_after: float) -> None:
     pdf.ln(gap_after)
 
 
-def test_pdf_parser_vertical_gap_yields_paragraph_break() -> None:
+def test_extract_text_vertical_gap_yields_paragraph_break() -> None:
     def draw(pdf: FPDF) -> None:
         _paragraph(pdf, "Section 2. Financial Highlights", gap_after=5)
         _paragraph(pdf, "Net profit was USD 132 million.", gap_after=5)
@@ -58,7 +46,7 @@ def test_pdf_parser_vertical_gap_yields_paragraph_break() -> None:
     )
 
 
-def test_pdf_parser_wrapped_lines_stay_in_one_paragraph() -> None:
+def test_extract_text_wrapped_lines_stay_in_one_paragraph() -> None:
     body = "Revenue grew steadily across all regions this year. " * 4
 
     def draw(pdf: FPDF) -> None:
@@ -77,7 +65,7 @@ def test_pdf_parser_wrapped_lines_stay_in_one_paragraph() -> None:
     )
 
 
-def test_pdf_parser_two_columns_keep_reading_order() -> None:
+def test_extract_text_two_columns_keep_reading_order() -> None:
     left = "Left column covers revenue growth in the logistics segment."
     right = "Right column covers the currency hedging policy in detail."
 
@@ -111,7 +99,7 @@ def test_join_lines_gap_wider_than_line_pitch_breaks_paragraph() -> None:
     assert join_lines(lines) == "a1\na2\na3\n\nb1\nb2"
 
 
-def test_join_lines_dense_paragraphs_still_break() -> None:
+def test_join_lines_dense_paragraphs_break_between_them() -> None:
     # Half the gaps are paragraph breaks; an average would hide them.
     lines = [
         _line("a1", 800),

@@ -18,32 +18,32 @@ def _chunk_sections(chunks: list[tuple[str, str | None]]) -> list[str | None]:
 class TestParagraphTokenChunker:
     """Unit tests for the token-aware chunker."""
 
-    def test_split_short_text_into_single_chunk(self) -> None:
+    def test_split_short_text_returns_one_unlabelled_chunk(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=100)
         result = chunker.split("Hello world. This is a short text.")
         assert len(result) == 1
         assert result[0][1] is None  # No section
 
-    def test_split_long_text_into_multiple_chunks(self) -> None:
+    def test_split_text_over_budget_returns_several_chunks(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=20)
         # ~30 tokens — should produce at least 2 chunks.
         text = "word " * 30
         result = chunker.split(text)
         assert len(result) >= 2
 
-    def test_section_extraction(self) -> None:
+    def test_split_section_heading_labels_chunk(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=200)
         text = "Section 1: Introduction\nThis is the intro paragraph."
         result = chunker.split(text)
         assert result[0][1] == "Section 1: Introduction"
 
-    def test_chapter_extraction(self) -> None:
+    def test_split_chapter_heading_labels_chunk(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=200)
         text = "Chapter 1: Overview\nSome content here."
         result = chunker.split(text)
         assert result[0][1] == "Chapter 1: Overview"
 
-    def test_section_label_does_not_leak_to_previous_chunk(self) -> None:
+    def test_split_new_section_keeps_previous_chunk_label(self) -> None:
         """Regression test: section change must NOT relabel a flushed chunk.
 
         When a new section header starts and the accumulated chunk is
@@ -72,7 +72,7 @@ class TestParagraphTokenChunker:
             f"expected 'Section Revenue'"
         )
 
-    def test_overlap_between_chunks(self) -> None:
+    def test_split_paragraphs_over_budget_return_several_chunks(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=15, overlap_ratio=0.5)
         # Paragraph breaks trigger chunk boundaries.
         text = (
@@ -82,19 +82,21 @@ class TestParagraphTokenChunker:
         # With multiple paragraphs, should produce multiple chunks.
         assert len(result) >= 2
 
-    def test_min_chunk_merged_with_previous(self) -> None:
+    def test_split_tiny_last_paragraph_merges_into_previous_chunk(
+        self,
+    ) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=100, min_chunk_tokens=50)
         # First paragraph fills a chunk, second is tiny → merged into first.
         text = "big " * 60 + "\n\n" + "tiny"
         result = chunker.split(text)
         assert len(result) == 1
 
-    def test_empty_text_returns_empty_list(self) -> None:
+    def test_split_empty_text_returns_empty_list(self) -> None:
         chunker = ParagraphTokenChunker()
         result = chunker.split("")
         assert result == []
 
-    def test_long_paragraph_splitting(self) -> None:
+    def test_split_oversized_paragraph_returns_non_empty_pieces(self) -> None:
         """A paragraph longer than chunk_tokens is split into sub-chunks."""
         chunker = ParagraphTokenChunker(chunk_tokens=15, overlap_ratio=0.2)
         text = "token " * 40  # 40 tokens in one paragraph, no paragraph breaks
@@ -104,7 +106,9 @@ class TestParagraphTokenChunker:
         for chunk_text, _ in result:
             assert len(chunk_text) > 0
 
-    def test_oversized_paragraph_after_flush_merges_overlap(self) -> None:
+    def test_split_oversized_paragraph_after_flush_merges_overlap(
+        self,
+    ) -> None:
         """A paragraph too big for the remaining budget after a flush is
         split immediately, with the overlap merged into its first piece
         instead of flushed as a duplicate overlap-only chunk."""
@@ -122,7 +126,7 @@ class TestParagraphTokenChunker:
         assert texts[1].startswith("delta epsilon zeta eta theta")
         assert texts[1].endswith(para2)
 
-    def test_oversized_first_paragraph_keeps_section_label(self) -> None:
+    def test_split_oversized_first_paragraph_keeps_section_label(self) -> None:
         """A first paragraph exceeding chunk_tokens is split into pieces
         that all carry its own section header."""
         chunker = ParagraphTokenChunker(
@@ -136,7 +140,7 @@ class TestParagraphTokenChunker:
             section == "Section 9" for section in _chunk_sections(result)
         )
 
-    def test_strip_whitespace_only_paragraphs(self) -> None:
+    def test_split_whitespace_only_paragraph_is_dropped(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=100)
         text = "Real content here.\n\n   \n\nMore content."
         result = chunker.split(text)
@@ -144,7 +148,7 @@ class TestParagraphTokenChunker:
         assert len(texts) >= 1
         assert "Real content" in texts[0]
 
-    def test_long_paragraph_split_keeps_original_spacing(self) -> None:
+    def test_split_oversized_paragraph_keeps_original_spacing(self) -> None:
         chunker = ParagraphTokenChunker(
             chunk_tokens=10, overlap_ratio=0.2, min_chunk_tokens=1
         )
@@ -156,7 +160,7 @@ class TestParagraphTokenChunker:
         assert all(" , " not in t and " . " not in t for t in texts)
         assert texts[0] == "Revenue reached USD 1,284 million, up 14"
 
-    def test_overlap_keeps_original_spacing(self) -> None:
+    def test_split_overlap_keeps_original_spacing(self) -> None:
         # 9-token overlap: "6,400 employees for their continued trust."
         chunker = ParagraphTokenChunker(
             chunk_tokens=22, overlap_ratio=0.41, min_chunk_tokens=1
@@ -170,7 +174,7 @@ class TestParagraphTokenChunker:
             "6,400 employees for their continued trust.\n\n" + para2
         )
 
-    def test_section_heading_closes_previous_section_chunk(self) -> None:
+    def test_split_section_heading_closes_previous_chunk(self) -> None:
         """Regression: a short heading used to fit into the tail of the
         previous section's chunk and relabel all of it."""
         chunker = ParagraphTokenChunker(
@@ -185,14 +189,14 @@ class TestParagraphTokenChunker:
             (highlights, "Section 2. Highlights"),
         ]
 
-    def test_section_heading_after_small_preamble_joins_it(self) -> None:
+    def test_split_heading_after_small_preamble_joins_preamble(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=100, min_chunk_tokens=20)
         text = "Annual Report 2025\n\nSection 1. Letter\n\nGrowth was steady."
         result = chunker.split(text)
 
         assert result == [(text, "Section 1. Letter")]
 
-    def test_overlap_starts_at_word_boundary(self) -> None:
+    def test_split_overlap_mid_number_starts_at_word_boundary(self) -> None:
         chunker = ParagraphTokenChunker(
             chunk_tokens=12, overlap_ratio=0.45, min_chunk_tokens=1
         )

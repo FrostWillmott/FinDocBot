@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from fpdf import FPDF
+import pytest
 
+from findocbot.domain.exceptions import InvalidQueryError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.in_memory import (
     InMemoryChunkRepository,
@@ -12,6 +13,8 @@ from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
+from tests.factories import build_pdf_bytes
+from tests.use_cases.fakes import StubProvider
 
 
 class FakeProviderGateway:
@@ -37,20 +40,7 @@ class FakeProviderGateway:
         ]
 
 
-def _build_pdf_bytes(text: str) -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", size=12)
-    pdf.multi_cell(0, 10, text=text)
-    data = pdf.output()
-    if isinstance(data, bytearray):
-        return bytes(data)
-    if isinstance(data, bytes):
-        return data
-    return data.encode("latin-1")
-
-
-async def test_upload_then_search_returns_relevant_chunk() -> None:
+async def test_execute_after_upload_returns_matching_chunk_first() -> None:
     provider = FakeProviderGateway()
     parser = PyPDFParser()
     chunker = ParagraphTokenChunker(chunk_tokens=120, overlap_ratio=0.1)
@@ -66,7 +56,7 @@ async def test_upload_then_search_returns_relevant_chunk() -> None:
     )
     search = SearchSimilarChunksUseCase(provider=provider, chunks=chunks)
 
-    pdf_bytes = _build_pdf_bytes(
+    pdf_bytes = build_pdf_bytes(
         "Section 1\nRevenue grew by 20 percent.\n\n"
         "Section 2\nOperational profit remained stable.\n\n"
         "Section 3\nAsset quality improved."
@@ -77,3 +67,11 @@ async def test_upload_then_search_returns_relevant_chunk() -> None:
 
     assert results
     assert "Revenue" in results[0].text
+
+
+async def test_execute_blank_query_raises_invalid_query() -> None:
+    search = SearchSimilarChunksUseCase(
+        provider=StubProvider(), chunks=InMemoryChunkRepository()
+    )
+    with pytest.raises(InvalidQueryError):
+        await search.execute(query="  ", top_k=3)

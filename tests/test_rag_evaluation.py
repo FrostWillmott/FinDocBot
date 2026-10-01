@@ -20,8 +20,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fpdf import FPDF
-
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.in_memory import (
     InMemoryChunkRepository,
@@ -34,6 +32,7 @@ from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
+from tests.factories import build_pdf_bytes
 
 # ---------------------------------------------------------------------------
 # Golden Q&A dataset
@@ -117,17 +116,6 @@ class _FakeProvider:
 # ---------------------------------------------------------------------------
 
 
-def _build_pdf_bytes(text: str) -> bytes:
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", size=12)
-    pdf.multi_cell(0, 10, text=text)
-    data = pdf.output()
-    if isinstance(data, bytes | bytearray):
-        return bytes(data)
-    return data.encode("latin-1")
-
-
 def _retrieval_precision(chunks: list, relevant_keywords: list[str]) -> float:
     """Fraction of retrieved chunks with at least one relevant keyword."""
     if not chunks:
@@ -156,7 +144,7 @@ def _faithfulness(
 # ---------------------------------------------------------------------------
 
 
-async def test_rag_evaluation_metrics() -> None:
+async def test_rag_pipeline_golden_dataset_meets_metric_thresholds() -> None:
     """Evaluate retrieval precision and faithfulness over the Q&A dataset."""
     provider = _FakeProvider()
     parser = PyPDFParser()
@@ -184,7 +172,7 @@ async def test_rag_evaluation_metrics() -> None:
         "Section 2\nOperational profit remained stable despite headwinds.\n\n"
         "Section 3\nAsset quality improved significantly in Q4."
     )
-    await upload.execute("annual_report.pdf", _build_pdf_bytes(corpus))
+    await upload.execute("annual_report.pdf", build_pdf_bytes(corpus))
 
     precision_scores: list[float] = []
     faithfulness_scores: list[float] = []

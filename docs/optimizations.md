@@ -183,16 +183,17 @@ export EMBEDDING_CACHE_TTL_SECONDS=7200  # 2 hours
 
 ## Testing
 
-Comprehensive tests created in `tests/test_embedding_cache.py`:
+Tests live in `tests/infrastructure/test_cached_embedding_gateway.py`:
 
-1. **test_cached_gateway_caches_identical_queries** — verification of identical query caching.
-2. **test_cached_gateway_does_not_cache_embed_many** — verification of no cache for batch operations.
-3. **test_cached_gateway_respects_cache_size** — verification of cache size and LRU logic compliance.
-4. **test_cached_gateway_clears_cache_on_stop** — verification of cache clearing on stop.
-5. **test_cached_gateway_tracks_metrics** — verification of hit/miss and hit rate metric correctness.
-6. **test_cached_gateway_respects_ttl** — verification of TTL expiration.
-7. **test_cached_gateway_without_ttl** — verification of operation without TTL (infinite storage).
-8. **test_ollama_gateway_batching** — verification of batching in OllamaGateway.
+1. **test_embed_one_repeated_text_hits_cache** — identical queries are served from the cache.
+2. **test_embed_many_repeated_texts_bypass_cache** — batch operations are not cached.
+3. **test_embed_one_full_cache_evicts_least_recent_entry** — size limit and LRU eviction.
+4. **test_stop_populated_cache_clears_entries** — cache is cleared on stop.
+5. **test_get_stats_after_hits_and_misses_reports_counts** — hit/miss and hit-rate metrics.
+6. **test_embed_one_entry_past_ttl_refetches_from_gateway** — TTL expiration (controlled clock).
+7. **test_embed_one_without_ttl_never_expires** — operation without TTL.
+
+Batching in `OllamaGateway` is covered in `tests/infrastructure/test_ollama_gateway.py`.
 
 All tests pass successfully.
 

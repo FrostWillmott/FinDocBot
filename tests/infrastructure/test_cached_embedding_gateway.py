@@ -9,7 +9,6 @@ import pytest
 from findocbot.infrastructure.cached_embedding_gateway import (
     CachedEmbeddingGateway,
 )
-from findocbot.infrastructure.ollama_gateway import OllamaGateway
 
 
 class MockGateway:
@@ -44,7 +43,7 @@ class MockGateway:
 
 
 @pytest.mark.asyncio
-async def test_cached_gateway_caches_identical_queries() -> None:
+async def test_embed_one_repeated_text_hits_cache() -> None:
     """Verify that identical queries hit cache instead of calling gateway."""
     mock = MockGateway()
     cached = CachedEmbeddingGateway(gateway=mock, cache_size=10)
@@ -69,7 +68,7 @@ async def test_cached_gateway_caches_identical_queries() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cached_gateway_does_not_cache_embed_many() -> None:
+async def test_embed_many_repeated_texts_bypass_cache() -> None:
     """Verify that embed_many is not cached (used for document chunks)."""
     mock = MockGateway()
     cached = CachedEmbeddingGateway(gateway=mock, cache_size=10)
@@ -86,7 +85,7 @@ async def test_cached_gateway_does_not_cache_embed_many() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cached_gateway_respects_cache_size() -> None:
+async def test_embed_one_full_cache_evicts_least_recent_entry() -> None:
     """Verify that cache evicts old entries when size limit is reached."""
     mock = MockGateway()
     cached = CachedEmbeddingGateway(gateway=mock, cache_size=2)
@@ -113,7 +112,7 @@ async def test_cached_gateway_respects_cache_size() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cached_gateway_clears_cache_on_stop() -> None:
+async def test_stop_populated_cache_clears_entries() -> None:
     """Verify that cache is cleared when gateway is stopped."""
     mock = MockGateway()
     cached = CachedEmbeddingGateway(gateway=mock, cache_size=10)
@@ -139,7 +138,7 @@ async def test_cached_gateway_clears_cache_on_stop() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cached_gateway_tracks_metrics() -> None:
+async def test_get_stats_after_hits_and_misses_reports_counts() -> None:
     """Verify that cache tracks hits and misses correctly."""
     mock = MockGateway()
     cached = CachedEmbeddingGateway(gateway=mock, cache_size=10)
@@ -187,7 +186,7 @@ async def test_cached_gateway_tracks_metrics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cached_gateway_respects_ttl() -> None:
+async def test_embed_one_entry_past_ttl_refetches_from_gateway() -> None:
     """Verify that cache entries expire after TTL."""
     mock = MockGateway()
     now = [1000.0]
@@ -216,7 +215,7 @@ async def test_cached_gateway_respects_ttl() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cached_gateway_without_ttl() -> None:
+async def test_embed_one_without_ttl_never_expires() -> None:
     """Verify that cache works indefinitely when TTL is None."""
     mock = MockGateway()
     now = [1000.0]
@@ -236,32 +235,10 @@ async def test_cached_gateway_without_ttl() -> None:
     await cached.stop()
 
 
-def test_cache_size_above_threshold_logs_warning(
+def test_init_cache_size_above_threshold_logs_warning(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Configuring an oversized cache emits a memory warning."""
     with caplog.at_level(logging.WARNING):
         CachedEmbeddingGateway(gateway=MockGateway(), cache_size=10_001)
     assert "Large cache size" in caplog.text
-
-
-@pytest.mark.asyncio
-async def test_ollama_gateway_batching() -> None:
-    """Verify that OllamaGateway batches embed_many calls."""
-    # Create gateway with small batch size
-    gateway = OllamaGateway(
-        base_url="http://localhost:11434",
-        chat_model="test",
-        embed_model="test",
-        batch_size=2,
-    )
-
-    # We can't test actual API calls without Ollama running,
-    # but we can verify the gateway accepts batch_size parameter
-    assert gateway._batch_size == 2
-
-    # Test empty list handling
-    await gateway.start()
-    result = await gateway.embed_many([])
-    assert result == []
-    await gateway.stop()
