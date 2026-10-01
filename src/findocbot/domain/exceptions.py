@@ -28,3 +28,7 @@ class ModelProviderError(InfrastructureError):
 
 class StorageError(InfrastructureError):
     """Raised when a persistence operation fails."""
+
+
+class EmbeddingDimensionError(InfrastructureError):
+    """Raised when embedding sizes disagree with the configured dimension."""

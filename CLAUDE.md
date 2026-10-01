@@ -68,9 +68,13 @@ passes through uncached.
   `InfrastructureError` → 503, `FinDocBotError` → 400.
 - **CPU-bound offloading**: PDF parsing and chunking run via `asyncio.to_thread()`
   to avoid blocking the event loop.
-- **Embedding dimension**: hardcoded as `VECTOR(768)` in
-  `migrations/001_init.sql` to match `nomic-embed-text`; switching the embedding
-  model needs a migration.
+- **Embedding dimension**: `EMBEDDING_DIM` (`Settings.embedding_dim`) sizes
+  `chunks.embedding` via a psql variable in `migrations/apply.sh`. Startup
+  verifies the column against the setting, and the chunk repository checks
+  every vector's length before insert/search.
+- **Prompt safety**: untrusted text (chunks, history, question) goes through
+  `use_cases/prompt_safety.neutralize` and sits inside tags, with the
+  instructions last.
 - **PDF → chunks**: the parser rebuilds paragraph breaks (blank lines) from line
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.
@@ -80,8 +84,8 @@ passes through uncached.
 ### Config
 
 `Settings` (pydantic-settings) loads from env / `.env`. Key knobs:
-`top_k`, `max_history_pairs`, `embedding_cache_size`, `embedding_batch_size`,
-`embedding_cache_ttl_seconds`.
+`embedding_dim`, `top_k`, `max_history_pairs`, `embedding_cache_size`,
+`embedding_batch_size`, `embedding_cache_ttl_seconds`.
 
 ### Testing
 

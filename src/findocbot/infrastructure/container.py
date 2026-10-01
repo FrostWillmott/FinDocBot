@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from findocbot.config import Settings
 from findocbot.infrastructure.cached_embedding_gateway import (
@@ -24,6 +25,9 @@ from findocbot.use_cases.search_similar_chunks import (
 )
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
 
 @dataclass
 class AppContainer:
@@ -35,10 +39,16 @@ class AppContainer:
     upload_pdf: UploadPDFUseCase
     search_chunks: SearchSimilarChunksUseCase
     answer_question: AnswerQuestionUseCase
+    # Run after the database is up; a failure aborts application startup.
+    startup_checks: list[Callable[[], Awaitable[None]]] = field(
+        default_factory=list
+    )
 
     async def startup(self) -> None:
-        """Initialize external resources."""
+        """Initialize external resources and run startup checks."""
         await self.db.start()
+        for check in self.startup_checks:
+            await check()
         await self.provider.start()
 
     async def shutdown(self) -> None:
@@ -66,7 +76,7 @@ def create_container(settings: Settings) -> AppContainer:
     )
 
     documents = PostgresDocumentRepository(db)
-    chunks = PostgresChunkRepository(db)
+    chunks = PostgresChunkRepository(db, settings.embedding_dim)
     history = PostgresChatHistoryRepository(db)
 
     search_chunks = SearchSimilarChunksUseCase(
@@ -93,4 +103,5 @@ def create_container(settings: Settings) -> AppContainer:
         upload_pdf=upload_pdf,
         search_chunks=search_chunks,
         answer_question=answer_question,
+        startup_checks=[chunks.verify_schema],
     )

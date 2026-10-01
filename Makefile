@@ -37,5 +37,4 @@ logs:
 	docker compose logs -f api db ollama
 
 migrate:
-	docker compose exec db psql -U postgres -d findocbot -f /docker-entrypoint-initdb.d/001_init.sql
-	docker compose exec db psql -U postgres -d findocbot -f /docker-entrypoint-initdb.d/002_hnsw_index.sql
+	docker compose exec db /docker-entrypoint-initdb.d/apply.sh

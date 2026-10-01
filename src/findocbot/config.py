@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "qwen2.5:7b"
     ollama_embed_model: str = "nomic-embed-text:latest"
+    # Output size of ollama_embed_model; also sizes chunks.embedding.
+    embedding_dim: int = 768
     postgres_dsn: PostgresDsn = PostgresDsn(
         "postgresql://postgres:postgres@localhost:5432/findocbot"
     )

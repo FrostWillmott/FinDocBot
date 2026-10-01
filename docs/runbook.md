@@ -17,6 +17,9 @@
    - `OLLAMA_BASE_URL`
    - `OLLAMA_CHAT_MODEL`
    - `OLLAMA_EMBED_MODEL`
+   - `EMBEDDING_DIM` — output size of the embedding model (768 for
+     `nomic-embed-text`); sizes `chunks.embedding` when migrations run, and
+     the API refuses to start if the column disagrees.
    - `POSTGRES_DSN`
 
 ## Local Development (without Docker API)

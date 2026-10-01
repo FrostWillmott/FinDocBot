@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncpg
 
 from findocbot.domain.entities import ChatTurn, Chunk, Document
-from findocbot.domain.exceptions import StorageError
+from findocbot.domain.exceptions import EmbeddingDimensionError, StorageError
 from findocbot.infrastructure.db import PostgresPool
 from findocbot.use_cases.ports import ChunkWithScore
 
@@ -50,9 +50,38 @@ class PostgresDocumentRepository:
 class PostgresChunkRepository:
     """Persist and search chunks with pgvector."""
 
-    def __init__(self, db: PostgresPool) -> None:
-        """Store db dependency."""
+    def __init__(self, db: PostgresPool, embedding_dim: int) -> None:
+        """Store db dependency and the configured vector size."""
         self._db = db
+        self._embedding_dim = embedding_dim
+
+    async def verify_schema(self) -> None:
+        """Fail fast if chunks.embedding differs from the configured size."""
+        try:
+            column_dim = await self._db.pool.fetchval(
+                """
+                SELECT atttypmod
+                FROM pg_attribute
+                WHERE attrelid = 'chunks'::regclass AND attname = 'embedding'
+                """
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to inspect chunks schema") from exc
+        if column_dim != self._embedding_dim:
+            raise EmbeddingDimensionError(
+                f"chunks.embedding is vector({column_dim}) but EMBEDDING_DIM "
+                f"is {self._embedding_dim}; re-run migrations or fix the "
+                "setting."
+            )
+
+    def _check_dim(self, embedding: list[float]) -> None:
+        # pgvector would reject the row too, but with an opaque error;
+        # this names the setting to fix.
+        if len(embedding) != self._embedding_dim:
+            raise EmbeddingDimensionError(
+                f"Embedding has {len(embedding)} dimensions, EMBEDDING_DIM is "
+                f"{self._embedding_dim}; check OLLAMA_EMBED_MODEL."
+            )
 
     async def add_chunks_with_embeddings(
         self,
@@ -65,6 +94,8 @@ class PostgresChunkRepository:
 
         if not chunks:
             return
+        for embedding in embeddings:
+            self._check_dim(embedding)
 
         try:
             async with self._db.pool.acquire() as conn:
@@ -102,6 +133,7 @@ class PostgresChunkRepository:
         top_k: int,
     ) -> list[ChunkWithScore]:
         """Search by cosine distance and map rows to DTO."""
+        self._check_dim(embedding)
         try:
             rows = await self._db.pool.fetch(
                 """

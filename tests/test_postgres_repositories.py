@@ -7,12 +7,14 @@ Run with: pytest --integration
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import asyncpg
 import pytest
 from testcontainers.postgres import PostgresContainer
 
 from findocbot.domain.entities import ChatTurn, Chunk, Document
+from findocbot.domain.exceptions import EmbeddingDimensionError
 from findocbot.infrastructure.db import PostgresPool
 from findocbot.infrastructure.postgres_repositories import (
     PostgresChatHistoryRepository,
@@ -22,32 +24,16 @@ from findocbot.infrastructure.postgres_repositories import (
 
 pytestmark = pytest.mark.integration
 
-_MIGRATION_SQL = """
-CREATE EXTENSION IF NOT EXISTS vector;
+EMBEDDING_DIM = 768
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
 
-CREATE TABLE IF NOT EXISTS documents (
-    id UUID PRIMARY KEY,
-    filename TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
-CREATE TABLE IF NOT EXISTS chunks (
-    id UUID PRIMARY KEY,
-    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    chunk_index INTEGER NOT NULL,
-    section TEXT NULL,
-    content TEXT NOT NULL,
-    embedding VECTOR(768) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS chat_turns (
-    id UUID PRIMARY KEY,
-    session_id TEXT NOT NULL,
-    question TEXT NOT NULL,
-    answer TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-"""
+def _migration_sql(embedding_dim: int) -> str:
+    """Real migrations with the psql variable apply.sh would set."""
+    return "\n".join(
+        path.read_text().replace(":embedding_dim", str(embedding_dim))
+        for path in sorted(_MIGRATIONS_DIR.glob("*.sql"))
+    )
 
 
 def _run_migration_sync(dsn: str) -> None:
@@ -56,7 +42,7 @@ def _run_migration_sync(dsn: str) -> None:
     async def _migrate() -> None:
         conn = await asyncpg.connect(dsn)
         try:
-            await conn.execute(_MIGRATION_SQL)
+            await conn.execute(_migration_sql(EMBEDDING_DIM))
         finally:
             await conn.close()
 
@@ -105,7 +91,7 @@ async def test_document_create_and_retrieve(db_pool: PostgresPool) -> None:
 @pytest.mark.asyncio
 async def test_chunk_insert_and_search(db_pool: PostgresPool) -> None:
     """Chunks with embeddings can be persisted and searched by vector."""
-    repo = PostgresChunkRepository(db_pool)
+    repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
     doc = Document.create(filename="report.pdf")
     doc_repo = PostgresDocumentRepository(db_pool)
     await doc_repo.create(doc)
@@ -117,12 +103,15 @@ async def test_chunk_insert_and_search(db_pool: PostgresPool) -> None:
             "Profit remained stable",
         ])
     ]
-    embeddings = [[0.0] * 768, [0.0] * 768]
-    embeddings[1][0] = 0.9  # Make the second vector closer to query
+    embeddings = [[0.0] * EMBEDDING_DIM, [0.0] * EMBEDDING_DIM]
+    # Zero vectors have no cosine direction and HNSW skips them, so both
+    # vectors are non-zero; the second points the same way as the query.
+    embeddings[0][1] = 0.9
+    embeddings[1][0] = 0.9
 
     await repo.add_chunks_with_embeddings(chunks, embeddings)
 
-    query_embedding = [0.5] + [0.0] * 767
+    query_embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
     results = await repo.search_by_embedding(query_embedding, top_k=2)
 
     assert len(results) == 2
@@ -155,6 +144,44 @@ async def test_search_empty_when_no_chunks(
     db_pool: PostgresPool,
 ) -> None:
     """Search with no indexed chunks returns empty list."""
-    repo = PostgresChunkRepository(db_pool)
-    results = await repo.search_by_embedding([1.0] * 768, top_k=5)
+    repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+    results = await repo.search_by_embedding([1.0] * EMBEDDING_DIM, top_k=5)
     assert results == []
+
+
+async def test_verify_schema_matching_dim_passes(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+
+    assert await repo.verify_schema() is None
+
+
+async def test_verify_schema_mismatched_dim_raises(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresChunkRepository(db_pool, 1024)
+
+    with pytest.raises(EmbeddingDimensionError, match="vector\\(768\\)"):
+        await repo.verify_schema()
+
+
+async def test_chunk_insert_wrong_dim_raises_before_writing(
+    db_pool: PostgresPool,
+) -> None:
+    doc = Document.create(filename="dim.pdf")
+    await PostgresDocumentRepository(db_pool).create(doc)
+    repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+    chunk = Chunk.create(document_id=doc.id, chunk_index=0, text="x")
+
+    with pytest.raises(EmbeddingDimensionError, match="has 3 dimensions"):
+        await repo.add_chunks_with_embeddings([chunk], [[0.1, 0.2, 0.3]])
+
+    assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
+
+
+async def test_search_wrong_dim_raises(db_pool: PostgresPool) -> None:
+    repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+
+    with pytest.raises(EmbeddingDimensionError):
+        await repo.search_by_embedding([1.0, 0.0], top_k=1)

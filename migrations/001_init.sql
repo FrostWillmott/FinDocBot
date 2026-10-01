@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS chunks (
     chunk_index INTEGER NOT NULL,
     section TEXT NULL,
     content TEXT NOT NULL,
-    embedding VECTOR(768) NOT NULL
+    -- :embedding_dim is a psql variable set from EMBEDDING_DIM by apply.sh.
+    embedding VECTOR(:embedding_dim) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks(document_id);

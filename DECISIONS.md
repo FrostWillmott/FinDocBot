@@ -80,3 +80,11 @@ later reversed, add a superseding entry instead of editing the old one.
   embedding batch loop, which aborts on the first call that exhausts them.
   Timeouts are not retried because a 120 s generation timeout would turn
   into minutes of waiting.
+- **Embedding dimension comes from `EMBEDDING_DIM`, not the schema** —
+  `001_init.sql` sizes `chunks.embedding` with a psql variable that
+  `migrations/apply.sh` (the container init script and `make migrate`) sets
+  from the environment; integration tests apply the same files. The API
+  verifies the column's `atttypmod` against the setting at startup and the
+  repository checks each vector's length, so a model/schema mismatch fails
+  with a message naming the setting instead of an opaque pgvector error.
+  Changing the dimension of an existing database still needs a migration.

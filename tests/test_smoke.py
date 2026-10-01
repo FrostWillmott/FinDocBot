@@ -148,14 +148,18 @@ async def test_app_lifespan_starts_and_stops_container_resources() -> None:
         async def stop(self) -> None:
             events.append("provider.stop")
 
+    async def schema_check() -> None:
+        events.append("schema.check")
+
     container = _build_test_container()
     container.db = _RecordingDB()  # type: ignore[assignment]
     container.provider = _RecordingProvider()
+    container.startup_checks = [schema_check]
     app = create_app(container=container)
 
     async with app.router.lifespan_context(app):
-        assert events == ["db.start", "provider.start"]
-    assert events[2:] == ["provider.stop", "db.stop"]
+        assert events == ["db.start", "schema.check", "provider.start"]
+    assert events[3:] == ["provider.stop", "db.stop"]
 
 
 def test_create_app_without_container_builds_production_wiring() -> None:

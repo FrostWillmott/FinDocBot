@@ -129,7 +129,9 @@ This decoupling allows for easy testing (e.g., swapping PostgreSQL for an in-mem
 PostgreSQL uses an **HNSW** index (`m=16, ef_construction=64`) over the
 `chunks.embedding` column for fast approximate nearest-neighbour search.
 The migration is applied automatically by `docker compose up` and
-`make migrate`.
+`make migrate`. The vector size comes from `EMBEDDING_DIM` (768 for
+`nomic-embed-text`); the API refuses to start if the column and the setting
+disagree.
 
 ---
 
