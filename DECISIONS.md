@@ -49,6 +49,19 @@ later reversed, add a superseding entry instead of editing the old one.
 
 ## 2026-10-01
 
+- **Paragraph breaks are rebuilt from line positions via pypdf's
+  `visitor_text`** — plain extraction separates every line with a single
+  `\n`, so paragraph and section boundaries inside a page were lost and whole
+  pages went through the token splitter. The parser keeps plain mode's text
+  and reading order and inserts a blank line where the baseline gap, in
+  units of font size, exceeds 1.3x the page's tightest line spacing (capped
+  at 1.8x), or where text jumps up the page (next column). Rejected:
+  `extraction_mode="layout"` — it renders multi-column pages side by side,
+  mixing both columns into every line; detecting `Section ...` lines inside
+  paragraphs — misfires on wrapped body text ("...as required by / Section
+  404 of the Act"). Limitations: thresholds are heuristic, double-spaced
+  text degrades to one paragraph per line, and the parser is verified on
+  fpdf2-generated PDFs only.
 - **A section heading closes the running chunk, with no overlap carried
   across** — a short heading otherwise fits into the previous section's tail
   and relabels that whole chunk. A section boundary is a topic boundary, so
