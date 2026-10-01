@@ -57,6 +57,8 @@
 
 ## Pre-commit
 
+Hooks: `ruff check`, `ruff format`, `mypy` (strict), `pytest`.
+
 1. Install pre-commit hooks:
    - `make precommit-install`
 2. Run hooks manually:
