@@ -67,3 +67,10 @@ later reversed, add a superseding entry instead of editing the old one.
   and relabels that whole chunk. A section boundary is a topic boundary, so
   overlap there only dilutes the new section's embedding. Leftovers under
   `min_chunk_tokens` (e.g. a title page) join the next section instead.
+- **Untrusted prompt spans are fenced in XML-like tags and escaped** —
+  document chunks, chat history and the question go inside `<documents>`,
+  `<chat_history>` and `<question>`, with the instructions last and marked
+  as taking precedence. `<`, `>` and `"` are HTML-escaped so text cannot
+  forge or close a tag; role markers (`SYSTEM:` at line start) and
+  "ignore previous"-style phrases are wrapped as `[quoted: ...]` rather than
+  deleted, keeping them inspectable. Defence in depth, not a guarantee.
