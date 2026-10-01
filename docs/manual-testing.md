@@ -33,7 +33,7 @@ uv sync --all-groups          # install dependencies
 uv run ruff check .           # linter  -> All checks passed!
 uv run ruff format --check .  # format  -> N files already formatted
 uv run mypy src/findocbot     # types   -> Success: no issues found
-uv run pytest -q              # tests   -> 51 passed, 4 skipped
+uv run pytest -q              # tests   -> 64 passed, 4 skipped
 ```
 
 Expected: `4 skipped` — these are the PostgreSQL integration tests, which
@@ -129,38 +129,18 @@ Swagger UI for manual requests: http://localhost:8000/docs
 
 ## 4. End-to-end RAG scenario
 
-### 4.1 Prepare a test PDF
+### 4.1 Test PDF
 
-If you don't have a financial PDF at hand, generate a simple one
-(fpdf2 is already in the dev dependencies):
-
-```bash
-uv run python -c "
-from fpdf import FPDF
-pdf = FPDF()
-pdf.add_page()
-pdf.set_font('Helvetica', size=12)
-text = '''Section 1. Financial Results.
-
-The company revenue in Q2 2023 was 120 million dollars.
-Net profit for 2023 reached 25 million dollars, up 20 percent year over year.
-
-Section 2. Outlook.
-
-Management expects revenue growth to continue into 2024.'''
-for line in text.split(chr(10)):
-    pdf.multi_cell(0, 8, line)
-pdf.output('sample.pdf')
-print('written sample.pdf')
-"
-```
+Use the bundled sample: [`docs/samples/aurora-ridge-annual-report-2025.pdf`](samples/aurora-ridge-annual-report-2025.pdf)
+— a short annual report of a fictional company, with five `Section N. ...`
+headings, each starting a new page.
 
 ### 4.2 Upload the document
 
 ```bash
 curl -s -X POST "http://localhost:8000/documents/upload" \
-     -F "file=@sample.pdf" | python3 -m json.tool
-# -> {"document_id": "<uuid>", "filename": "sample.pdf"}
+     -F "file=@docs/samples/aurora-ridge-annual-report-2025.pdf" | python3 -m json.tool
+# -> {"document_id": "<uuid>", "filename": "aurora-ridge-annual-report-2025.pdf"}
 ```
 
 Negative scenario:
@@ -176,8 +156,9 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 ```bash
 curl -s -X POST "http://localhost:8000/search" \
      -H "Content-Type: application/json" \
-     -d '{"query": "net profit for 2023", "top_k": 3}' | python3 -m json.tool
-# -> a list of chunks with text/score/section fields, score descending
+     -d '{"query": "net profit for 2025", "top_k": 3}' | python3 -m json.tool
+# -> a list of chunks with text/score/section fields, score descending;
+#    the top hit is labelled "Section 2. Financial Highlights"
 ```
 
 ### 4.4 Question answering (RAG + structured output)
@@ -185,9 +166,9 @@ curl -s -X POST "http://localhost:8000/search" \
 ```bash
 curl -s -X POST "http://localhost:8000/ask" \
      -H "Content-Type: application/json" \
-     -d '{"question": "What was the company revenue in Q2?",
+     -d '{"question": "What was the total revenue in 2025?",
           "session_id": "demo-1", "top_k": 3}' | python3 -m json.tool
-# -> {"answer": "...120 million...", "confidence": "high|medium|low", "sources": [...]}
+# -> {"answer": "...USD 1,284 million...", "confidence": "high|medium|low", "sources": [...]}
 ```
 
 Check that `confidence` is one of {high, medium, low} and `sources` is
@@ -247,7 +228,6 @@ Don't forget to bring the services back: `docker compose start ollama db`.
 ```bash
 make down          # stop and remove containers
 # docker compose down -v   # + remove volumes (full wipe of DB and models)
-rm -f sample.pdf
 ```
 
 ---
