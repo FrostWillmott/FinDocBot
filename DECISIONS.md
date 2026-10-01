@@ -94,3 +94,7 @@ later reversed, add a superseding entry instead of editing the old one.
   RAG evaluation stays at the root. `__init__.py` files make same-named
   modules safe across directories and let shared helpers import as
   `tests.factories` / `tests.use_cases.fakes` instead of being copied.
+- **CI runners pinned to `ubuntu-24.04`, not `ubuntu-latest`** — GitHub
+  moves `ubuntu-latest` to Ubuntu 26 from 2026-10-19; pinning keeps the
+  runner OS from changing under an unrelated push. Bump it deliberately in
+  its own commit.
