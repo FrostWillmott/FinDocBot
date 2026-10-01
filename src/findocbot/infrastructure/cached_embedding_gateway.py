@@ -10,6 +10,8 @@ from hashlib import sha256
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from findocbot.use_cases.ports import ModelProviderGateway
 
 logger = logging.getLogger(__name__)
@@ -39,11 +41,13 @@ class CachedEmbeddingGateway:
         gateway: ModelProviderGateway,
         cache_size: int = 1000,
         ttl_seconds: int | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        """Store gateway and configure cache size and TTL."""
+        """Store gateway and configure cache size, TTL and clock."""
         self._gateway = gateway
         self._cache_size = cache_size
         self._ttl_seconds = ttl_seconds
+        self._clock = clock
         # Cache stores (embedding, timestamp) tuples
         self._cache: OrderedDict[str, tuple[list[float], float]] = (
             OrderedDict()
@@ -80,7 +84,7 @@ class CachedEmbeddingGateway:
         """Check if cache entry has expired based on TTL."""
         if self._ttl_seconds is None:
             return False
-        return (time.time() - timestamp) > self._ttl_seconds
+        return (self._clock() - timestamp) > self._ttl_seconds
 
     async def embed_one(self, text: str) -> list[float]:
         """Embed single text with caching and TTL support."""
@@ -102,7 +106,7 @@ class CachedEmbeddingGateway:
         # duplicate request — an accepted trade-off vs. per-key locking.
         result = await self._gateway.embed_one(text)
 
-        self._cache[cache_key] = (result, time.time())
+        self._cache[cache_key] = (result, self._clock())
 
         if len(self._cache) > self._cache_size:
             self._cache.popitem(last=False)

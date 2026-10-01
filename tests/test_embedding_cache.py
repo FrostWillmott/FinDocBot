@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 import pytest
@@ -191,8 +190,10 @@ async def test_cached_gateway_tracks_metrics() -> None:
 async def test_cached_gateway_respects_ttl() -> None:
     """Verify that cache entries expire after TTL."""
     mock = MockGateway()
-    # Set TTL to 1 second
-    cached = CachedEmbeddingGateway(gateway=mock, cache_size=10, ttl_seconds=1)
+    now = [1000.0]
+    cached = CachedEmbeddingGateway(
+        gateway=mock, cache_size=10, ttl_seconds=1, clock=lambda: now[0]
+    )
     await cached.start()
 
     # First call should hit the gateway
@@ -204,8 +205,7 @@ async def test_cached_gateway_respects_ttl() -> None:
     assert mock.embed_one_calls == 1
     assert result2 == result1
 
-    # Wait for TTL to expire
-    await asyncio.sleep(1.1)
+    now[0] += 1.1
 
     # After TTL, should hit gateway again
     result3 = await cached.embed_one("test query")
@@ -219,8 +219,9 @@ async def test_cached_gateway_respects_ttl() -> None:
 async def test_cached_gateway_without_ttl() -> None:
     """Verify that cache works indefinitely when TTL is None."""
     mock = MockGateway()
+    now = [1000.0]
     cached = CachedEmbeddingGateway(
-        gateway=mock, cache_size=10, ttl_seconds=None
+        gateway=mock, cache_size=10, ttl_seconds=None, clock=lambda: now[0]
     )
     await cached.start()
 
@@ -228,8 +229,7 @@ async def test_cached_gateway_without_ttl() -> None:
     await cached.embed_one("test query")
     assert mock.embed_one_calls == 1
 
-    # Even after waiting, should still be cached
-    await asyncio.sleep(0.1)
+    now[0] += 10**6
     await cached.embed_one("test query")
     assert mock.embed_one_calls == 1  # Still cached
 
