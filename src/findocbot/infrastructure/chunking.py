@@ -31,6 +31,10 @@ class ParagraphTokenChunker:
 
         for paragraph in paragraphs:
             maybe_section = self._extract_section(paragraph)
+            closed = self._close_before_section(maybe_section, current_parts)
+            if closed is not None:
+                chunks.append((closed, current_section))
+                current_parts = []
             candidate = "\n\n".join([*current_parts, paragraph]).strip()
             if self._count_tokens(candidate) <= self._chunk_tokens:
                 current_parts.append(paragraph)
@@ -89,6 +93,25 @@ class ParagraphTokenChunker:
                 chunks[-1] = (merged_text, chunks[-1][1])
         return chunks
 
+    def _close_before_section(
+        self,
+        maybe_section: str | None,
+        current_parts: list[str],
+    ) -> str | None:
+        """Return the running chunk's text if a heading should close it.
+
+        Otherwise a short heading fits into the previous section's tail and
+        relabels it. No overlap is carried across: a section boundary is a
+        topic boundary. Too-small leftovers (e.g. a title page) join the
+        section instead.
+        """
+        if maybe_section is None or not current_parts:
+            return None
+        current_text = "\n\n".join(current_parts).strip()
+        if self._count_tokens(current_text) < self._min_chunk_tokens:
+            return None
+        return current_text
+
     @staticmethod
     def _append_to_current(
         paragraph: str,
@@ -142,7 +165,7 @@ class ParagraphTokenChunker:
         paragraph: str,
         section: str | None,
     ) -> list[tuple[str, str | None]]:
-        tokens = TOKEN_PATTERN.findall(paragraph)
+        tokens = list(TOKEN_PATTERN.finditer(paragraph))
         if len(tokens) <= self._chunk_tokens:
             return [(paragraph, section)]
 
@@ -150,7 +173,11 @@ class ParagraphTokenChunker:
         start = 0
         while start < len(tokens):
             end = min(len(tokens), start + self._chunk_tokens)
-            piece = " ".join(tokens[start:end]).strip()
+            # Slice the source text rather than re-joining tokens, so the
+            # original spacing survives ("6,400", not "6 , 400").
+            piece = paragraph[
+                tokens[start].start() : tokens[end - 1].end()
+            ].strip()
             if piece:
                 parts.append((piece, section))
             if end >= len(tokens):
@@ -159,12 +186,24 @@ class ParagraphTokenChunker:
         return parts
 
     def _build_overlap(self, chunk_text: str) -> list[str]:
-        overlap_tokens = TOKEN_PATTERN.findall(chunk_text)[
+        overlap_tokens = list(TOKEN_PATTERN.finditer(chunk_text))[
             -self._overlap_tokens :
         ]
         if not overlap_tokens:
             return []
-        return [" ".join(overlap_tokens)]
+        # Start at a word boundary so the overlap never opens mid-number
+        # (",284 million" from "1,284"); the skipped tokens are duplicated
+        # content anyway.
+        start = next(
+            (
+                token.start()
+                for token in overlap_tokens
+                if token.start() == 0
+                or chunk_text[token.start() - 1].isspace()
+            ),
+            overlap_tokens[0].start(),
+        )
+        return [chunk_text[start:]]
 
     @staticmethod
     def _count_tokens(text: str) -> int:

@@ -141,3 +141,63 @@ class TestParagraphTokenChunker:
         texts = _chunk_texts(result)
         assert len(texts) >= 1
         assert "Real content" in texts[0]
+
+    def test_long_paragraph_split_keeps_original_spacing(self) -> None:
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=10, overlap_ratio=0.2, min_chunk_tokens=1
+        )
+        text = "Revenue reached USD 1,284 million, up 14.6% year on year. " * 3
+        result = chunker.split(text)
+
+        texts = _chunk_texts(result)
+        assert len(texts) >= 2
+        assert all(" , " not in t and " . " not in t for t in texts)
+        assert texts[0] == "Revenue reached USD 1,284 million, up 14"
+
+    def test_overlap_keeps_original_spacing(self) -> None:
+        # 9-token overlap: "6,400 employees for their continued trust."
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=22, overlap_ratio=0.41, min_chunk_tokens=1
+        )
+        para1 = "We thank our 6,400 employees for their continued trust."
+        para2 = "Total revenue reached USD 1,284 million in fiscal 2025."
+        result = chunker.split(para1 + "\n\n" + para2)
+
+        texts = _chunk_texts(result)
+        assert texts[1] == (
+            "6,400 employees for their continued trust.\n\n" + para2
+        )
+
+    def test_section_heading_closes_previous_section_chunk(self) -> None:
+        """Regression: a short heading used to fit into the tail of the
+        previous section's chunk and relabel all of it."""
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=100, overlap_ratio=0.2, min_chunk_tokens=5
+        )
+        intro = "Section 1. Letter\n\n" + "Growth was steady this year. " * 3
+        highlights = "Section 2. Highlights\n\nNet profit was USD 132 million."
+        result = chunker.split(intro + "\n\n" + highlights)
+
+        assert result == [
+            (intro.strip(), "Section 1. Letter"),
+            (highlights, "Section 2. Highlights"),
+        ]
+
+    def test_section_heading_after_small_preamble_joins_it(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=100, min_chunk_tokens=20)
+        text = "Annual Report 2025\n\nSection 1. Letter\n\nGrowth was steady."
+        result = chunker.split(text)
+
+        assert result == [(text, "Section 1. Letter")]
+
+    def test_overlap_starts_at_word_boundary(self) -> None:
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=12, overlap_ratio=0.45, min_chunk_tokens=1
+        )
+        para1 = "Revenue reached USD 1,284 million this year."
+        para2 = "Outlook remains positive."
+        result = chunker.split(para1 + "\n\n" + para2)
+
+        # The 5-token window starts at "284" (mid "1,284"); it snaps to
+        # "million".
+        assert _chunk_texts(result)[1] == ("million this year.\n\n" + para2)

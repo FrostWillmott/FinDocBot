@@ -46,3 +46,11 @@ later reversed, add a superseding entry instead of editing the old one.
   the built-in `GITHUB_TOKEN` — still no external service or secret. Requires
   `relative_files = true` under `[tool.coverage.run]`; without it the action
   can't map runner paths back to the repo.
+
+## 2026-10-01
+
+- **A section heading closes the running chunk, with no overlap carried
+  across** — a short heading otherwise fits into the previous section's tail
+  and relabels that whole chunk. A section boundary is a topic boundary, so
+  overlap there only dilutes the new section's embedding. Leftovers under
+  `min_chunk_tokens` (e.g. a title page) join the next section instead.
