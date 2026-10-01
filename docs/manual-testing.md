@@ -33,10 +33,10 @@ uv sync --all-groups          # install dependencies
 uv run ruff check .           # linter  -> All checks passed!
 uv run ruff format --check .  # format  -> N files already formatted
 uv run mypy src/findocbot     # types   -> Success: no issues found
-uv run pytest -q              # tests   -> 64 passed, 4 skipped
+uv run pytest -q              # tests   -> 85 passed, 8 skipped
 ```
 
-Expected: `4 skipped` — these are the PostgreSQL integration tests, which
+Expected: `8 skipped` — these are the PostgreSQL integration tests, which
 require Docker.
 
 To run them too (spins up a temporary Postgres via testcontainers):
