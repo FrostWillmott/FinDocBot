@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from findocbot.domain.entities import Chunk, Document
-from findocbot.domain.exceptions import EmptyDocumentError
+from findocbot.domain.exceptions import EmptyDocumentError, StorageError
 from findocbot.use_cases.ports import (
     ChunkerPort,
     ChunkRepositoryPort,
@@ -69,7 +69,7 @@ class UploadPDFUseCase:
             await self._chunks.add_chunks_with_embeddings(
                 built_chunks, embeddings
             )
-        except Exception:
+        except (StorageError, ValueError):
             # Remove the orphan document row if chunk persistence fails,
             # since document + chunks are not written in one transaction.
             await self._documents.delete(document.id)

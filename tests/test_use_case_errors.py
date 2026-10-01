@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from fpdf import FPDF
 
@@ -108,6 +110,22 @@ async def test_answer_question_malformed_llm_output_falls_back() -> None:
 
     assert response.answer == "Revenue grew."
     assert response.confidence == "medium"
+
+
+async def test_answer_question_malformed_llm_output_logs_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    provider = _Provider(
+        structured={"answer": "Revenue grew.", "confidence": "definitely"}
+    )
+    ask = _build_answer_use_case(provider)
+
+    with caplog.at_level(logging.WARNING):
+        await ask.execute(
+            session_id="s1", question="How did revenue change?", top_k=3
+        )
+
+    assert "failed schema validation" in caplog.text
 
 
 async def test_search_empty_query_raises_invalid_query() -> None:

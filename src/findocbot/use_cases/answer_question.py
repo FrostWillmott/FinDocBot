@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from pydantic import BaseModel, ValidationError
@@ -16,6 +17,8 @@ from findocbot.use_cases.ports import (
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _AnswerValidation(BaseModel):
@@ -92,7 +95,10 @@ class AnswerQuestionUseCase:
         )
         try:
             validated = _AnswerValidation(**structured)
-        except ValidationError:
+        except ValidationError as exc:
+            logger.warning(
+                f"LLM answer failed schema validation, using defaults: {exc}"
+            )
             # Malformed LLM output — fall back to a safe default so the
             # caller gets a valid response rather than a 500.
             validated = _AnswerValidation(
