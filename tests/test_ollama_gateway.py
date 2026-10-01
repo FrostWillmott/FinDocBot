@@ -152,6 +152,30 @@ async def test_generate_structured_malformed_json_raises(
         await gateway.generate_structured("question", {})
 
 
+@respx.mock
+async def test_generate_structured_non_object_json_raises(
+    gateway: OllamaGateway,
+) -> None:
+    respx.post(f"{BASE_URL}/api/generate").mock(
+        return_value=httpx.Response(
+            200, json={"response": "[1, 2]", "done": True}
+        )
+    )
+    with pytest.raises(ModelProviderError, match="not a JSON object"):
+        await gateway.generate_structured("question", {})
+
+
+@respx.mock
+async def test_embed_many_malformed_payload_raises_model_provider_error(
+    gateway: OllamaGateway,
+) -> None:
+    respx.post(f"{BASE_URL}/api/embed").mock(
+        return_value=httpx.Response(200, json={"embeddings": [["x"]]})
+    )
+    with pytest.raises(ModelProviderError, match="malformed embeddings"):
+        await gateway.embed_many(["text"])
+
+
 async def test_start_is_idempotent_and_stop_without_start_is_noop() -> None:
     """Repeated start() reuses the client; stop() twice does not fail."""
     gw = OllamaGateway(

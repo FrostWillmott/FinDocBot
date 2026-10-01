@@ -6,8 +6,17 @@ import json
 from typing import Any
 
 import httpx
+from pydantic import BaseModel, ValidationError
 
 from findocbot.domain.exceptions import ModelProviderError
+
+
+class _EmbedResponse(BaseModel):
+    embeddings: list[list[float]]
+
+
+class _GenerateResponse(BaseModel):
+    response: str
 
 
 class OllamaGateway:
@@ -50,7 +59,7 @@ class OllamaGateway:
 
     async def _post(
         self, path: str, json_body: dict[str, object]
-    ) -> dict[str, object]:
+    ) -> httpx.Response:
         """POST to Ollama; transport errors become ModelProviderError."""
         client = self._get_client()
         try:
@@ -66,7 +75,7 @@ class OllamaGateway:
             raise ModelProviderError(
                 f"Ollama unreachable at {self._base_url}"
             ) from exc
-        return response.json()  # type: ignore[no-any-return]
+        return response
 
     async def embed_one(self, text: str) -> list[float]:
         """Embed single query text."""
@@ -82,11 +91,17 @@ class OllamaGateway:
 
         for i in range(0, len(texts), self._batch_size):
             batch = texts[i : i + self._batch_size]
-            payload = await self._post(
+            response = await self._post(
                 "/api/embed",
                 {"model": self._embed_model, "input": batch},
             )
-            all_embeddings.extend(payload["embeddings"])  # type: ignore[arg-type]
+            try:
+                payload = _EmbedResponse.model_validate_json(response.content)
+            except ValidationError as exc:
+                raise ModelProviderError(
+                    "Ollama returned malformed embeddings"
+                ) from exc
+            all_embeddings.extend(payload.embeddings)
 
         if len(all_embeddings) != len(texts):
             raise ModelProviderError(
@@ -106,7 +121,7 @@ class OllamaGateway:
         Uses Ollama's ``format`` field to enforce structured output so the
         caller receives a parsed dict rather than raw text.
         """
-        payload = await self._post(
+        response = await self._post(
             "/api/generate",
             {
                 "model": self._chat_model,
@@ -116,9 +131,14 @@ class OllamaGateway:
             },
         )
         try:
-            result: dict[str, Any] = json.loads(str(payload["response"]))
-        except (json.JSONDecodeError, KeyError) as exc:
+            payload = _GenerateResponse.model_validate_json(response.content)
+            result = json.loads(payload.response)
+        except (ValidationError, json.JSONDecodeError) as exc:
             raise ModelProviderError(
                 "Ollama returned malformed structured output"
             ) from exc
+        if not isinstance(result, dict):
+            raise ModelProviderError(
+                "Ollama structured output is not a JSON object"
+            )
         return result

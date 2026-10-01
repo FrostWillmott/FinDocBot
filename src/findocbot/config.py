@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "qwen2.5:7b"
     ollama_embed_model: str = "nomic-embed-text:latest"
-    postgres_dsn: PostgresDsn = (
-        "postgresql://postgres:postgres@localhost:5432/findocbot"  # type: ignore[assignment]
+    postgres_dsn: PostgresDsn = PostgresDsn(
+        "postgresql://postgres:postgres@localhost:5432/findocbot"
     )
 
     top_k: int = 5
