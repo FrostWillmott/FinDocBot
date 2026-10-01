@@ -7,7 +7,11 @@ import logging
 import pytest
 from fpdf import FPDF
 
-from findocbot.domain.exceptions import InvalidQueryError, StorageError
+from findocbot.domain.exceptions import (
+    InvalidQueryError,
+    ModelProviderError,
+    StorageError,
+)
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.in_memory import (
     InMemoryChunkRepository,
@@ -126,6 +130,17 @@ async def test_answer_question_malformed_llm_output_logs_warning(
         )
 
     assert "failed schema validation" in caplog.text
+
+
+async def test_execute_numeric_answer_raises_provider_error() -> None:
+    ask = _build_answer_use_case(
+        _Provider(structured={"answer": 42, "confidence": "high"})
+    )
+
+    with pytest.raises(ModelProviderError, match="not a string"):
+        await ask.execute(
+            session_id="s1", question="How did revenue change?", top_k=3
+        )
 
 
 async def test_search_empty_query_raises_invalid_query() -> None:

@@ -54,6 +54,11 @@ class _FailingEmbedProvider(_StubProvider):
         raise ModelProviderError("Ollama is down")
 
 
+class _NumericAnswerProvider(_StubProvider):
+    async def generate_structured(self, prompt: str, schema: dict) -> dict:
+        return {"answer": 42, "confidence": "high"}
+
+
 class _FailingSearchChunkRepository(InMemoryChunkRepository):
     async def search_by_embedding(
         self, embedding: list[float], top_k: int
@@ -158,3 +163,15 @@ async def test_upload_oversized_file_returns_413() -> None:
         )
         assert resp.status_code == 413
         assert "50 MB" in resp.json()["detail"]
+
+
+async def test_ask_non_string_answer_returns_502() -> None:
+    transport = _build_app(provider=_NumericAnswerProvider())
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        resp = await client.post(
+            "/ask", json={"session_id": "s1", "question": "revenue?"}
+        )
+        assert resp.status_code == 502
+        assert "not a string" in resp.json()["detail"]

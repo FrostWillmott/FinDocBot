@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError
 
 from findocbot.domain.entities import ChatTurn
-from findocbot.domain.exceptions import InvalidQueryError
+from findocbot.domain.exceptions import InvalidQueryError, ModelProviderError
 from findocbot.use_cases.dto import AskResponseDTO, SearchResultDTO
 from findocbot.use_cases.ports import (
     ChatHistoryRepositoryPort,
@@ -103,14 +103,17 @@ class AnswerQuestionUseCase:
         try:
             validated = _AnswerValidation(**structured)
         except ValidationError as exc:
+            answer = structured.get("answer", "") or ""
+            if not isinstance(answer, str):
+                # Nothing usable to return; report it like any other
+                # malformed provider output instead of failing with a 500.
+                raise ModelProviderError("LLM answer is not a string") from exc
             logger.warning(
                 f"LLM answer failed schema validation, using defaults: {exc}"
             )
-            # Malformed LLM output — fall back to a safe default so the
-            # caller gets a valid response rather than a 500.
-            validated = _AnswerValidation(
-                answer=structured.get("answer", "") or "",
-            )
+            # Only optional fields were malformed — keep the answer text and
+            # fall back to defaults for the rest.
+            validated = _AnswerValidation(answer=answer)
 
         await self._history.add_turn(
             ChatTurn.create(
