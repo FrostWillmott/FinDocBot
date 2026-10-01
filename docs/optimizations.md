@@ -139,6 +139,10 @@ async def embed_many(self, texts: list[str]) -> list[list[float]]:
 embeddings = await self._provider.embed_many([c.text for c in built_chunks])
 ```
 
+The snippet is simplified to show batching; the real method also validates
+each response and retries transient failures via `_post` (see
+`src/findocbot/infrastructure/ollama_gateway.py`).
+
 ### 4. Lifecycle Management in AppContainer
 
 **Problem:** Lack of centralized lifecycle management for components with external resources.
