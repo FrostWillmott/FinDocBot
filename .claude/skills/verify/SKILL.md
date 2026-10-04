@@ -38,6 +38,12 @@ import json, sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class H(BaseHTTPRequestHandler):
+    def do_GET(self):  # /health pings /api/version
+        data = json.dumps({"version": "stub"}).encode()
+        self.send_response(200 if self.path == "/api/version" else 404)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers(); self.wfile.write(data)
+
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         if self.path == "/api/embed":
@@ -69,8 +75,6 @@ install; confirm through traceback paths in the log.
 
 - App logs go to stderr as `time LEVEL logger: message`; filter out
   uvicorn's own lines with `grep -v "INFO:"`.
-- The stub needs `GET /api/version` too, or `/health` reports
-  `model_provider` as unavailable.
 - A user-run Ollama may already hold :11434, so keep the stub on its own port.
 - Teardown: kill uvicorn and the stub, `docker stop findocbot-verify-db` (`--rm`
   removes it), `git worktree remove`.
