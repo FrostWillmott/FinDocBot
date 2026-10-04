@@ -33,7 +33,7 @@ uv sync --all-groups          # install dependencies
 uv run ruff check .           # linter  -> All checks passed!
 uv run ruff format --check .  # format  -> N files already formatted
 uv run mypy src/findocbot     # types   -> Success: no issues found
-uv run pytest -q              # tests   -> 86 passed, 7 skipped
+uv run pytest -q              # tests   -> 96 passed, 7 skipped
 ```
 
 Expected: `7 skipped` — these are the PostgreSQL integration tests, which

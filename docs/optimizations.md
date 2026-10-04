@@ -18,7 +18,7 @@ This document describes the implemented optimizations to improve embedding proce
 - Added `_client: httpx.AsyncClient | None` field.
 - `start()` method initializes the client.
 - `stop()` method correctly closes connections.
-- `embed_one()`, `embed_many()`, and `generate()` methods use the reusable client.
+- `embed_one()`, `embed_many()`, and `generate_structured()` methods use the reusable client.
 
 **Benefits:**
 - Latency reduction by reusing TCP connections.
@@ -166,8 +166,7 @@ each response and retries transient failures via `_post` (see
 New parameters in `src/findocbot/config.py`:
 
 ```python
-@dataclass(frozen=True)
-class Settings:
+class Settings(BaseSettings):
     # ... existing parameters ...
     embedding_cache_size: int = 1000                    # LRU cache size for embeddings
     embedding_batch_size: int = 50                      # Batch size for document uploads

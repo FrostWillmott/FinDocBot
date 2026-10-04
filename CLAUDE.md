@@ -57,9 +57,9 @@ Each has a real implementation in `infrastructure/` and a fake in
 
 ### Caching layer
 
-`CachedEmbeddingGateway` wraps `ModelProviderGateway` with an in-memory TTL cache
-(TTLCache from `cachetools`). It only caches `embed_one`/`embed_many`; generation
-passes through uncached.
+`CachedEmbeddingGateway` wraps `ModelProviderGateway` with a hand-rolled LRU
+cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
+`embed_one` (query embeddings); `embed_many` and generation pass through uncached.
 
 ### Key patterns
 
