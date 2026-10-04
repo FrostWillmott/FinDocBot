@@ -2,16 +2,17 @@ repos:
   - repo: local
     hooks:
       # ruff runs from uv.lock, so the hook, make lint and CI share one version.
+      # Markdown too: ruff formats its Python code blocks, and CI checks them.
       - id: ruff-check
         name: ruff check
         entry: uv run ruff check --force-exclude
         language: system
-        types_or: [python, pyi]
+        types_or: [python, pyi, markdown]
       - id: ruff-format
         name: ruff format
         entry: uv run ruff format --force-exclude
         language: system
-        types_or: [python, pyi]
+        types_or: [python, pyi, markdown]
       - id: mypy
         name: mypy
         entry: uv run mypy src/findocbot
