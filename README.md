@@ -18,13 +18,13 @@
 | src/findocbot/infrastructure/pdf\_parser.py                |       59 |        0 |       14 |        0 |    100% |           |
 | src/findocbot/infrastructure/postgres\_repositories.py     |       70 |       38 |       10 |        4 |     45% |14, 26-37, 41-47, 60-71, 80-\>exit, 93, 96, 100-128, 137-156, 180-199, 203-227 |
 | src/findocbot/main.py                                      |       22 |        1 |        2 |        0 |     96% |        43 |
-| src/findocbot/use\_cases/answer\_question.py               |       57 |        0 |        4 |        0 |    100% |           |
+| src/findocbot/use\_cases/answer\_question.py               |       58 |        0 |        4 |        0 |    100% |           |
 | src/findocbot/use\_cases/dto.py                            |       16 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/ports.py                          |       27 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/prompt\_safety.py                 |       12 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/use\_cases/search\_similar\_chunks.py        |       15 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/use\_cases/upload\_pdf.py                    |       27 |        0 |        2 |        0 |    100% |           |
-| **TOTAL**                                                  |  **792** |   **48** |  **124** |    **9** | **93%** |           |
+| **TOTAL**                                                  |  **793** |   **48** |  **124** |    **9** | **93%** |           |
 
 
 ## Setup coverage badge
