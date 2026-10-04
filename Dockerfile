@@ -7,7 +7,7 @@ RUN groupadd -r findocbot && useradd -r -g findocbot -d /app findocbot
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.12.11
 
 # Dependencies first so they cache independently of the source. The
 # project itself is built in the second sync, which needs README.md

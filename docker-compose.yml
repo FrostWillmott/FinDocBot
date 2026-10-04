@@ -20,7 +20,7 @@ services:
       retries: 20
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.35.1
     container_name: findocbot-ollama
     ports:
       - "11434:11434"

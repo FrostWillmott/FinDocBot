@@ -172,3 +172,20 @@ later reversed, add a superseding entry instead of editing the old one.
   integration test. Ids are typed `UUID` in the path, so a malformed id is
   a 422 instead of a Postgres type error surfacing as 503. Not-found cases
   share a `NotFoundError` base mapped to 404.
+- **Image and tool versions are pinned: `ollama/ollama:0.35.1`,
+  `uv==0.12.11` in the Dockerfile** — `latest` and an unpinned `pip install
+  uv` made the build depend on the day it ran. The Ollama tag is the one the
+  end-to-end runs used (same digest as the `latest` pulled 2026-10-02).
+  Neither is bumped by Dependabot; update them by hand.
+- **Dependabot uses the `uv` ecosystem, minor and patch grouped** — under
+  `pip` it opened no Python PR in eight months while `fastapi` and others
+  fell behind; the `>=` ranges in `pyproject.toml` were always satisfied and
+  `uv.lock` was never read. Grouping keeps the first run from opening a PR
+  per package.
+- **Pydantic is allowed in use cases, for validating model output** — two
+  rules disagree: `clean-architecture.md` flags framework imports in use
+  cases, while `python-core.md` and `ai-engineering.md` ([MUST]) ask for
+  Pydantic schemas to validate LLM output. The validation is a use-case
+  rule (what counts as a usable answer), and Pydantic is a validation
+  library, not a delivery or persistence framework, so `answer_question.py`
+  keeps it. The domain layer stays stdlib-only.
