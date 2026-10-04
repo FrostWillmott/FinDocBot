@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "qwen2.5:7b"
     ollama_embed_model: str = "nomic-embed-text:latest"
+    # Ollama silently drops the start of a prompt longer than num_ctx, i.e.
+    # the retrieved sources. Sized for the worst case: see DECISIONS.md.
+    ollama_num_ctx: int = 16384
+    ollama_num_predict: int = 1024
     # Output size of ollama_embed_model; also sizes chunks.embedding.
     embedding_dim: int = 768
     postgres_dsn: PostgresDsn = PostgresDsn(

@@ -39,6 +39,8 @@ class OllamaGateway:
         embed_model: str,
         timeout_seconds: float = 120.0,
         batch_size: int = 50,
+        num_ctx: int = 16384,
+        num_predict: int = 1024,
         max_attempts: int = 3,
         backoff_seconds: float = 0.5,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -51,6 +53,8 @@ class OllamaGateway:
         self._embed_model = embed_model
         self._timeout = timeout_seconds
         self._batch_size = batch_size
+        self._num_ctx = num_ctx
+        self._num_predict = num_predict
         self._max_attempts = max_attempts
         self._backoff_seconds = backoff_seconds
         self._sleep = sleep
@@ -177,6 +181,10 @@ class OllamaGateway:
                 "prompt": prompt,
                 "stream": False,
                 "format": schema,
+                "options": {
+                    "num_ctx": self._num_ctx,
+                    "num_predict": self._num_predict,
+                },
             },
         )
         try:

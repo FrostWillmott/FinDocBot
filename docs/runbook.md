@@ -17,6 +17,9 @@
    - `OLLAMA_BASE_URL`
    - `OLLAMA_CHAT_MODEL`
    - `OLLAMA_EMBED_MODEL`
+   - `OLLAMA_NUM_CTX` / `OLLAMA_NUM_PREDICT` — prompt window and answer
+     token cap for generation; a prompt longer than the window is silently
+     cut from the start, so raise it together with `top_k`.
    - `EMBEDDING_DIM` — output size of the embedding model (768 for
      `nomic-embed-text`); sizes `chunks.embedding` when migrations run, and
      the API refuses to start if the column disagrees.

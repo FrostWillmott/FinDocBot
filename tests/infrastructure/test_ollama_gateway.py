@@ -99,6 +99,18 @@ async def test_generate_structured_valid_json_returns_parsed_dict(
 
 
 @respx.mock
+async def test_generate_structured_request_sends_context_and_output_limits(
+    gateway: OllamaGateway,
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/generate").mock(
+        return_value=httpx.Response(200, json={"response": "{}"})
+    )
+    await gateway.generate_structured("question", {})
+    body = json.loads(route.calls.last.request.content)
+    assert body["options"] == {"num_ctx": 16384, "num_predict": 1024}
+
+
+@respx.mock
 async def test_generate_structured_http_503_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:

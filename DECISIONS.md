@@ -120,3 +120,10 @@ later reversed, add a superseding entry instead of editing the old one.
   external repo pinned its own ruff (0.12.8 vs 0.15.0 in `uv.lock`); with
   `preview = true` formatting can differ between versions, and the hook and
   CI would then disagree.
+- **Generation sends `num_ctx=16384` and `num_predict=1024`** — without
+  them Ollama uses its server default context and cuts longer prompts from
+  the start, which drops the retrieved sources without an error. Worst case
+  is ~12k tokens: 20 chunks (`top_k` max) x 300 tokens, 5 history pairs of
+  up to 4000 chars (~1k tokens each), the question and instructions. The
+  answer cap keeps one call bounded; `/api/embed` gets no options, chunks
+  already fit the embedding model's window.
