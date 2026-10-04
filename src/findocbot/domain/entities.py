@@ -14,14 +14,18 @@ class Document:
 
     id: str
     filename: str
+    # SHA-256 of the uploaded bytes; None for documents stored before it.
+    content_hash: str | None = None
     created_at: datetime = field(
         default_factory=lambda: datetime.now(tz=UTC),
     )
 
     @staticmethod
-    def create(filename: str) -> Document:
+    def create(filename: str, content_hash: str | None = None) -> Document:
         """Create a document with generated identifier."""
-        return Document(id=str(uuid4()), filename=filename)
+        return Document(
+            id=str(uuid4()), filename=filename, content_hash=content_hash
+        )
 
 
 @dataclass(frozen=True)

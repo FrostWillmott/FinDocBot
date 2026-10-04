@@ -38,5 +38,9 @@ class StorageError(InfrastructureError):
     """Raised when a persistence operation fails."""
 
 
+class DuplicateDocumentError(StorageError):
+    """Raised when a document with the same content hash already exists."""
+
+
 class EmbeddingDimensionError(InfrastructureError):
     """Raised when embedding sizes disagree with the configured dimension."""

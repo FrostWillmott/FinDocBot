@@ -157,3 +157,11 @@ later reversed, add a superseding entry instead of editing the old one.
   prompt follows the same safety layout as the answer prompt; its output
   goes only to the embedder, and a malformed reply falls back to the
   original question rather than failing the request.
+- **Uploads are deduplicated by SHA-256 of the raw bytes; a duplicate
+  returns the stored document with 200, not 409** — two copies of one PDF
+  fill `top_k` with identical chunks. Re-uploading is then idempotent and
+  costs no parsing or embedding. Raw bytes, not extracted text: the same
+  report re-exported to a new PDF counts as a new document, accepted as
+  the simpler rule. The response is the stored document, so its filename
+  is the first upload's. Rows from before `004` have no hash; duplicates
+  among them stay until deleted.

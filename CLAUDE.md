@@ -88,7 +88,10 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.
 - **Document persistence**: the document row is inserted only after embeddings
-  succeed; rolled back if chunk insertion fails.
+  succeed; rolled back if chunk insertion fails. A SHA-256 of the uploaded bytes
+  (`documents.content_hash`, unique) makes a re-upload return the stored
+  document before parsing; a concurrent duplicate insert raises
+  `DuplicateDocumentError` and also resolves to the stored one.
 
 ### Config
 

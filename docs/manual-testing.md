@@ -147,6 +147,9 @@ curl -s -X POST "http://localhost:8000/documents/upload" \
 # -> {"document_id": "<uuid>", "filename": "aurora-ridge-annual-report-2025.pdf"}
 ```
 
+Running the same command again returns the same `document_id`: identical
+bytes are not indexed twice.
+
 Negative scenario:
 
 ```bash

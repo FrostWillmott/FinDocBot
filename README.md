@@ -83,6 +83,9 @@ curl -X POST "http://localhost:8000/documents/upload" \
      -F "file=@/path/to/report.pdf"
 ```
 
+Uploading the same file again (byte for byte) returns the stored document's
+`document_id` and filename instead of indexing a second copy.
+
 ### Search Document
 `POST /search` — Search for relevant text fragments.
 

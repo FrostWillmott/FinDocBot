@@ -10,6 +10,7 @@ from findocbot.domain.entities import (
     Chunk,
     Document,
 )
+from findocbot.domain.exceptions import DuplicateDocumentError
 from findocbot.use_cases.ports import ChunkWithScore
 
 
@@ -31,7 +32,23 @@ class InMemoryDocumentRepository:
 
     async def create(self, document: Document) -> None:
         """Store document entity."""
+        if (
+            document.content_hash is not None
+            and await self.find_by_content_hash(document.content_hash)
+        ):
+            raise DuplicateDocumentError("Document already exists")
         self.items[document.id] = document
+
+    async def find_by_content_hash(self, content_hash: str) -> Document | None:
+        """Return the document stored with this content hash, if any."""
+        return next(
+            (
+                item
+                for item in self.items.values()
+                if item.content_hash == content_hash
+            ),
+            None,
+        )
 
     async def delete(self, document_id: str) -> None:
         """Remove document entity by id."""

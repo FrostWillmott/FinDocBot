@@ -60,7 +60,10 @@ class DocumentRepositoryPort(Protocol):
     """Persistence operations for documents."""
 
     async def create(self, document: Document) -> None:
-        """Persist a document."""
+        """Persist a document; raise DuplicateDocumentError on same hash."""
+
+    async def find_by_content_hash(self, content_hash: str) -> Document | None:
+        """Return the document stored with this content hash, if any."""
 
     async def delete(self, document_id: str) -> None:
         """Remove a document by id."""

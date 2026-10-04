@@ -10,7 +10,11 @@ from findocbot.domain.entities import (
     Chunk,
     Document,
 )
-from findocbot.domain.exceptions import EmbeddingDimensionError, StorageError
+from findocbot.domain.exceptions import (
+    DuplicateDocumentError,
+    EmbeddingDimensionError,
+    StorageError,
+)
 from findocbot.infrastructure.db import PostgresPool
 from findocbot.use_cases.ports import ChunkWithScore
 
@@ -31,15 +35,40 @@ class PostgresDocumentRepository:
         try:
             await self._db.pool.execute(
                 """
-                INSERT INTO documents (id, filename, created_at)
-                VALUES ($1, $2, $3)
+                INSERT INTO documents (id, filename, content_hash, created_at)
+                VALUES ($1, $2, $3, $4)
                 """,
                 document.id,
                 document.filename,
+                document.content_hash,
                 document.created_at,
             )
+        except asyncpg.UniqueViolationError as exc:
+            raise DuplicateDocumentError("Document already exists") from exc
         except asyncpg.PostgresError as exc:
             raise StorageError("Failed to persist document") from exc
+
+    async def find_by_content_hash(self, content_hash: str) -> Document | None:
+        """Return the document stored with this content hash, if any."""
+        try:
+            row = await self._db.pool.fetchrow(
+                """
+                SELECT id, filename, content_hash, created_at
+                FROM documents
+                WHERE content_hash = $1
+                """,
+                content_hash,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to look up document") from exc
+        if row is None:
+            return None
+        return Document(
+            id=str(row["id"]),
+            filename=row["filename"],
+            content_hash=row["content_hash"],
+            created_at=row["created_at"],
+        )
 
     async def delete(self, document_id: str) -> None:
         """Delete document row by id."""

@@ -19,7 +19,11 @@ from findocbot.domain.entities import (
     Chunk,
     Document,
 )
-from findocbot.domain.exceptions import EmbeddingDimensionError, StorageError
+from findocbot.domain.exceptions import (
+    DuplicateDocumentError,
+    EmbeddingDimensionError,
+    StorageError,
+)
 from findocbot.infrastructure.db import PostgresPool
 from findocbot.infrastructure.postgres_repositories import (
     PostgresChatHistoryRepository,
@@ -194,6 +198,41 @@ async def test_chunk_insert_wrong_dim_raises_before_writing(
         await repo.add_chunks_with_embeddings([chunk], [[0.1, 0.2, 0.3]])
 
     assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
+
+
+@pytest.mark.integration
+async def test_document_find_by_content_hash_after_create_returns_it(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresDocumentRepository(db_pool)
+    doc = Document.create(filename="a.pdf", content_hash="abc")
+    await repo.create(doc)
+
+    assert await repo.find_by_content_hash("abc") == doc
+
+
+@pytest.mark.integration
+async def test_document_create_same_content_hash_raises_duplicate(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresDocumentRepository(db_pool)
+    await repo.create(Document.create(filename="a.pdf", content_hash="abc"))
+
+    duplicate = Document.create(filename="b.pdf", content_hash="abc")
+
+    with pytest.raises(DuplicateDocumentError):
+        await repo.create(duplicate)
+
+
+@pytest.mark.integration
+async def test_document_create_two_without_hash_keeps_both(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresDocumentRepository(db_pool)
+    await repo.create(Document.create(filename="a.pdf"))
+    await repo.create(Document.create(filename="b.pdf"))
+
+    assert await db_pool.pool.fetchval("SELECT count(*) FROM documents") == 2
 
 
 @pytest.mark.integration

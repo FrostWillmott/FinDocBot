@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 
 from findocbot.domain.entities import Chunk, Document
-from findocbot.domain.exceptions import EmptyDocumentError, StorageError
+from findocbot.domain.exceptions import (
+    DuplicateDocumentError,
+    EmptyDocumentError,
+    StorageError,
+)
 from findocbot.use_cases.ports import (
     ChunkerPort,
     ChunkRepositoryPort,
@@ -36,16 +41,24 @@ class UploadPDFUseCase:
     async def execute(self, filename: str, content: bytes) -> Document:
         """Run upload pipeline and return created document.
 
-        CPU-bound PDF parsing and chunking are offloaded to a thread
-        so they do not block the event loop.
+        Re-uploading the same bytes returns the stored document without
+        parsing or embedding again. CPU-bound PDF parsing and chunking are
+        offloaded to a thread so they do not block the event loop.
         """
+        content_hash = hashlib.sha256(content).hexdigest()
+        existing = await self._documents.find_by_content_hash(content_hash)
+        if existing is not None:
+            return existing
+
         text = (
             await asyncio.to_thread(self._parser.extract_text, content)
         ).strip()
         if not text:
             raise EmptyDocumentError("Uploaded PDF does not contain text.")
 
-        document = Document.create(filename=filename)
+        document = Document.create(
+            filename=filename, content_hash=content_hash
+        )
 
         chunk_parts = await asyncio.to_thread(self._chunker.split, text)
         built_chunks = [
@@ -64,7 +77,14 @@ class UploadPDFUseCase:
         ])
         # Persist the document only after embedding succeeds so that
         # a provider failure does not leave an orphan document row.
-        await self._documents.create(document)
+        try:
+            await self._documents.create(document)
+        except DuplicateDocumentError:
+            # A concurrent upload of the same bytes was stored first.
+            stored = await self._documents.find_by_content_hash(content_hash)
+            if stored is None:
+                raise
+            return stored
         try:
             await self._chunks.add_chunks_with_embeddings(
                 built_chunks, embeddings
