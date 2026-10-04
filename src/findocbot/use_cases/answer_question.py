@@ -109,6 +109,7 @@ class AnswerQuestionUseCase:
             if not isinstance(answer, str | None):
                 # Nothing usable to return; report it like any other
                 # malformed provider output instead of failing with a 500.
+                logger.warning(f"LLM answer is not a string: {exc}")
                 raise ModelProviderError("LLM answer is not a string") from exc
             logger.warning(
                 f"LLM answer failed schema validation, using defaults: {exc}"

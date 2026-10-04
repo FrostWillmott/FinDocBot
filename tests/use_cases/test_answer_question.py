@@ -199,3 +199,18 @@ async def test_execute_non_string_answer_raises_provider_error(
         await ask.execute(
             session_id="s1", question="How did revenue change?", top_k=3
         )
+
+
+async def test_execute_non_string_answer_logs_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ask = _build_answer_use_case(
+        StubProvider(structured={"answer": 42, "confidence": "high"})
+    )
+
+    with caplog.at_level(logging.WARNING), pytest.raises(ModelProviderError):
+        await ask.execute(
+            session_id="s1", question="How did revenue change?", top_k=3
+        )
+
+    assert "LLM answer is not a string" in caplog.text
