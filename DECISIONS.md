@@ -189,3 +189,10 @@ later reversed, add a superseding entry instead of editing the old one.
   rule (what counts as a usable answer), and Pydantic is a validation
   library, not a delivery or persistence framework, so `answer_question.py`
   keeps it. The domain layer stays stdlib-only.
+- **The PDF parser also maps pypdf's builtin exceptions to a 400** —
+  fuzzing 1500 corrupted copies of two PDFs (byte flips, truncation, cut
+  ranges; seed 20261004) gave 122 raw `KeyError`, `AttributeError`,
+  `NotImplementedError`, `TypeError`, `ValueError`, `IndexError` and
+  `UnboundLocalError` from pypdf internals, each a 500. The catch list is
+  exactly what was observed, not `Exception`. It can also hide a bug in our
+  own extraction visitor as a 400, so that branch logs the traceback.

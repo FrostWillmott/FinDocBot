@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from io import BytesIO
@@ -11,6 +12,20 @@ from pypdf import PageObject, PdfReader
 from pypdf.errors import PyPdfError
 
 from findocbot.domain.exceptions import InvalidDocumentError
+
+logger = logging.getLogger(__name__)
+
+# Builtins pypdf raises from its internals on malformed files instead of a
+# PyPdfError; each was seen fuzzing corrupted PDFs (see DECISIONS.md).
+_PYPDF_INTERNAL_ERRORS = (
+    KeyError,
+    AttributeError,
+    NotImplementedError,
+    TypeError,
+    ValueError,
+    IndexError,
+    UnboundLocalError,
+)
 
 # Spacing is the baseline gap between two lines in units of font size;
 # single-spaced text sits at ~1.2-1.6. A paragraph break is spacing 1.3x
@@ -47,6 +62,13 @@ class PyPDFParser:
         except PyPdfError as exc:
             raise InvalidDocumentError(
                 f"Uploaded file is not a readable PDF: {exc}"
+            ) from exc
+        except _PYPDF_INTERNAL_ERRORS as exc:
+            # Also catches a bug in our own visitor; the traceback keeps it
+            # findable while the client gets a 400 for a file pypdf choked on.
+            logger.warning(f"pypdf failed on upload: {exc!r}", exc_info=True)
+            raise InvalidDocumentError(
+                "Uploaded file is not a readable PDF."
             ) from exc
         return "\n\n".join(text for text in pages if text)
 

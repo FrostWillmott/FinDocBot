@@ -33,6 +33,24 @@ def test_extract_text_unreadable_bytes_raises_invalid_document(
         parser.extract_text(content)
 
 
+# Same-length edits keep the xref offsets valid, so pypdf gets past parsing
+# and fails inside its internals with a builtin, not a PyPdfError.
+@pytest.mark.parametrize(
+    ("original", "broken"),
+    [
+        (b"/Subtype /Type1", b"/Subtype /Type0"),  # KeyError
+        (b"/FlateDecode", b"/FlateDecodX"),  # NotImplementedError
+    ],
+)
+def test_extract_text_pypdf_internal_error_raises_invalid_document(
+    original: bytes, broken: bytes
+) -> None:
+    content = build_pdf_bytes("Revenue grew.").replace(original, broken)
+
+    with pytest.raises(InvalidDocumentError, match="not a readable PDF"):
+        PyPDFParser().extract_text(content)
+
+
 def _pdf_bytes(draw: Callable[[FPDF], None]) -> bytes:
     pdf = FPDF()
     pdf.add_page()
