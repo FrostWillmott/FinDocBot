@@ -11,6 +11,10 @@ class EmptyDocumentError(FinDocBotError):
     """Raised when extracted document content is empty."""
 
 
+class InvalidDocumentError(FinDocBotError):
+    """Raised when uploaded bytes cannot be read as a PDF."""
+
+
 class InvalidQueryError(FinDocBotError):
     """Raised when a search or question is invalid."""
 

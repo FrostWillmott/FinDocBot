@@ -8,6 +8,9 @@ from io import BytesIO
 from itertools import pairwise
 
 from pypdf import PageObject, PdfReader
+from pypdf.errors import PyPdfError
+
+from findocbot.domain.exceptions import InvalidDocumentError
 
 # Spacing is the baseline gap between two lines in units of font size;
 # single-spaced text sits at ~1.2-1.6. A paragraph break is spacing 1.3x
@@ -36,8 +39,15 @@ class PyPDFParser:
 
     def extract_text(self, content: bytes) -> str:
         """Return page text with blank lines between paragraphs."""
-        reader = PdfReader(BytesIO(content))
-        pages = [_extract_page(page) for page in reader.pages]
+        # pypdf parses lazily: a bad header fails in the constructor, an
+        # encrypted file on `.pages`, a broken stream inside extraction.
+        try:
+            reader = PdfReader(BytesIO(content))
+            pages = [_extract_page(page) for page in reader.pages]
+        except PyPdfError as exc:
+            raise InvalidDocumentError(
+                f"Uploaded file is not a readable PDF: {exc}"
+            ) from exc
         return "\n\n".join(text for text in pages if text)
 
 

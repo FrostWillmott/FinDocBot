@@ -152,6 +152,20 @@ async def test_upload_pdf_without_text_returns_400() -> None:
         assert "does not contain text" in resp.json()["detail"]
 
 
+async def test_upload_non_pdf_bytes_with_pdf_content_type_returns_400() -> (
+    None
+):
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        resp = await client.post(
+            "/documents/upload",
+            files={"file": ("fake.pdf", b"not a pdf", "application/pdf")},
+        )
+        assert resp.status_code == 400
+        assert "not a readable PDF" in resp.json()["detail"]
+
+
 async def test_upload_oversized_file_returns_413() -> None:
     oversized = b"0" * (50 * 1024 * 1024 + 1)
     async with httpx.AsyncClient(

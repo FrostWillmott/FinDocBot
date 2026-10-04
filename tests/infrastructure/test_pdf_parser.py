@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import pytest
 from fpdf import FPDF
 
+from findocbot.domain.exceptions import InvalidDocumentError
 from findocbot.infrastructure.pdf_parser import (
     PyPDFParser,
     TextLine,
@@ -19,6 +21,16 @@ def test_extract_text_single_line_pdf_returns_its_text() -> None:
     extracted = parser.extract_text(pdf_bytes)
 
     assert "Revenue increased by 12% in Q4." in extracted
+
+
+@pytest.mark.parametrize("content", [b"not a pdf", b""])
+def test_extract_text_unreadable_bytes_raises_invalid_document(
+    content: bytes,
+) -> None:
+    parser = PyPDFParser()
+
+    with pytest.raises(InvalidDocumentError, match="not a readable PDF"):
+        parser.extract_text(content)
 
 
 def _pdf_bytes(draw: Callable[[FPDF], None]) -> bytes:
