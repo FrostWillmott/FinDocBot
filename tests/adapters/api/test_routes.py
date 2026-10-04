@@ -188,9 +188,7 @@ async def test_ask_non_string_answer_returns_502() -> None:
     async with httpx.AsyncClient(
         transport=transport, base_url="http://test"
     ) as client:
-        resp = await client.post(
-            "/ask", json={"session_id": "s1", "question": "revenue?"}
-        )
+        resp = await client.post("/ask", json={"question": "revenue?"})
         assert resp.status_code == 502
 
 
@@ -220,3 +218,28 @@ async def test_health_failing_check_returns_503_naming_it() -> None:
                 "checks": {"database": "ok", "model_provider": "unavailable"},
             },
         )
+
+
+async def test_ask_unknown_session_id_returns_404() -> None:
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        resp = await client.post(
+            "/ask", json={"session_id": "guessed-id", "question": "revenue?"}
+        )
+        assert resp.status_code == 404
+
+
+async def test_ask_returned_session_id_is_accepted_on_next_call() -> None:
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        first = await client.post("/ask", json={"question": "revenue?"})
+        resp = await client.post(
+            "/ask",
+            json={
+                "session_id": first.json()["session_id"],
+                "question": "and profit?",
+            },
+        )
+        assert resp.status_code == 200

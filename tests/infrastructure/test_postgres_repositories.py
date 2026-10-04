@@ -13,7 +13,12 @@ import asyncpg
 import pytest
 from testcontainers.postgres import PostgresContainer
 
-from findocbot.domain.entities import ChatTurn, Chunk, Document
+from findocbot.domain.entities import (
+    ChatSession,
+    ChatTurn,
+    Chunk,
+    Document,
+)
 from findocbot.domain.exceptions import EmbeddingDimensionError, StorageError
 from findocbot.infrastructure.db import PostgresPool
 from findocbot.infrastructure.postgres_repositories import (
@@ -67,7 +72,7 @@ async def db_pool(pg_dsn: str) -> PostgresPool:
     pool = PostgresPool(pg_dsn)
     await pool.start()
     # The container is module-scoped; wipe data so tests stay independent.
-    await pool.pool.execute("TRUNCATE chunks, documents, chat_turns")
+    await pool.pool.execute("TRUNCATE chunks, documents, chat_turns, sessions")
     yield pool
     await pool.stop()
 
@@ -189,6 +194,26 @@ async def test_chunk_insert_wrong_dim_raises_before_writing(
         await repo.add_chunks_with_embeddings([chunk], [[0.1, 0.2, 0.3]])
 
     assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
+
+
+@pytest.mark.integration
+async def test_session_exists_after_create_returns_true(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresChatHistoryRepository(db_pool)
+    session = ChatSession.create()
+    await repo.create_session(session)
+
+    assert await repo.session_exists(session.id) is True
+
+
+@pytest.mark.integration
+async def test_session_exists_never_issued_id_returns_false(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresChatHistoryRepository(db_pool)
+
+    assert await repo.session_exists("guessed-id") is False
 
 
 @pytest.mark.integration

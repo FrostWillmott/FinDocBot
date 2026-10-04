@@ -213,7 +213,6 @@ async def test_ask_after_pdf_upload_returns_answer_with_sources() -> None:
         ask_resp = await client.post(
             "/ask",
             json={
-                "session_id": "smoke-session",
                 "question": "How did revenue change?",
                 "top_k": 3,
             },

@@ -66,6 +66,9 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 - **Error mapping**: `adapters/api/routes.py:_map_use_case_errors()` maps domain
   exceptions to HTTP status codes — `ModelProviderError` → 502,
   `InfrastructureError` → 503, `FinDocBotError` → 400.
+- **Sessions**: `/ask` without `session_id` starts a session with a
+  server-issued `secrets.token_urlsafe(32)` id (table `sessions`); an id not
+  in that table is a 404 (`SessionNotFoundError`), checked before any model call.
 - **Health**: `/health` runs `AppContainer.health_checks` (`PostgresPool.ping`,
   `OllamaGateway.ping`: one attempt, no retries) and answers 503 if any fails.
 - **CPU-bound offloading**: PDF parsing and chunking run via `asyncio.to_thread()`

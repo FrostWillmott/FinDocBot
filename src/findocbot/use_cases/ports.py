@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from findocbot.domain.entities import ChatTurn, Chunk, Document
+from findocbot.domain.entities import (
+    ChatSession,
+    ChatTurn,
+    Chunk,
+    Document,
+)
 
 
 @dataclass(frozen=True)
@@ -81,6 +86,12 @@ class ChunkRepositoryPort(Protocol):
 
 class ChatHistoryRepositoryPort(Protocol):
     """Persistence operations for Q/A history."""
+
+    async def create_session(self, session: ChatSession) -> None:
+        """Persist a newly issued session."""
+
+    async def session_exists(self, session_id: str) -> bool:
+        """Return whether the session was issued."""
 
     async def add_turn(self, turn: ChatTurn) -> None:
         """Persist chat turn."""

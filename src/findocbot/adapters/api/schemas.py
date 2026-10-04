@@ -17,7 +17,8 @@ class SearchRequest(BaseModel):
 class AskRequest(BaseModel):
     """Question request payload."""
 
-    session_id: str = Field(min_length=1)
+    # Omit on the first question; then send the id from the response.
+    session_id: str | None = Field(default=None, min_length=1)
     question: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=20)
 
@@ -46,3 +47,4 @@ class AskResponse(BaseModel):
     answer: str
     confidence: Literal["high", "medium", "low"] = "medium"
     sources: list[ChunkResponse]
+    session_id: str

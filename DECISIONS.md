@@ -139,3 +139,12 @@ later reversed, add a superseding entry instead of editing the old one.
   The checks are wired in the container rather than added to the
   `ModelProviderGateway` port, which use cases don't need for this. The
   Ollama ping skips the retry loop: a probe should report, not wait.
+- **The server issues `session_id`; `/ask` rejects ids it did not issue
+  with 404** — a client-chosen id let anyone who guessed it (README used
+  `user-session-123`) have the model recount another dialogue or plant
+  turns in it. Ids are `secrets.token_urlsafe(32)`, stored in `sessions`.
+  The row is created only after the first answer succeeds, so a failed
+  call leaves nothing the client never got an id for. No FK from
+  `chat_turns`: turns from before the change carry unissued ids and stay
+  unreachable. This is not user isolation — there is no auth and documents
+  stay shared; a future `user_id` column on `sessions` would add that.

@@ -98,10 +98,17 @@ curl -X POST "http://localhost:8000/search" \
 ```bash
 curl -X POST "http://localhost:8000/ask" \
      -H "Content-Type: application/json" \
-     -d '{
-       "question": "What was the company revenue in Q2?",
-       "session_id": "user-session-123"
-     }'
+     -d '{"question": "What was the company revenue in Q2?"}'
+```
+
+The first question starts a session: the response carries a server-issued
+`session_id`. Send it back to continue the dialogue; an id the server did
+not issue gets `404`.
+
+```bash
+curl -X POST "http://localhost:8000/ask" \
+     -H "Content-Type: application/json" \
+     -d '{"question": "And net profit?", "session_id": "<session_id from the first response>"}'
 ```
 
 Example `/ask` call in Swagger UI against a
@@ -134,6 +141,10 @@ The migration is applied automatically by `docker compose up` and
 `make migrate`. The vector size comes from `EMBEDDING_DIM` (768 for
 `nomic-embed-text`); the API refuses to start if the column and the setting
 disagree.
+
+`docker compose up` runs migrations only on an empty database volume. After
+pulling a new migration (e.g. `003_sessions.sql`), run `make migrate` against
+an existing volume.
 
 ---
 

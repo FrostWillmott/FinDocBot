@@ -24,4 +24,5 @@ class AskResponseDTO:
 
     answer: str
     sources: list[SearchResultDTO]
+    session_id: str
     confidence: Literal["high", "medium", "low"] = "medium"

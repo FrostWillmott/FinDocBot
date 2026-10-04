@@ -7,8 +7,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
-from findocbot.domain.entities import ChatTurn
-from findocbot.domain.exceptions import InvalidQueryError, ModelProviderError
+from findocbot.domain.entities import ChatSession, ChatTurn
+from findocbot.domain.exceptions import (
+    InvalidQueryError,
+    ModelProviderError,
+    SessionNotFoundError,
+)
 from findocbot.use_cases.dto import AskResponseDTO, SearchResultDTO
 from findocbot.use_cases.ports import (
     ChatHistoryRepositoryPort,
@@ -76,21 +80,34 @@ class AnswerQuestionUseCase:
 
     async def execute(
         self,
-        session_id: str,
+        session_id: str | None,
         question: str,
         top_k: int,
     ) -> AskResponseDTO:
-        """Generate contextual answer and store interaction."""
+        """Generate contextual answer and store interaction.
+
+        ``session_id=None`` starts a new session; its id comes back in the
+        response. Any other id must have been issued earlier.
+        """
         clean_question = question.strip()
         if not clean_question:
             raise InvalidQueryError("Question cannot be empty.")
+        # Checked before the model calls so a bad id costs no Ollama time.
+        if session_id is not None and not await self._history.session_exists(
+            session_id
+        ):
+            raise SessionNotFoundError("Unknown session_id.")
 
         sources = await self._search_use_case.execute(
             clean_question, top_k=top_k
         )
-        recent_turns = await self._history.list_recent(
-            session_id=session_id,
-            limit=self._max_history_pairs,
+        recent_turns = (
+            []
+            if session_id is None
+            else await self._history.list_recent(
+                session_id=session_id,
+                limit=self._max_history_pairs,
+            )
         )
         prompt = self._build_prompt(
             question=clean_question,
@@ -118,6 +135,12 @@ class AnswerQuestionUseCase:
             # fall back to defaults for the rest.
             validated = _AnswerValidation(answer=answer)
 
+        if session_id is None:
+            # Created only now: a failed first call leaves no session behind
+            # that the client never learned the id of.
+            session = ChatSession.create()
+            await self._history.create_session(session)
+            session_id = session.id
         await self._history.add_turn(
             ChatTurn.create(
                 session_id=session_id,
@@ -129,6 +152,7 @@ class AnswerQuestionUseCase:
             answer=validated.answer,
             confidence=validated.confidence,
             sources=sources,
+            session_id=session_id,
         )
 
     @staticmethod

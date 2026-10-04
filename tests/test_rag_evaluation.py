@@ -180,7 +180,8 @@ async def test_rag_pipeline_golden_dataset_meets_metric_thresholds() -> None:
     for qa in QA_DATASET:
         retrieved = await search.execute(qa.question, top_k=3)
         result = await ask.execute(
-            session_id="eval-session",
+            # A fresh session per question keeps the samples independent.
+            session_id=None,
             question=qa.question,
             top_k=3,
         )

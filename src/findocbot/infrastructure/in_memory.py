@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from findocbot.domain.entities import ChatTurn, Chunk, Document
+from findocbot.domain.entities import (
+    ChatSession,
+    ChatTurn,
+    Chunk,
+    Document,
+)
 from findocbot.use_cases.ports import ChunkWithScore
 
 
@@ -81,6 +86,15 @@ class InMemoryHistoryRepository:
     def __init__(self) -> None:
         """Initialize in-memory chat history."""
         self.items: list[ChatTurn] = []
+        self.session_ids: set[str] = set()
+
+    async def create_session(self, session: ChatSession) -> None:
+        """Record an issued session."""
+        self.session_ids.add(session.id)
+
+    async def session_exists(self, session_id: str) -> bool:
+        """Return whether the session was issued."""
+        return session_id in self.session_ids
 
     async def add_turn(self, turn: ChatTurn) -> None:
         """Append one turn to history."""

@@ -170,9 +170,10 @@ curl -s -X POST "http://localhost:8000/search" \
 ```bash
 curl -s -X POST "http://localhost:8000/ask" \
      -H "Content-Type: application/json" \
-     -d '{"question": "What was the total revenue in 2025?",
-          "session_id": "demo-1", "top_k": 3}' | python3 -m json.tool
-# -> {"answer": "...USD 1,284 million...", "confidence": "high|medium|low", "sources": [...]}
+     -d '{"question": "What was the total revenue in 2025?", "top_k": 3}' \
+     | python3 -m json.tool
+# -> {"answer": "...USD 1,284 million...", "confidence": "high|medium|low",
+#     "sources": [...], "session_id": "<43-char server-issued id>"}
 ```
 
 Check that `confidence` is one of {high, medium, low} and `sources` is
@@ -181,13 +182,21 @@ non-empty.
 ### 4.5 Dialogue memory (session history)
 
 Ask a follow-up question in the same session — the answer should take the
-context into account:
+context into account. Use the `session_id` returned in 4.4:
 
 ```bash
 curl -s -X POST "http://localhost:8000/ask" \
      -H "Content-Type: application/json" \
      -d '{"question": "And what about net profit?",
-          "session_id": "demo-1", "top_k": 3}' | python3 -m json.tool
+          "session_id": "<session_id from 4.4>", "top_k": 3}' | python3 -m json.tool
+```
+
+An id the server did not issue is rejected:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://localhost:8000/ask" \
+     -H "Content-Type: application/json" \
+     -d '{"question": "Hi?", "session_id": "demo-1"}'   # -> 404
 ```
 
 Verify the history is written to the database:

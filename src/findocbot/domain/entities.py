@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -48,6 +49,21 @@ class Chunk:
             text=text,
             section=section,
         )
+
+
+@dataclass(frozen=True)
+class ChatSession:
+    """Dialog session; its id is the only credential for its history."""
+
+    id: str
+    created_at: datetime = field(
+        default_factory=lambda: datetime.now(tz=UTC),
+    )
+
+    @staticmethod
+    def create() -> ChatSession:
+        """Create a session with an unguessable 256-bit identifier."""
+        return ChatSession(id=secrets.token_urlsafe(32))
 
 
 @dataclass(frozen=True)

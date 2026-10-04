@@ -7,6 +7,7 @@ import pytest
 from findocbot.domain.exceptions import (
     InvalidQueryError,
     ModelProviderError,
+    SessionNotFoundError,
 )
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.in_memory import (
@@ -16,6 +17,7 @@ from findocbot.infrastructure.in_memory import (
 )
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.ports import ModelProviderGateway
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
@@ -81,7 +83,7 @@ async def test_execute_matching_document_returns_grounded_answer() -> None:
     await upload.execute("report.pdf", pdf_bytes)
 
     response = await ask.execute(
-        session_id="session-1",
+        session_id=None,
         question="How did revenue change?",
         top_k=2,
     )
@@ -117,7 +119,7 @@ async def _prompt_for_document(text: str, question: str) -> str:
         history=InMemoryHistoryRepository(),
     )
     await upload.execute("report.pdf", build_pdf_bytes(text))
-    await ask.execute(session_id="s1", question=question, top_k=2)
+    await ask.execute(session_id=None, question=question, top_k=2)
     return provider.prompts[0]
 
 
@@ -141,7 +143,7 @@ async def test_execute_prompt_escapes_forged_closing_tag() -> None:
 
 
 def _build_answer_use_case(
-    provider: StubProvider,
+    provider: ModelProviderGateway,
     history: InMemoryHistoryRepository | None = None,
 ) -> AnswerQuestionUseCase:
     search = SearchSimilarChunksUseCase(
@@ -157,7 +159,7 @@ def _build_answer_use_case(
 async def test_execute_blank_question_raises_invalid_query() -> None:
     ask = _build_answer_use_case(StubProvider())
     with pytest.raises(InvalidQueryError):
-        await ask.execute(session_id="s1", question="   ", top_k=3)
+        await ask.execute(session_id=None, question="   ", top_k=3)
 
 
 async def test_execute_invalid_confidence_falls_back_to_medium() -> None:
@@ -167,7 +169,7 @@ async def test_execute_invalid_confidence_falls_back_to_medium() -> None:
     ask = _build_answer_use_case(provider)
 
     response = await ask.execute(
-        session_id="s1", question="How did revenue change?", top_k=3
+        session_id=None, question="How did revenue change?", top_k=3
     )
 
     assert response.answer == "Revenue grew."
@@ -184,7 +186,7 @@ async def test_execute_invalid_confidence_logs_warning(
 
     with caplog.at_level(logging.WARNING):
         await ask.execute(
-            session_id="s1", question="How did revenue change?", top_k=3
+            session_id=None, question="How did revenue change?", top_k=3
         )
 
     assert "failed schema validation" in caplog.text
@@ -200,7 +202,7 @@ async def test_execute_non_string_answer_raises_provider_error(
 
     with pytest.raises(ModelProviderError, match="not a string"):
         await ask.execute(
-            session_id="s1", question="How did revenue change?", top_k=3
+            session_id=None, question="How did revenue change?", top_k=3
         )
 
 
@@ -212,10 +214,11 @@ async def test_execute_missing_answer_key_raises_provider_error() -> None:
 
     with pytest.raises(ModelProviderError, match="not a string"):
         await ask.execute(
-            session_id="s1", question="How did revenue change?", top_k=3
+            session_id=None, question="How did revenue change?", top_k=3
         )
 
-    assert await history.list_recent(session_id="s1", limit=5) == []
+    # Neither a turn nor a session the client never learned the id of.
+    assert (history.items, history.session_ids) == ([], set())
 
 
 async def test_execute_non_string_answer_logs_warning(
@@ -227,7 +230,41 @@ async def test_execute_non_string_answer_logs_warning(
 
     with caplog.at_level(logging.WARNING), pytest.raises(ModelProviderError):
         await ask.execute(
-            session_id="s1", question="How did revenue change?", top_k=3
+            session_id=None, question="How did revenue change?", top_k=3
         )
 
     assert "LLM answer is not a string" in caplog.text
+
+
+async def test_execute_without_session_id_issues_new_session() -> None:
+    history = InMemoryHistoryRepository()
+    ask = _build_answer_use_case(StubProvider(), history=history)
+
+    response = await ask.execute(
+        session_id=None, question="How did revenue change?", top_k=3
+    )
+
+    assert history.session_ids == {response.session_id}
+
+
+async def test_execute_issued_session_id_feeds_history_into_prompt() -> None:
+    provider = _RecordingProvider()
+    ask = _build_answer_use_case(provider)
+    first = await ask.execute(
+        session_id=None, question="What was revenue?", top_k=3
+    )
+
+    await ask.execute(
+        session_id=first.session_id, question="And profit?", top_k=3
+    )
+
+    assert "What was revenue?" in provider.prompts[1]
+
+
+async def test_execute_unknown_session_id_raises_before_model_calls() -> None:
+    provider = _RecordingProvider()
+    ask = _build_answer_use_case(provider)
+
+    with pytest.raises(SessionNotFoundError):
+        await ask.execute(session_id="guessed-id", question="Hi?", top_k=3)
+    assert provider.prompts == []

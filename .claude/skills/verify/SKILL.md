@@ -62,7 +62,8 @@ HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 ```
 
 Write the model's JSON reply to `mode.json`, then `POST /ask`
-`{"session_id": "...", "question": "...", "top_k": 2}`. Persisted turns:
+`{"question": "...", "top_k": 2}`; add the returned `session_id` to follow-up
+calls (an id the server did not issue is a 404). Persisted turns:
 `docker exec findocbot-verify-db psql -U postgres -d findocbot -c "select * from chat_turns"`.
 
 ## Before/after comparison

@@ -83,7 +83,8 @@ Hooks: `ruff check`, `ruff format`, `mypy` (strict), `pytest`.
      - `{"query":"revenue in q4","top_k":3}`
 3. Ask:
    - `POST /ask` with payload:
-     - `{"session_id":"demo","question":"How did revenue change?","top_k":3}`
+     - `{"question":"How did revenue change?","top_k":3}` — the response
+       carries a `session_id`; send it back to continue the dialogue.
 
 ## Troubleshooting
 

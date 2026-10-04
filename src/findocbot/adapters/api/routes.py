@@ -21,6 +21,7 @@ from findocbot.domain.exceptions import (
     FinDocBotError,
     InfrastructureError,
     ModelProviderError,
+    SessionNotFoundError,
 )
 from findocbot.infrastructure.container import AppContainer
 
@@ -45,6 +46,8 @@ def _map_use_case_errors() -> Generator[None, None, None]:
         ) from error
     except InfrastructureError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except SessionNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
     except FinDocBotError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
@@ -151,6 +154,7 @@ def build_router(container: AppContainer) -> APIRouter:
                 )
                 for item in result.sources
             ],
+            session_id=result.session_id,
         )
 
     return router

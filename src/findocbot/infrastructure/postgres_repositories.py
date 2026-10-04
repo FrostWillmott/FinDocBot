@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import asyncpg
 
-from findocbot.domain.entities import ChatTurn, Chunk, Document
+from findocbot.domain.entities import (
+    ChatSession,
+    ChatTurn,
+    Chunk,
+    Document,
+)
 from findocbot.domain.exceptions import EmbeddingDimensionError, StorageError
 from findocbot.infrastructure.db import PostgresPool
 from findocbot.use_cases.ports import ChunkWithScore
@@ -174,6 +179,28 @@ class PostgresChatHistoryRepository:
     def __init__(self, db: PostgresPool) -> None:
         """Store db dependency."""
         self._db = db
+
+    async def create_session(self, session: ChatSession) -> None:
+        """Insert an issued session."""
+        try:
+            await self._db.pool.execute(
+                "INSERT INTO sessions (id, created_at) VALUES ($1, $2)",
+                session.id,
+                session.created_at,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to persist session") from exc
+
+    async def session_exists(self, session_id: str) -> bool:
+        """Return whether the session was issued."""
+        try:
+            found = await self._db.pool.fetchval(
+                "SELECT EXISTS (SELECT 1 FROM sessions WHERE id = $1)",
+                session_id,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to look up session") from exc
+        return bool(found)
 
     async def add_turn(self, turn: ChatTurn) -> None:
         """Insert chat turn."""

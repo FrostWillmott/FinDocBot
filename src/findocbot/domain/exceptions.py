@@ -19,6 +19,10 @@ class InvalidQueryError(FinDocBotError):
     """Raised when a search or question is invalid."""
 
 
+class SessionNotFoundError(FinDocBotError):
+    """Raised when a session id was not issued by the server."""
+
+
 # --- Infrastructure / adapter exceptions ---
 
 
