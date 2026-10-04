@@ -51,22 +51,24 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
    ```
 
 2. **Configure environment**:
-   Install dependencies and prepare the virtual environment:
+   Create `.env` (Compose requires it for the `api` service) and install dependencies:
    ```bash
+   cp .env.example .env
    make sync
    ```
 
-3. **Start infrastructure**:
-   Spin up PostgreSQL and Ollama via Docker Compose (models are pulled automatically):
+3. **Start the stack**:
+   Spin up PostgreSQL, Ollama and the API via Docker Compose (models are pulled automatically):
    ```bash
    make up
    ```
+   The API will be available at: `http://localhost:8000`. Swagger documentation: `http://localhost:8000/docs`.
 
-4. **Run the API**:
+   To run the API from your checkout instead (with hot reload), start only the infrastructure:
    ```bash
+   docker compose up -d db ollama
    make dev
    ```
-   The API will be available at: `http://localhost:8000`. Swagger documentation: `http://localhost:8000/docs`.
 
 ---
 

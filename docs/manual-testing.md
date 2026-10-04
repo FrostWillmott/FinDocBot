@@ -116,9 +116,10 @@ curl -s http://localhost:8000/health
 > `docker-compose.yml` overrides `OLLAMA_BASE_URL` and `POSTGRES_DSN` with
 > docker-network hosts (`ollama`/`db`) via `environment:`.
 
-Run:
+Stop the containerised API first — it holds port 8000 — then run:
 
 ```bash
+docker compose stop api
 make dev
 curl -s http://localhost:8000/health   # in another terminal -> {"status":"ok"}
 ```

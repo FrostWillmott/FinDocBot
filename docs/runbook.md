@@ -26,8 +26,9 @@
 
 1. Install dependencies:
    - `make sync`
-2. Start infrastructure:
-   - `make up`
+2. Start infrastructure only (`make up` would also start the `api`
+   container on port 8000):
+   - `docker compose up -d db ollama`
 3. Run API locally:
    - `make dev`
 4. Health check:
