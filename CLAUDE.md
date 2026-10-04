@@ -52,8 +52,10 @@ Use cases declare their dependencies as `Protocol` classes in `use_cases/ports.p
 | `ModelProviderGateway` | Embeddings + structured generation |
 | `DocumentRepositoryPort` / `ChunkRepositoryPort` / `ChatHistoryRepositoryPort` | Persistence |
 
-Each has a real implementation in `infrastructure/` and a fake in
-`infrastructure/in_memory.py` for tests.
+Each has a real implementation in `infrastructure/`. Repository fakes live in
+`tests/in_memory.py`, provider stubs in the tests that use them; neither ships
+in the package. `adapters/api/routes.py` depends on the `ApiServices` Protocol,
+not on `AppContainer`, so the API layer never imports `infrastructure`.
 
 ### Caching layer
 
@@ -105,13 +107,14 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 
 - **Integration tests** are gated behind `@pytest.mark.integration` and the
   `--integration` flag (see `tests/conftest.py`). They need Docker for PostgreSQL.
-- **In-memory fakes** (`infrastructure/in_memory.py`) cover repositories and the
-  model provider — no Docker needed for unit tests.
+- **In-memory fakes** (`tests/in_memory.py`) cover the repositories; model
+  provider stubs sit in `tests/use_cases/fakes.py` and in individual tests —
+  no Docker needed for unit tests.
 - Tests mirror `src/findocbot/`: `infrastructure/chunking.py` →
   `tests/infrastructure/test_chunking.py`, `main.py` → `tests/test_main.py`
   (app wiring smoke). Cross-cutting `tests/test_rag_evaluation.py` sits at the
   root. Test directories are packages, so shared helpers import as
-  `tests.factories` (PDF builder) and `tests.use_cases.fakes`.
+  `tests.factories` (PDF builder), `tests.in_memory` and `tests.use_cases.fakes`.
 - Test names follow `test_{what}_{condition}_{expected}`.
 - `tests/conftest.py` holds only the `--integration` option and marker. The
   Postgres fixtures (`pg_dsn` via testcontainers, `db_pool`) live in

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from findocbot.domain.entities import Chunk
-from findocbot.infrastructure.in_memory import InMemoryChunkRepository
+from tests.in_memory import InMemoryChunkRepository
 
 
 async def test_search_by_embedding_zero_vector_returns_zero_score() -> None:

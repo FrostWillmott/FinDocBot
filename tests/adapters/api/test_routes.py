@@ -11,11 +11,6 @@ from findocbot.config import Settings
 from findocbot.domain.exceptions import ModelProviderError, StorageError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.container import AppContainer
-from findocbot.infrastructure.in_memory import (
-    InMemoryChunkRepository,
-    InMemoryDocumentRepository,
-    InMemoryHistoryRepository,
-)
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.main import create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
@@ -26,6 +21,11 @@ from findocbot.use_cases.search_similar_chunks import (
 )
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 from tests.factories import build_pdf_bytes
+from tests.in_memory import (
+    InMemoryChunkRepository,
+    InMemoryDocumentRepository,
+    InMemoryHistoryRepository,
+)
 
 
 class _FakeDB:

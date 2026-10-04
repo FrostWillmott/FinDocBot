@@ -6,8 +6,8 @@ import pytest
 
 from findocbot.domain.entities import Document
 from findocbot.domain.exceptions import DocumentNotFoundError
-from findocbot.infrastructure.in_memory import InMemoryDocumentRepository
 from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
+from tests.in_memory import InMemoryDocumentRepository
 
 
 def _document(name: str, day: int) -> Document:

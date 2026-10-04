@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
+from typing import Protocol
 from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
@@ -26,9 +27,26 @@ from findocbot.domain.exceptions import (
     ModelProviderError,
     NotFoundError,
 )
-from findocbot.infrastructure.container import AppContainer
+from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
+from findocbot.use_cases.search_similar_chunks import (
+    SearchSimilarChunksUseCase,
+)
+from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 
 logger = logging.getLogger(__name__)
+
+
+class ApiServices(Protocol):
+    """What the routes need; the app's container provides it."""
+
+    upload_pdf: UploadPDFUseCase
+    search_chunks: SearchSimilarChunksUseCase
+    answer_question: AnswerQuestionUseCase
+    manage_documents: ManageDocumentsUseCase
+    # Each raises InfrastructureError when its system is down.
+    health_checks: dict[str, Callable[[], Awaitable[None]]]
+
 
 PDF_UPLOAD_FILE = File(...)
 _MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
@@ -74,7 +92,7 @@ def _document_response(document: Document) -> DocumentResponse:
     )
 
 
-def _add_document_routes(router: APIRouter, container: AppContainer) -> None:
+def _add_document_routes(router: APIRouter, container: ApiServices) -> None:
     @router.get("/documents", response_model=list[DocumentResponse])
     async def list_documents(
         limit: int = Query(default=50, ge=1, le=200),
@@ -101,7 +119,7 @@ def _add_document_routes(router: APIRouter, container: AppContainer) -> None:
             await container.manage_documents.delete_document(str(document_id))
 
 
-def build_router(container: AppContainer) -> APIRouter:
+def build_router(container: ApiServices) -> APIRouter:
     """Build API router with use-case handlers."""
     router = APIRouter()
 

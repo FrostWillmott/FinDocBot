@@ -203,3 +203,8 @@ later reversed, add a superseding entry instead of editing the old one.
   they are tuned to the code around them, not to the environment.
   `CHUNK_TOKENS` is coupled to `OLLAMA_NUM_CTX` and `_MAX_SOURCE_CHARS`;
   `.env.example` says so next to it.
+- **Routes depend on an `ApiServices` Protocol; repository fakes moved to
+  `tests/in_memory.py`** — `routes.py` imported `AppContainer`, so the
+  adapter layer depended on the infrastructure composition root, and the
+  fakes shipped in the production package. `main.py` stays the only place
+  that knows the container. Behaviour is unchanged.

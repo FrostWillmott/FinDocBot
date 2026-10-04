@@ -1,4 +1,4 @@
-"""In-memory adapters used in tests and local dry runs."""
+"""In-memory repository fakes for tests."""
 
 from __future__ import annotations
 
