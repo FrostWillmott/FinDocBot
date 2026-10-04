@@ -131,3 +131,11 @@ later reversed, add a superseding entry instead of editing the old one.
   production container** — root stays at `WARNING` and only the `findocbot`
   logger follows `LOG_LEVEL`, since httpx logs every Ollama request at
   `INFO`. Tests inject a container and keep pytest's logging untouched.
+- **`/health` checks PostgreSQL and Ollama and answers 503 when either is
+  down** — a process-only check reported healthy while every request
+  failed with 503. One endpoint, no liveness/readiness split: nothing
+  restarts the container on a failed check yet; if an orchestrator does,
+  split off a cheap liveness route so a DB outage doesn't cause restarts.
+  The checks are wired in the container rather than added to the
+  `ModelProviderGateway` port, which use cases don't need for this. The
+  Ollama ping skips the retry loop: a probe should report, not wait.

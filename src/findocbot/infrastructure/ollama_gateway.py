@@ -79,6 +79,18 @@ class OllamaGateway:
             )
         return self._client
 
+    async def ping(self, timeout_seconds: float = 2.0) -> None:
+        """Check that Ollama answers, in one attempt without retries."""
+        try:
+            response = await self._get_client().get(
+                f"{self._base_url}/api/version", timeout=timeout_seconds
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise ModelProviderError(
+                f"Ollama unreachable at {self._base_url}"
+            ) from exc
+
     async def _post(
         self, path: str, json_body: dict[str, object]
     ) -> httpx.Response:

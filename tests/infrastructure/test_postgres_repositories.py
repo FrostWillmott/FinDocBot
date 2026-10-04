@@ -14,7 +14,7 @@ import pytest
 from testcontainers.postgres import PostgresContainer
 
 from findocbot.domain.entities import ChatTurn, Chunk, Document
-from findocbot.domain.exceptions import EmbeddingDimensionError
+from findocbot.domain.exceptions import EmbeddingDimensionError, StorageError
 from findocbot.infrastructure.db import PostgresPool
 from findocbot.infrastructure.postgres_repositories import (
     PostgresChatHistoryRepository,
@@ -189,6 +189,23 @@ async def test_chunk_insert_wrong_dim_raises_before_writing(
         await repo.add_chunks_with_embeddings([chunk], [[0.1, 0.2, 0.3]])
 
     assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
+
+
+@pytest.mark.integration
+async def test_ping_running_database_returns_none(
+    db_pool: PostgresPool,
+) -> None:
+    assert await db_pool.ping() is None
+
+
+@pytest.mark.integration
+async def test_ping_closed_pool_raises_storage_error(pg_dsn: str) -> None:
+    db = PostgresPool(pg_dsn)
+    await db.start()
+    await db.pool.close()
+
+    with pytest.raises(StorageError, match="Database is unavailable"):
+        await db.ping()
 
 
 @pytest.fixture

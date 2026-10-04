@@ -67,8 +67,10 @@ install; confirm through traceback paths in the log.
 
 ## Gotchas
 
-- App warnings have no level prefix in the uvicorn log (no logging config;
-  Python's last-resort handler prints them).
+- App logs go to stderr as `time LEVEL logger: message`; filter out
+  uvicorn's own lines with `grep -v "INFO:"`.
+- The stub needs `GET /api/version` too, or `/health` reports
+  `model_provider` as unavailable.
 - A user-run Ollama may already hold :11434, so keep the stub on its own port.
 - Teardown: kill uvicorn and the stub, `docker stop findocbot-verify-db` (`--rm`
   removes it), `git worktree remove`.

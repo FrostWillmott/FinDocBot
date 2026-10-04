@@ -37,7 +37,8 @@
 3. Run API locally:
    - `make dev`
 4. Health check:
-   - `curl http://localhost:8000/health`
+   - `curl http://localhost:8000/health` — 200 when PostgreSQL and Ollama
+     both answer, 503 with the failing check marked `unavailable` otherwise.
 
 ## Full Docker Run
 

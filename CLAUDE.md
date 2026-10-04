@@ -66,6 +66,8 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 - **Error mapping**: `adapters/api/routes.py:_map_use_case_errors()` maps domain
   exceptions to HTTP status codes — `ModelProviderError` → 502,
   `InfrastructureError` → 503, `FinDocBotError` → 400.
+- **Health**: `/health` runs `AppContainer.health_checks` (`PostgresPool.ping`,
+  `OllamaGateway.ping`: one attempt, no retries) and answers 503 if any fails.
 - **CPU-bound offloading**: PDF parsing and chunking run via `asyncio.to_thread()`
   to avoid blocking the event loop.
 - **Embedding dimension**: `EMBEDDING_DIM` (`Settings.embedding_dim`) sizes

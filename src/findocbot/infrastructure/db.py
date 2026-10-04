@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncpg
 
+from findocbot.domain.exceptions import StorageError
+
 
 class PostgresPool:
     """Thin wrapper around asyncpg pool lifecycle."""
@@ -32,3 +34,17 @@ class PostgresPool:
         if self._pool is None:
             raise RuntimeError("Postgres pool is not initialized.")
         return self._pool
+
+    async def ping(self, timeout_seconds: float = 2.0) -> None:
+        """Run a trivial query; raise StorageError if the DB is down."""
+        try:
+            # Timeout on acquire: a saturated pool must not hang the probe.
+            async with self.pool.acquire(timeout=timeout_seconds) as conn:
+                await conn.fetchval("SELECT 1", timeout=timeout_seconds)
+        except (
+            asyncpg.PostgresError,
+            asyncpg.InterfaceError,
+            OSError,
+            TimeoutError,
+        ) as exc:
+            raise StorageError("Database is unavailable") from exc

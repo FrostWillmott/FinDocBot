@@ -43,6 +43,10 @@ class AppContainer:
     startup_checks: list[Callable[[], Awaitable[None]]] = field(
         default_factory=list
     )
+    # Run by /health; each raises InfrastructureError when its system is down.
+    health_checks: dict[str, Callable[[], Awaitable[None]]] = field(
+        default_factory=dict
+    )
 
     async def startup(self) -> None:
         """Initialize external resources and run startup checks."""
@@ -106,4 +110,8 @@ def create_container(settings: Settings) -> AppContainer:
         search_chunks=search_chunks,
         answer_question=answer_question,
         startup_checks=[chunks.verify_schema],
+        health_checks={
+            "database": db.ping,
+            "model_provider": ollama_gateway.ping,
+        },
     )

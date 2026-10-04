@@ -169,16 +169,22 @@ def test_configure_logging_info_level_enables_app_info_logs() -> None:
         app_logger.setLevel(previous)
 
 
-async def test_health_request_returns_status_ok() -> None:
-    """Smoke: /health responds with status ok."""
-    app = create_app(container=_build_test_container())
+async def test_health_all_checks_pass_returns_status_ok() -> None:
+    """Smoke: /health responds with status ok and each check's result."""
+
+    async def passing_check() -> None:
+        pass
+
+    container = _build_test_container()
+    container.health_checks = {"database": passing_check}
+    app = create_app(container=container)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
         transport=transport, base_url="http://test"
     ) as client:
         resp = await client.get("/health")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "ok"}
+        assert resp.json() == {"status": "ok", "checks": {"database": "ok"}}
 
 
 async def test_ask_after_pdf_upload_returns_answer_with_sources() -> None:

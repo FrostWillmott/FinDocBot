@@ -106,8 +106,11 @@ There are two options — pick one.
 
 ```bash
 curl -s http://localhost:8000/health
-# -> {"status":"ok"}
+# -> {"status":"ok","checks":{"database":"ok","model_provider":"ok"}}
 ```
+
+If PostgreSQL or Ollama is down, `/health` answers 503 with
+`"status":"degraded"` and `"unavailable"` next to the failing check.
 
 ### Option B. API locally (`make dev`)
 
@@ -121,7 +124,7 @@ Stop the containerised API first — it holds port 8000 — then run:
 ```bash
 docker compose stop api
 make dev
-curl -s http://localhost:8000/health   # in another terminal -> {"status":"ok"}
+curl -s http://localhost:8000/health   # in another terminal -> "status":"ok"
 ```
 
 Swagger UI for manual requests: http://localhost:8000/docs
@@ -236,7 +239,7 @@ make down          # stop and remove containers
 ## "It works" checklist
 
 - [ ] `ruff`, `mypy`, `pytest` are green
-- [ ] `/health` returns `{"status":"ok"}`
+- [ ] `/health` returns 200 with `"status":"ok"` and both checks `"ok"`
 - [ ] PDF upload returns a `document_id`
 - [ ] `/search` returns relevant chunks with descending score
 - [ ] `/ask` returns `answer` + valid `confidence` + `sources`

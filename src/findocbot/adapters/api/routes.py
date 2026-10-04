@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from collections.abc import Generator
+from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 
 from findocbot.adapters.api.schemas import (
     AskRequest,
@@ -47,13 +49,39 @@ def _map_use_case_errors() -> Generator[None, None, None]:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+async def _run_health_check(
+    name: str, check: Callable[[], Awaitable[None]]
+) -> str:
+    try:
+        await check()
+    except InfrastructureError as error:
+        logger.warning(f"Health check {name} failed: {error}")
+        return "unavailable"
+    return "ok"
+
+
 def build_router(container: AppContainer) -> APIRouter:
     """Build API router with use-case handlers."""
     router = APIRouter()
 
     @router.get("/health")
-    async def healthcheck() -> dict[str, str]:
-        return {"status": "ok"}
+    async def healthcheck() -> JSONResponse:
+        names = list(container.health_checks)
+        results = await asyncio.gather(
+            *(
+                _run_health_check(name, container.health_checks[name])
+                for name in names
+            )
+        )
+        checks = dict(zip(names, results, strict=True))
+        healthy = all(result == "ok" for result in results)
+        return JSONResponse(
+            status_code=200 if healthy else 503,
+            content={
+                "status": "ok" if healthy else "degraded",
+                "checks": checks,
+            },
+        )
 
     @router.post("/documents/upload", response_model=UploadResponse)
     async def upload_document(

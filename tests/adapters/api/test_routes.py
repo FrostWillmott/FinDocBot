@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 import httpx
 from fpdf import FPDF
 
@@ -69,6 +71,7 @@ class _FailingSearchChunkRepository(InMemoryChunkRepository):
 def _build_app(
     provider: _StubProvider | None = None,
     chunks: InMemoryChunkRepository | None = None,
+    health_checks: dict[str, Callable[[], Awaitable[None]]] | None = None,
 ) -> httpx.ASGITransport:
     provider = provider if provider is not None else _StubProvider()
     chunks = chunks if chunks is not None else InMemoryChunkRepository()
@@ -97,6 +100,7 @@ def _build_app(
         upload_pdf=upload_pdf,
         search_chunks=search_chunks,
         answer_question=answer_question,
+        health_checks=health_checks or {},
     )
     return httpx.ASGITransport(app=create_app(container=container))
 
@@ -188,3 +192,31 @@ async def test_ask_non_string_answer_returns_502() -> None:
             "/ask", json={"session_id": "s1", "question": "revenue?"}
         )
         assert resp.status_code == 502
+
+
+async def _passing_check() -> None:
+    pass
+
+
+async def _failing_check() -> None:
+    raise ModelProviderError("Ollama unreachable")
+
+
+async def test_health_failing_check_returns_503_naming_it() -> None:
+    transport = _build_app(
+        health_checks={
+            "database": _passing_check,
+            "model_provider": _failing_check,
+        }
+    )
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        resp = await client.get("/health")
+        assert (resp.status_code, resp.json()) == (
+            503,
+            {
+                "status": "degraded",
+                "checks": {"database": "ok", "model_provider": "unavailable"},
+            },
+        )

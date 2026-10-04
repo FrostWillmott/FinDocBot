@@ -368,3 +368,27 @@ def test_init_zero_max_attempts_raises_value_error() -> None:
             embed_model="test",
             max_attempts=0,
         )
+
+
+@respx.mock
+async def test_ping_running_server_returns_none(
+    gateway: OllamaGateway,
+) -> None:
+    respx.get(f"{BASE_URL}/api/version").mock(
+        return_value=httpx.Response(200, json={"version": "0.12.3"})
+    )
+
+    assert await gateway.ping() is None
+
+
+@respx.mock
+async def test_ping_unreachable_server_raises_without_retry(
+    gateway: OllamaGateway, sleeps: list[float]
+) -> None:
+    respx.get(f"{BASE_URL}/api/version").mock(
+        side_effect=httpx.ConnectError("refused")
+    )
+
+    with pytest.raises(ModelProviderError, match="unreachable"):
+        await gateway.ping()
+    assert sleeps == []
