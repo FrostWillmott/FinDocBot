@@ -27,7 +27,8 @@ services:
     volumes:
       - ollama:/root/.ollama
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      # The image ships no curl or wget; the CLI fails if the server is down.
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -37,13 +38,15 @@ services:
       - |
         ollama serve &
         sleep 5
-        for model in $$OLLAMA_MODELS; do
+        for model in $$FINDOCBOT_MODELS; do
           echo "Pulling $$model ..."
           ollama pull "$$model"
         done
         wait
     environment:
-      OLLAMA_MODELS: "qwen2.5:7b nomic-embed-text:latest"
+      # Not OLLAMA_MODELS: Ollama reads that as the models directory path,
+      # which would store the downloads outside the volume.
+      FINDOCBOT_MODELS: "qwen2.5:7b nomic-embed-text:latest"
 
   api:
     build:
