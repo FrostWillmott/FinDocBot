@@ -103,8 +103,10 @@ class AnswerQuestionUseCase:
         try:
             validated = _AnswerValidation(**structured)
         except ValidationError as exc:
-            answer = structured.get("answer", "") or ""
-            if not isinstance(answer, str):
+            answer = structured.get("answer")
+            # Check the raw value: an `or ""` default would turn 0 or False
+            # into an empty answer before the type check sees it.
+            if not isinstance(answer, str | None):
                 # Nothing usable to return; report it like any other
                 # malformed provider output instead of failing with a 500.
                 raise ModelProviderError("LLM answer is not a string") from exc
@@ -113,7 +115,7 @@ class AnswerQuestionUseCase:
             )
             # Only optional fields were malformed — keep the answer text and
             # fall back to defaults for the rest.
-            validated = _AnswerValidation(answer=answer)
+            validated = _AnswerValidation(answer=answer or "")
 
         await self._history.add_turn(
             ChatTurn.create(

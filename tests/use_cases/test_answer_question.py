@@ -187,9 +187,12 @@ async def test_execute_invalid_confidence_logs_warning(
     assert "failed schema validation" in caplog.text
 
 
-async def test_execute_numeric_answer_raises_provider_error() -> None:
+@pytest.mark.parametrize("answer", [42, 0, False])
+async def test_execute_non_string_answer_raises_provider_error(
+    answer: object,
+) -> None:
     ask = _build_answer_use_case(
-        StubProvider(structured={"answer": 42, "confidence": "high"})
+        StubProvider(structured={"answer": answer, "confidence": "high"})
     )
 
     with pytest.raises(ModelProviderError, match="not a string"):
