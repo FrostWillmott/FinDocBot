@@ -9,9 +9,13 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir uv
 
+# Dependencies first so they cache independently of the source. The
+# project itself is built in the second sync, which needs README.md
+# because hatchling reads `project.readme` from pyproject.toml.
 COPY pyproject.toml uv.lock /app/
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --frozen --no-dev --no-editable --no-install-project
 
+COPY README.md /app/
 COPY src /app/src
 RUN uv sync --frozen --no-dev --no-editable
 
