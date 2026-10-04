@@ -196,3 +196,10 @@ later reversed, add a superseding entry instead of editing the old one.
   `UnboundLocalError` from pypdf internals, each a 500. The catch list is
   exactly what was observed, not `Exception`. It can also hide a bug in our
   own extraction visitor as a 400, so that branch logs the traceback.
+- **Ollama timeout, pool size and chunker parameters are settings** —
+  they differ by deployment (CPU generation in Docker needs a longer
+  timeout) and were editable only in code. Retry count and backoff, the
+  `/health` probe timeout and the per-span prompt limits stay constants:
+  they are tuned to the code around them, not to the environment.
+  `CHUNK_TOKENS` is coupled to `OLLAMA_NUM_CTX` and `_MAX_SOURCE_CHARS`;
+  `.env.example` says so next to it.

@@ -24,6 +24,11 @@
      `nomic-embed-text`); sizes `chunks.embedding` when migrations run, and
      the API refuses to start if the column disagrees.
    - `POSTGRES_DSN`
+   - `OLLAMA_TIMEOUT_SECONDS` — per-request timeout to Ollama (120 s).
+   - `DB_POOL_MAX_SIZE` — PostgreSQL connection pool size (5).
+   - `CHUNK_TOKENS` / `CHUNK_OVERLAP_RATIO` — chunk size and overlap for new
+     uploads (300 / 0.15); documents already indexed keep their chunks.
+     Raise `OLLAMA_NUM_CTX` along with `CHUNK_TOKENS`.
    - `LOG_LEVEL` — level for the app's own loggers (`INFO` by default);
      libraries stay at `WARNING`.
 

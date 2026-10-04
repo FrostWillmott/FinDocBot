@@ -20,11 +20,18 @@ class Settings(BaseSettings):
     # the retrieved sources. Sized for the worst case: see DECISIONS.md.
     ollama_num_ctx: int = 16384
     ollama_num_predict: int = 1024
+    ollama_timeout_seconds: float = 120.0
     # Output size of ollama_embed_model; also sizes chunks.embedding.
     embedding_dim: int = 768
     postgres_dsn: PostgresDsn = PostgresDsn(
         "postgresql://postgres:postgres@localhost:5432/findocbot"
     )
+
+    db_pool_max_size: int = 5
+
+    # Feeds the num_ctx budget (top_k x chunk_tokens); applies to new uploads.
+    chunk_tokens: int = 300
+    chunk_overlap_ratio: float = 0.15
 
     top_k: int = 5
     max_history_pairs: int = 5

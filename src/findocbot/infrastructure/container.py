@@ -65,14 +65,20 @@ class AppContainer:
 
 def create_container(settings: Settings) -> AppContainer:
     """Wire use-cases with concrete infrastructure implementations."""
-    db = PostgresPool(str(settings.postgres_dsn))
+    db = PostgresPool(
+        str(settings.postgres_dsn), max_size=settings.db_pool_max_size
+    )
     parser = PyPDFParser()
-    chunker = ParagraphTokenChunker(chunk_tokens=300, overlap_ratio=0.15)
+    chunker = ParagraphTokenChunker(
+        chunk_tokens=settings.chunk_tokens,
+        overlap_ratio=settings.chunk_overlap_ratio,
+    )
 
     ollama_gateway = OllamaGateway(
         base_url=settings.ollama_base_url,
         chat_model=settings.ollama_chat_model,
         embed_model=settings.ollama_embed_model,
+        timeout_seconds=settings.ollama_timeout_seconds,
         batch_size=settings.embedding_batch_size,
         num_ctx=settings.ollama_num_ctx,
         num_predict=settings.ollama_num_predict,

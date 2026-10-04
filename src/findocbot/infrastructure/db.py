@@ -10,16 +10,17 @@ from findocbot.domain.exceptions import StorageError
 class PostgresPool:
     """Thin wrapper around asyncpg pool lifecycle."""
 
-    def __init__(self, dsn: str) -> None:
+    def __init__(self, dsn: str, max_size: int = 5) -> None:
         """Create pool wrapper with connection string."""
         self._dsn = dsn
+        self._max_size = max_size
         self._pool: asyncpg.Pool | None = None
 
     async def start(self) -> None:
         """Create asyncpg pool if missing."""
         if self._pool is None:
             self._pool = await asyncpg.create_pool(
-                dsn=self._dsn, min_size=1, max_size=5
+                dsn=self._dsn, min_size=1, max_size=self._max_size
             )
 
     async def stop(self) -> None:
