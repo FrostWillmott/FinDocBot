@@ -1,11 +1,17 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.8
-    hooks:
-      - id: ruff-check
-      - id: ruff-format
   - repo: local
     hooks:
+      # ruff runs from uv.lock, so the hook, make lint and CI share one version.
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
       - id: mypy
         name: mypy
         entry: uv run mypy src/findocbot

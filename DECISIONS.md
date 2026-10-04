@@ -113,3 +113,10 @@ later reversed, add a superseding entry instead of editing the old one.
 - **A missing or `None` LLM answer is a 502, same as a non-string one** — it
   used to slip through as an empty answer and be stored in chat history,
   from where it was fed into every later prompt of the session.
+- **502 responses carry a fixed message, the provider error goes to the
+  log** — `ModelProviderError` text names Ollama's internal URL, which a
+  client has no use for.
+- **ruff pre-commit hooks run `uv run ruff`, not `ruff-pre-commit`** — the
+  external repo pinned its own ruff (0.12.8 vs 0.15.0 in `uv.lock`); with
+  `preview = true` formatting can differ between versions, and the hook and
+  CI would then disagree.
