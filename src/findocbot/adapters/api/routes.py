@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 
@@ -21,6 +22,8 @@ from findocbot.domain.exceptions import (
 )
 from findocbot.infrastructure.container import AppContainer
 
+logger = logging.getLogger(__name__)
+
 PDF_UPLOAD_FILE = File(...)
 _MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 _MAX_UPLOAD_MB = _MAX_UPLOAD_BYTES // 1024 // 1024
@@ -32,7 +35,12 @@ def _map_use_case_errors() -> Generator[None, None, None]:
     try:
         yield
     except ModelProviderError as error:
-        raise HTTPException(status_code=502, detail=str(error)) from error
+        # The message can name the provider's internal URL; log it, but
+        # keep it out of the response.
+        logger.error(f"Model provider error: {error}")
+        raise HTTPException(
+            status_code=502, detail="Model provider request failed."
+        ) from error
     except InfrastructureError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except FinDocBotError as error:

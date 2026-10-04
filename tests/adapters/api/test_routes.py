@@ -121,7 +121,7 @@ async def test_search_provider_failure_returns_502() -> None:
             "/search", json={"query": "revenue", "top_k": 3}
         )
         assert resp.status_code == 502
-        assert "Ollama is down" in resp.json()["detail"]
+        assert resp.json()["detail"] == "Model provider request failed."
 
 
 async def test_search_storage_failure_returns_503() -> None:
@@ -188,4 +188,3 @@ async def test_ask_non_string_answer_returns_502() -> None:
             "/ask", json={"session_id": "s1", "question": "revenue?"}
         )
         assert resp.status_code == 502
-        assert "not a string" in resp.json()["detail"]
