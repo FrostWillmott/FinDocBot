@@ -140,14 +140,17 @@ async def test_execute_prompt_escapes_forged_closing_tag() -> None:
     assert prompt.count("</documents>") == 1
 
 
-def _build_answer_use_case(provider: StubProvider) -> AnswerQuestionUseCase:
+def _build_answer_use_case(
+    provider: StubProvider,
+    history: InMemoryHistoryRepository | None = None,
+) -> AnswerQuestionUseCase:
     search = SearchSimilarChunksUseCase(
         provider=provider, chunks=InMemoryChunkRepository()
     )
     return AnswerQuestionUseCase(
         provider=provider,
         search_use_case=search,
-        history=InMemoryHistoryRepository(),
+        history=history or InMemoryHistoryRepository(),
     )
 
 
@@ -187,7 +190,7 @@ async def test_execute_invalid_confidence_logs_warning(
     assert "failed schema validation" in caplog.text
 
 
-@pytest.mark.parametrize("answer", [42, 0, False])
+@pytest.mark.parametrize("answer", [42, 0, False, None])
 async def test_execute_non_string_answer_raises_provider_error(
     answer: object,
 ) -> None:
@@ -199,6 +202,20 @@ async def test_execute_non_string_answer_raises_provider_error(
         await ask.execute(
             session_id="s1", question="How did revenue change?", top_k=3
         )
+
+
+async def test_execute_missing_answer_key_raises_provider_error() -> None:
+    history = InMemoryHistoryRepository()
+    ask = _build_answer_use_case(
+        StubProvider(structured={"confidence": "high"}), history=history
+    )
+
+    with pytest.raises(ModelProviderError, match="not a string"):
+        await ask.execute(
+            session_id="s1", question="How did revenue change?", top_k=3
+        )
+
+    assert await history.list_recent(session_id="s1", limit=5) == []
 
 
 async def test_execute_non_string_answer_logs_warning(
