@@ -80,8 +80,9 @@ class OllamaGateway:
     ) -> httpx.Response:
         """POST to Ollama, retrying transient failures with backoff.
 
-        429/5xx and connection errors are retried; other HTTP errors fail
-        at once. The bounded attempts double as the circuit breaker for
+        429/5xx and transport errors (refused connection, dropped
+        connection mid-response) are retried; other HTTP errors fail at
+        once. The bounded attempts double as the circuit breaker for
         batch loops, which abort on the first call that exhausts them.
         Timeouts are not retried: a slow generation would otherwise hold
         the request for several timeout periods.
@@ -106,16 +107,17 @@ class OllamaGateway:
                         f"Ollama returned HTTP {status}"
                     ) from exc
                 reason = f"HTTP {status}"
-            except httpx.ConnectError as exc:
+            except httpx.TimeoutException as exc:
+                # Before TransportError: timeouts are a subclass of it.
+                raise ModelProviderError(
+                    f"Ollama timed out at {self._base_url}"
+                ) from exc
+            except httpx.TransportError as exc:
                 if attempt == self._max_attempts:
                     raise ModelProviderError(
                         f"Ollama unreachable at {self._base_url}"
                     ) from exc
-                reason = "connection error"
-            except httpx.TimeoutException as exc:
-                raise ModelProviderError(
-                    f"Ollama timed out at {self._base_url}"
-                ) from exc
+                reason = "transport error"
             delay = self._backoff_seconds * 2 ** (attempt - 1)
             delay += random.uniform(0, delay / 2)
             logger.warning(

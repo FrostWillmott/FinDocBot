@@ -98,3 +98,18 @@ later reversed, add a superseding entry instead of editing the old one.
   moves `ubuntu-latest` to Ubuntu 26 from 2026-10-19; pinning keeps the
   runner OS from changing under an unrelated push. Bump it deliberately in
   its own commit.
+
+## 2026-10-04
+
+- **Ollama calls retry every `httpx.TransportError`, still not timeouts** —
+  supersedes the "connection errors" entry above. A connection dropped
+  mid-generation (`ReadError`, `RemoteProtocolError` on an Ollama restart)
+  is as transient as a refused one and used to escape as a 500. The
+  timeout branch stays first because `TimeoutException` is a
+  `TransportError` subclass.
+- **Unreadable PDF bytes are a 400, not a 500** — the parser maps
+  `pypdf.errors.PyPdfError` to `InvalidDocumentError` (a `FinDocBotError`)
+  so a client sending garbage with `application/pdf` gets a client error.
+- **A missing or `None` LLM answer is a 502, same as a non-string one** — it
+  used to slip through as an empty answer and be stored in chat history,
+  from where it was fed into every later prompt of the session.

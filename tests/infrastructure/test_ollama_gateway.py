@@ -296,6 +296,33 @@ async def test_post_transient_connect_error_retries_then_succeeds(
 
 
 @respx.mock
+async def test_post_transient_read_error_retries_then_succeeds(
+    gateway: OllamaGateway,
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/embed").mock(
+        side_effect=[httpx.ReadError("connection reset"), _EMBED_OK]
+    )
+
+    await gateway.embed_one("query")
+
+    assert route.call_count == 2
+
+
+@respx.mock
+async def test_post_persistent_protocol_error_raises_provider_error(
+    gateway: OllamaGateway,
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/generate").mock(
+        side_effect=httpx.RemoteProtocolError("server disconnected")
+    )
+
+    with pytest.raises(ModelProviderError, match="unreachable"):
+        await gateway.generate_structured("question", {})
+
+    assert route.call_count == 3
+
+
+@respx.mock
 async def test_embed_many_exhausted_batch_aborts_remaining_batches(
     sleeps: list[float],
 ) -> None:
