@@ -103,7 +103,9 @@ curl -X POST "http://localhost:8000/ask" \
 
 The first question starts a session: the response carries a server-issued
 `session_id`. Send it back to continue the dialogue; an id the server did
-not issue gets `404`.
+not issue gets `404`. Follow-up questions are rewritten by the model into
+standalone search queries before retrieval, so "And net profit?" finds the
+right chunks.
 
 ```bash
 curl -X POST "http://localhost:8000/ask" \

@@ -258,7 +258,8 @@ async def test_execute_issued_session_id_feeds_history_into_prompt() -> None:
         session_id=first.session_id, question="And profit?", top_k=3
     )
 
-    assert "What was revenue?" in provider.prompts[1]
+    answer_prompt = provider.prompts[-1]
+    assert "What was revenue?" in answer_prompt
 
 
 async def test_execute_unknown_session_id_raises_before_model_calls() -> None:
@@ -268,3 +269,102 @@ async def test_execute_unknown_session_id_raises_before_model_calls() -> None:
     with pytest.raises(SessionNotFoundError):
         await ask.execute(session_id="guessed-id", question="Hi?", top_k=3)
     assert provider.prompts == []
+
+
+class _RewritingProvider(StubProvider):
+    """Answers the rewrite schema with a fixed query; records traffic."""
+
+    def __init__(self, rewrite: dict | None = None) -> None:
+        super().__init__()
+        self.rewrite = (
+            {"query": "What was net profit in 2025?"}
+            if rewrite is None
+            else rewrite
+        )
+        self.embedded: list[str] = []
+        self.prompts: list[str] = []
+
+    async def embed_one(self, text: str) -> list[float]:
+        self.embedded.append(text)
+        return await super().embed_one(text)
+
+    async def generate_structured(self, prompt: str, schema: dict) -> dict:
+        self.prompts.append(prompt)
+        if "query" in schema["properties"]:
+            return self.rewrite
+        return self.structured
+
+
+async def _ask_follow_up(provider: _RewritingProvider) -> None:
+    ask = _build_answer_use_case(provider)
+    first = await ask.execute(
+        session_id=None, question="What was revenue in 2025?", top_k=3
+    )
+    await ask.execute(
+        session_id=first.session_id, question="And net profit?", top_k=3
+    )
+
+
+async def test_execute_first_question_searches_without_rewrite() -> None:
+    provider = _RewritingProvider()
+    ask = _build_answer_use_case(provider)
+
+    await ask.execute(
+        session_id=None, question="What was revenue in 2025?", top_k=3
+    )
+
+    assert (provider.embedded, len(provider.prompts)) == (
+        ["What was revenue in 2025?"],
+        1,
+    )
+
+
+async def test_execute_follow_up_searches_by_rewritten_query() -> None:
+    provider = _RewritingProvider()
+
+    await _ask_follow_up(provider)
+
+    assert provider.embedded[-1] == "What was net profit in 2025?"
+
+
+async def test_execute_follow_up_answer_prompt_keeps_original_question() -> (
+    None
+):
+    provider = _RewritingProvider()
+
+    await _ask_follow_up(provider)
+
+    assert "<question>And net profit?</question>" in provider.prompts[-1]
+
+
+async def test_execute_rewrite_prompt_places_instructions_after_data() -> None:
+    provider = _RewritingProvider()
+
+    await _ask_follow_up(provider)
+
+    rewrite_prompt = provider.prompts[1]
+    assert rewrite_prompt.index("</question>") < rewrite_prompt.index(
+        "Instructions ("
+    )
+
+
+@pytest.mark.parametrize("rewrite", [{}, {"query": ""}, {"query": 42}])
+async def test_execute_invalid_rewrite_searches_by_original_question(
+    rewrite: dict,
+) -> None:
+    provider = _RewritingProvider(rewrite=rewrite)
+
+    await _ask_follow_up(provider)
+
+    assert provider.embedded[-1] == "And net profit?"
+
+
+async def test_execute_invalid_rewrite_logs_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    provider = _RewritingProvider(rewrite={})
+
+    with caplog.at_level(logging.WARNING):
+        await _ask_follow_up(provider)
+
+    assert "rewrite failed validation" in caplog.text

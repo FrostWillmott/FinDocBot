@@ -191,6 +191,10 @@ curl -s -X POST "http://localhost:8000/ask" \
           "session_id": "<session_id from 4.4>", "top_k": 3}' | python3 -m json.tool
 ```
 
+Before searching, the model rewrites the follow-up into a standalone query
+(here, something like "What was the net profit in 2025?"). Run the API with
+`LOG_LEVEL=DEBUG` to see the rewrite in the log.
+
 An id the server did not issue is rejected:
 
 ```bash

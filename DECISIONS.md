@@ -148,3 +148,12 @@ later reversed, add a superseding entry instead of editing the old one.
   `chat_turns`: turns from before the change carry unissued ids and stay
   unreachable. This is not user isolation — there is no auth and documents
   stay shared; a future `user_id` column on `sessions` would add that.
+- **Follow-up questions are rewritten by the LLM before retrieval** —
+  embedding only "And net profit?" searches without the topic it refers to.
+  Chosen over concatenating the previous question (drags retrieval to the
+  old topic) and over two searches merged by score (cheap, but helps less).
+  Cost: one extra generation per follow-up, seconds on local Ollama, about a
+  minute on CPU in Docker; first questions are unaffected. The rewrite
+  prompt follows the same safety layout as the answer prompt; its output
+  goes only to the embedder, and a malformed reply falls back to the
+  original question rather than failing the request.

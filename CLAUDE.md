@@ -69,6 +69,10 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 - **Sessions**: `/ask` without `session_id` starts a session with a
   server-issued `secrets.token_urlsafe(32)` id (table `sessions`); an id not
   in that table is a 404 (`SessionNotFoundError`), checked before any model call.
+- **Follow-up retrieval**: when the session has history, `/ask` first asks the
+  model to rewrite the question into a standalone search query (one extra
+  generation); invalid output falls back to the original question. The answer
+  prompt still gets the user's own question.
 - **Health**: `/health` runs `AppContainer.health_checks` (`PostgresPool.ping`,
   `OllamaGateway.ping`: one attempt, no retries) and answers 503 if any fails.
 - **CPU-bound offloading**: PDF parsing and chunking run via `asyncio.to_thread()`
