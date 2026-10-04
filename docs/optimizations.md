@@ -118,11 +118,11 @@ async def embed_many(self, texts: list[str]) -> list[list[float]]:
     """Embed many chunk texts with automatic batching."""
     if not texts:
         return []
-    
+
     # Process in batches to avoid timeout on large documents
     all_embeddings: list[list[float]] = []
     client = self._get_client()
-    
+
     for i in range(0, len(texts), self._batch_size):
         batch = texts[i : i + self._batch_size]
         response = await client.post(
@@ -132,8 +132,9 @@ async def embed_many(self, texts: list[str]) -> list[list[float]]:
         response.raise_for_status()
         payload = response.json()
         all_embeddings.extend(payload["embeddings"])
-    
+
     return all_embeddings
+
 
 # Use case is now simply:
 embeddings = await self._provider.embed_many([c.text for c in built_chunks])
@@ -168,9 +169,9 @@ New parameters in `src/findocbot/config.py`:
 ```python
 class Settings(BaseSettings):
     # ... existing parameters ...
-    embedding_cache_size: int = 1000                    # LRU cache size for embeddings
-    embedding_batch_size: int = 50                      # Batch size for document uploads
-    embedding_cache_ttl_seconds: int | None = 3600      # Cache entry TTL (1 hour)
+    embedding_cache_size: int = 1000  # LRU cache size for embeddings
+    embedding_batch_size: int = 50  # Batch size for document uploads
+    embedding_cache_ttl_seconds: int | None = 3600  # Cache entry TTL (1 hour)
 ```
 
 Override via environment variables:
@@ -240,9 +241,9 @@ print(f"Current size: {stats.size}/{stats.max_size}")
 ```python
 from prometheus_client import Counter, Gauge
 
-cache_hits = Counter('embedding_cache_hits_total', 'Total cache hits')
-cache_misses = Counter('embedding_cache_misses_total', 'Total cache misses')
-cache_size = Gauge('embedding_cache_size', 'Current cache size')
+cache_hits = Counter("embedding_cache_hits_total", "Total cache hits")
+cache_misses = Counter("embedding_cache_misses_total", "Total cache misses")
+cache_size = Gauge("embedding_cache_size", "Current cache size")
 ```
 
 ## Further Optimizations
