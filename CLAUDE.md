@@ -18,18 +18,24 @@ All commands use `uv` via the Makefile:
 | Type check | `uv run mypy src/findocbot` |
 | Start infra (DB + Ollama) | `make up` |
 | Stop infra | `make down` |
+| Apply migrations to a running `db` | `make migrate` |
+| Install pre-commit hooks | `make precommit-install` |
 
-The CI `test` job runs `ruff check`, `ruff format --check`, `mypy --strict`, and `pytest --cov-fail-under=90`. The `integration` job runs `pytest --integration -m integration` separately.
+The CI `test` job runs `ruff check`, `ruff format --check`, `mypy --strict`, and `pytest --cov-fail-under=90`. The `integration` job runs `pytest --integration -m integration` separately. `ruff format` also formats Python code blocks in Markdown, so docs fail the check too; the pre-commit ruff hooks cover Markdown for that reason.
 
 ## Architecture
 
-The project follows **Clean Architecture** with four layers (outer to inner):
+The project follows **Clean Architecture**; dependencies point inward:
 
 ```
-adapters/api  →  use_cases  →  domain
-                      ↓
-               infrastructure
+adapters/api   ─┐
+                ├─→  use_cases  →  domain
+infrastructure ─┘    (ports.py)
 ```
+
+`infrastructure` implements the ports declared in `use_cases/ports.py`; use
+cases never import it. `main.py` and `infrastructure/container.py` are the
+only places that wire concrete classes.
 
 ### Dependency injection
 
@@ -86,6 +92,10 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 - **Prompt safety**: untrusted text (chunks, history, question) goes through
   `use_cases/prompt_safety.neutralize` and sits inside tags, with the
   instructions last.
+- **Unreadable PDFs**: the parser maps `PyPdfError` and a fixed list of builtins
+  pypdf raises from its internals (found by fuzzing, see DECISIONS.md) to
+  `InvalidDocumentError` → 400. Extend that list only with types observed
+  from pypdf, never to `Exception`.
 - **PDF → chunks**: the parser rebuilds paragraph breaks (blank lines) from line
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.
@@ -94,6 +104,13 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
   (`documents.content_hash`, unique) makes a re-upload return the stored
   document before parsing; a concurrent duplicate insert raises
   `DuplicateDocumentError` and also resolves to the stored one.
+
+### Migrations
+
+Numbered SQL files in `migrations/`, applied in order by `migrations/apply.sh`:
+automatically when the `db` volume is empty, and by `make migrate` otherwise.
+`make migrate` re-runs every file, so each must be idempotent (`IF NOT EXISTS`).
+The integration tests apply the same files.
 
 ### Config
 
