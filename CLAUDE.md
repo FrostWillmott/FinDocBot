@@ -86,7 +86,7 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 `Settings` (pydantic-settings) loads from env / `.env`. Key knobs:
 `embedding_dim`, `top_k`, `max_history_pairs`, `embedding_cache_size`,
 `embedding_batch_size`, `embedding_cache_ttl_seconds`, `ollama_num_ctx`,
-`ollama_num_predict`.
+`ollama_num_predict`, `log_level`.
 
 ### Testing
 

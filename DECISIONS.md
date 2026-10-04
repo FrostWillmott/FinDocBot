@@ -127,3 +127,7 @@ later reversed, add a superseding entry instead of editing the old one.
   up to 4000 chars (~1k tokens each), the question and instructions. The
   answer cap keeps one call bounded; `/api/embed` gets no options, chunks
   already fit the embedding model's window.
+- **Logging is configured in `create_app` only when it builds the
+  production container** — root stays at `WARNING` and only the `findocbot`
+  logger follows `LOG_LEVEL`, since httpx logs every Ollama request at
+  `INFO`. Tests inject a container and keep pytest's logging untouched.

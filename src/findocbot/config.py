@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -29,6 +31,7 @@ class Settings(BaseSettings):
     embedding_cache_size: int = 1000
     embedding_batch_size: int = 50
     embedding_cache_ttl_seconds: int | None = 3600
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
 
 def load_settings() -> Settings:

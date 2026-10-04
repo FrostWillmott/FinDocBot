@@ -6,6 +6,8 @@ the container can be built with fake dependencies.
 
 from __future__ import annotations
 
+import logging
+
 import httpx
 
 from findocbot.config import Settings
@@ -20,7 +22,7 @@ from findocbot.infrastructure.in_memory import (
     InMemoryHistoryRepository,
 )
 from findocbot.infrastructure.pdf_parser import PyPDFParser
-from findocbot.main import create_app
+from findocbot.main import configure_logging, create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
@@ -153,6 +155,18 @@ def test_create_app_without_container_builds_production_app() -> None:
     """Smoke: default create_app() wires the production container."""
     app = create_app()
     assert app.title == "FinDocBot API"
+
+
+def test_configure_logging_info_level_enables_app_info_logs() -> None:
+    app_logger = logging.getLogger("findocbot")
+    previous = app_logger.level
+    try:
+        configure_logging("INFO")
+        assert logging.getLogger("findocbot.infrastructure").isEnabledFor(
+            logging.INFO
+        )
+    finally:
+        app_logger.setLevel(previous)
 
 
 async def test_health_request_returns_status_ok() -> None:

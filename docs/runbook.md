@@ -24,6 +24,8 @@
      `nomic-embed-text`); sizes `chunks.embedding` when migrations run, and
      the API refuses to start if the column disagrees.
    - `POSTGRES_DSN`
+   - `LOG_LEVEL` — level for the app's own loggers (`INFO` by default);
+     libraries stay at `WARNING`.
 
 ## Local Development (without Docker API)
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -11,6 +12,15 @@ from fastapi import FastAPI
 from findocbot.adapters.api.routes import build_router
 from findocbot.config import load_settings
 from findocbot.infrastructure.container import AppContainer, create_container
+
+
+def configure_logging(level: str) -> None:
+    """Send the app's logs to stderr with time and level."""
+    # Root stays at WARNING: at INFO httpx logs a line per Ollama request.
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+    logging.getLogger("findocbot").setLevel(level)
 
 
 def create_app(
@@ -24,6 +34,7 @@ def create_app(
     """
     if container is None:
         settings = load_settings()
+        configure_logging(settings.log_level)
         container = create_container(settings)
 
     @asynccontextmanager
