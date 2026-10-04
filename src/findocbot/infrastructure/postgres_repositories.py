@@ -23,6 +23,15 @@ def _vector_literal(values: list[float]) -> str:
     return "[" + ",".join(f"{value:.9f}" for value in values) + "]"
 
 
+def _document_from_row(row: asyncpg.Record) -> Document:
+    return Document(
+        id=str(row["id"]),
+        filename=row["filename"],
+        content_hash=row["content_hash"],
+        created_at=row["created_at"],
+    )
+
+
 class PostgresDocumentRepository:
     """Persist document metadata in PostgreSQL."""
 
@@ -61,24 +70,50 @@ class PostgresDocumentRepository:
             )
         except asyncpg.PostgresError as exc:
             raise StorageError("Failed to look up document") from exc
-        if row is None:
-            return None
-        return Document(
-            id=str(row["id"]),
-            filename=row["filename"],
-            content_hash=row["content_hash"],
-            created_at=row["created_at"],
-        )
+        return None if row is None else _document_from_row(row)
 
-    async def delete(self, document_id: str) -> None:
-        """Delete document row by id."""
+    async def get(self, document_id: str) -> Document | None:
+        """Return the document with this id, if any."""
         try:
-            await self._db.pool.execute(
-                "DELETE FROM documents WHERE id = $1",
+            row = await self._db.pool.fetchrow(
+                """
+                SELECT id, filename, content_hash, created_at
+                FROM documents
+                WHERE id = $1
+                """,
+                document_id,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to load document") from exc
+        return None if row is None else _document_from_row(row)
+
+    async def list_page(self, limit: int, offset: int) -> list[Document]:
+        """Return documents, newest first."""
+        try:
+            rows = await self._db.pool.fetch(
+                """
+                SELECT id, filename, content_hash, created_at
+                FROM documents
+                ORDER BY created_at DESC, id
+                LIMIT $1 OFFSET $2
+                """,
+                limit,
+                offset,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to list documents") from exc
+        return [_document_from_row(row) for row in rows]
+
+    async def delete(self, document_id: str) -> bool:
+        """Delete document row (chunks cascade); return whether it existed."""
+        try:
+            deleted_id = await self._db.pool.fetchval(
+                "DELETE FROM documents WHERE id = $1 RETURNING id",
                 document_id,
             )
         except asyncpg.PostgresError as exc:
             raise StorageError("Failed to delete document") from exc
+        return deleted_id is not None
 
 
 class PostgresChunkRepository:

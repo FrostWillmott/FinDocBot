@@ -165,3 +165,10 @@ later reversed, add a superseding entry instead of editing the old one.
   the simpler rule. The response is the stored document, so its filename
   is the first upload's. Rows from before `004` have no hash; duplicates
   among them stay until deleted.
+- **`GET /documents`, `GET`/`DELETE /documents/{id}` go through one
+  `ManageDocumentsUseCase`** — three one-line use-case classes would be
+  ceremony. Delete relies on `ON DELETE CASCADE` to drop the chunks; the
+  in-memory fakes don't model the cascade, so that part is covered by an
+  integration test. Ids are typed `UUID` in the path, so a malformed id is
+  a 422 instead of a Postgres type error surfacing as 503. Not-found cases
+  share a `NotFoundError` base mapped to 404.

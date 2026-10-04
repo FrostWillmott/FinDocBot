@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -39,6 +40,14 @@ class UploadResponse(BaseModel):
 
     document_id: str
     filename: str
+
+
+class DocumentResponse(BaseModel):
+    """Stored document metadata."""
+
+    document_id: str
+    filename: str
+    created_at: datetime
 
 
 class AskResponse(BaseModel):

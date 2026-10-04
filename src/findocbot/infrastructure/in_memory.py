@@ -50,9 +50,20 @@ class InMemoryDocumentRepository:
             None,
         )
 
-    async def delete(self, document_id: str) -> None:
-        """Remove document entity by id."""
-        self.items.pop(document_id, None)
+    async def get(self, document_id: str) -> Document | None:
+        """Return the document with this id, if any."""
+        return self.items.get(document_id)
+
+    async def list_page(self, limit: int, offset: int) -> list[Document]:
+        """Return documents, newest first."""
+        newest_first = sorted(
+            self.items.values(), key=lambda item: item.created_at, reverse=True
+        )
+        return newest_first[offset : offset + limit]
+
+    async def delete(self, document_id: str) -> bool:
+        """Remove document entity by id; return whether it existed."""
+        return self.items.pop(document_id, None) is not None
 
 
 @dataclass

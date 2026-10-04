@@ -19,11 +19,13 @@ from findocbot.infrastructure.in_memory import (
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.main import create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
 from findocbot.use_cases.ports import ChunkWithScore
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
+from tests.factories import build_pdf_bytes
 
 
 class _FakeDB:
@@ -100,6 +102,7 @@ def _build_app(
         upload_pdf=upload_pdf,
         search_chunks=search_chunks,
         answer_question=answer_question,
+        manage_documents=ManageDocumentsUseCase(documents),
         health_checks=health_checks or {},
     )
     return httpx.ASGITransport(app=create_app(container=container))
@@ -243,3 +246,59 @@ async def test_ask_returned_session_id_is_accepted_on_next_call() -> None:
             },
         )
         assert resp.status_code == 200
+
+
+async def _upload_pdf(client: httpx.AsyncClient) -> httpx.Response:
+    pdf = build_pdf_bytes("Revenue grew.")
+    return await client.post(
+        "/documents/upload", files={"file": ("r.pdf", pdf, "application/pdf")}
+    )
+
+
+async def test_documents_after_upload_lists_it() -> None:
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        upload = await _upload_pdf(client)
+        resp = await client.get("/documents")
+        assert [item["document_id"] for item in resp.json()] == [
+            upload.json()["document_id"]
+        ]
+
+
+async def test_delete_document_then_get_returns_404() -> None:
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        upload = await _upload_pdf(client)
+        url = f"/documents/{upload.json()['document_id']}"
+        deleted = await client.delete(url)
+        resp = await client.get(url)
+        assert (deleted.status_code, resp.status_code) == (204, 404)
+
+
+async def test_delete_unknown_document_returns_404() -> None:
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        resp = await client.delete(
+            "/documents/00000000-0000-0000-0000-000000000000"
+        )
+        assert resp.status_code == 404
+
+
+async def test_get_document_malformed_id_returns_422() -> None:
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        resp = await client.get("/documents/not-a-uuid")
+        assert resp.status_code == 422
+
+
+async def test_get_document_after_upload_returns_its_filename() -> None:
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        upload = await _upload_pdf(client)
+        resp = await client.get(f"/documents/{upload.json()['document_id']}")
+        assert resp.json()["filename"] == "r.pdf"

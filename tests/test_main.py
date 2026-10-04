@@ -24,6 +24,7 @@ from findocbot.infrastructure.in_memory import (
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.main import configure_logging, create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
@@ -116,6 +117,7 @@ def _build_test_container() -> AppContainer:
         upload_pdf=upload_pdf,
         search_chunks=search_chunks,
         answer_question=answer_question,
+        manage_documents=ManageDocumentsUseCase(documents),
     )
 
 

@@ -19,8 +19,16 @@ class InvalidQueryError(FinDocBotError):
     """Raised when a search or question is invalid."""
 
 
-class SessionNotFoundError(FinDocBotError):
+class NotFoundError(FinDocBotError):
+    """Base for lookups of an id that does not exist."""
+
+
+class SessionNotFoundError(NotFoundError):
     """Raised when a session id was not issued by the server."""
+
+
+class DocumentNotFoundError(NotFoundError):
+    """Raised when no document has the requested id."""
 
 
 # --- Infrastructure / adapter exceptions ---

@@ -86,6 +86,17 @@ curl -X POST "http://localhost:8000/documents/upload" \
 Uploading the same file again (byte for byte) returns the stored document's
 `document_id` and filename instead of indexing a second copy.
 
+### List, Inspect and Delete Documents
+`GET /documents?limit=50&offset=0` — stored documents, newest first
+(`limit` up to 200). `GET /documents/{document_id}` — one document.
+`DELETE /documents/{document_id}` — removes the document and its chunks, so
+search stops returning them (`204`; `404` if the id is unknown).
+
+```bash
+curl "http://localhost:8000/documents"
+curl -X DELETE "http://localhost:8000/documents/<document_id>"
+```
+
 ### Search Document
 `POST /search` — Search for relevant text fragments.
 

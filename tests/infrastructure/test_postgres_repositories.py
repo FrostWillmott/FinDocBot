@@ -236,6 +236,65 @@ async def test_document_create_two_without_hash_keeps_both(
 
 
 @pytest.mark.integration
+async def test_document_list_page_returns_newest_first(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresDocumentRepository(db_pool)
+    older = Document.create(filename="older.pdf")
+    newer = Document.create(filename="newer.pdf")
+    await repo.create(older)
+    await repo.create(newer)
+
+    page = await repo.list_page(limit=1, offset=0)
+
+    assert [doc.id for doc in page] == [newer.id]
+
+
+@pytest.mark.integration
+async def test_document_get_after_create_returns_it(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresDocumentRepository(db_pool)
+    doc = Document.create(filename="a.pdf", content_hash="abc")
+    await repo.create(doc)
+
+    assert await repo.get(doc.id) == doc
+
+
+@pytest.mark.integration
+async def test_document_delete_removes_its_chunks_from_search(
+    db_pool: PostgresPool,
+) -> None:
+    doc = Document.create(filename="a.pdf")
+    documents = PostgresDocumentRepository(db_pool)
+    await documents.create(doc)
+    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
+    await chunks.add_chunks_with_embeddings(
+        [Chunk.create(document_id=doc.id, chunk_index=0, text="x")],
+        [embedding],
+    )
+
+    await documents.delete(doc.id)
+
+    assert await chunks.search_by_embedding(embedding, top_k=5) == []
+
+
+@pytest.mark.integration
+async def test_document_delete_twice_reports_whether_it_existed(
+    db_pool: PostgresPool,
+) -> None:
+    repo = PostgresDocumentRepository(db_pool)
+    doc = Document.create(filename="a.pdf")
+    await repo.create(doc)
+
+    assert (await repo.delete(doc.id), await repo.delete(doc.id)) == (
+        True,
+        False,
+    )
+
+
+@pytest.mark.integration
 async def test_session_exists_after_create_returns_true(
     db_pool: PostgresPool,
 ) -> None:

@@ -6,22 +6,25 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
+from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
 from findocbot.adapters.api.schemas import (
     AskRequest,
     AskResponse,
     ChunkResponse,
+    DocumentResponse,
     SearchRequest,
     UploadResponse,
 )
+from findocbot.domain.entities import Document
 from findocbot.domain.exceptions import (
     FinDocBotError,
     InfrastructureError,
     ModelProviderError,
-    SessionNotFoundError,
+    NotFoundError,
 )
 from findocbot.infrastructure.container import AppContainer
 
@@ -46,7 +49,7 @@ def _map_use_case_errors() -> Generator[None, None, None]:
         ) from error
     except InfrastructureError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
-    except SessionNotFoundError as error:
+    except NotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except FinDocBotError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -61,6 +64,41 @@ async def _run_health_check(
         logger.warning(f"Health check {name} failed: {error}")
         return "unavailable"
     return "ok"
+
+
+def _document_response(document: Document) -> DocumentResponse:
+    return DocumentResponse(
+        document_id=document.id,
+        filename=document.filename,
+        created_at=document.created_at,
+    )
+
+
+def _add_document_routes(router: APIRouter, container: AppContainer) -> None:
+    @router.get("/documents", response_model=list[DocumentResponse])
+    async def list_documents(
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+    ) -> list[DocumentResponse]:
+        with _map_use_case_errors():
+            documents = await container.manage_documents.list_documents(
+                limit=limit, offset=offset
+            )
+        return [_document_response(document) for document in documents]
+
+    # UUID path params: a malformed id is a 422 here, not a DB type error.
+    @router.get("/documents/{document_id}", response_model=DocumentResponse)
+    async def get_document(document_id: UUID) -> DocumentResponse:
+        with _map_use_case_errors():
+            document = await container.manage_documents.get_document(
+                str(document_id)
+            )
+        return _document_response(document)
+
+    @router.delete("/documents/{document_id}", status_code=204)
+    async def delete_document(document_id: UUID) -> None:
+        with _map_use_case_errors():
+            await container.manage_documents.delete_document(str(document_id))
 
 
 def build_router(container: AppContainer) -> APIRouter:
@@ -157,4 +195,5 @@ def build_router(container: AppContainer) -> APIRouter:
             session_id=result.session_id,
         )
 
+    _add_document_routes(router, container)
     return router

@@ -19,6 +19,7 @@ from findocbot.infrastructure.postgres_repositories import (
     PostgresDocumentRepository,
 )
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
 from findocbot.use_cases.ports import ModelProviderGateway
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
@@ -39,6 +40,7 @@ class AppContainer:
     upload_pdf: UploadPDFUseCase
     search_chunks: SearchSimilarChunksUseCase
     answer_question: AnswerQuestionUseCase
+    manage_documents: ManageDocumentsUseCase
     # Run after the database is up; a failure aborts application startup.
     startup_checks: list[Callable[[], Awaitable[None]]] = field(
         default_factory=list
@@ -109,6 +111,7 @@ def create_container(settings: Settings) -> AppContainer:
         upload_pdf=upload_pdf,
         search_chunks=search_chunks,
         answer_question=answer_question,
+        manage_documents=ManageDocumentsUseCase(documents),
         startup_checks=[chunks.verify_schema],
         health_checks={
             "database": db.ping,

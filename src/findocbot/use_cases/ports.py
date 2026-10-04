@@ -65,8 +65,14 @@ class DocumentRepositoryPort(Protocol):
     async def find_by_content_hash(self, content_hash: str) -> Document | None:
         """Return the document stored with this content hash, if any."""
 
-    async def delete(self, document_id: str) -> None:
-        """Remove a document by id."""
+    async def get(self, document_id: str) -> Document | None:
+        """Return the document with this id, if any."""
+
+    async def list_page(self, limit: int, offset: int) -> list[Document]:
+        """Return documents, newest first."""
+
+    async def delete(self, document_id: str) -> bool:
+        """Remove a document and its chunks; return whether it existed."""
 
 
 class ChunkRepositoryPort(Protocol):

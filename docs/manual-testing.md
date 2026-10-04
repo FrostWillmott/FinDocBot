@@ -213,6 +213,19 @@ docker compose exec db psql -U postgres -d findocbot \
   -c "SELECT session_id, question FROM chat_turns ORDER BY created_at;"
 ```
 
+### 4.6 List and delete documents
+
+```bash
+curl -s "http://localhost:8000/documents" | python3 -m json.tool
+# -> [{"document_id": "<uuid>", "filename": "...", "created_at": "..."}]
+curl -s -o /dev/null -w "%{http_code}\n" -X DELETE \
+     "http://localhost:8000/documents/<document_id>"          # -> 204
+```
+
+After the delete, `/search` no longer returns that document's chunks, and
+repeating the delete gives `404`. Deleting the only document empties the
+index: re-upload it before going on.
+
 ---
 
 ## 5. Inspect data in the database (optional)
@@ -260,4 +273,5 @@ make down          # stop and remove containers
 - [ ] `/search` returns relevant chunks with descending score
 - [ ] `/ask` returns `answer` + valid `confidence` + `sources`
 - [ ] Dialogue history is persisted in `chat_turns`
+- [ ] `DELETE /documents/{id}` removes the document's chunks from `/search`
 - [ ] Ollama/Postgres outages yield 502/503, not 500
