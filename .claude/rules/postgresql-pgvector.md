@@ -16,10 +16,13 @@ rows — without one every query is a full table scan.
 
 - **HNSW** is the default for production: high recall, fast queries, higher RAM.
   ```python
-  Index("idx_embedding", Model.embedding,
-        postgresql_using="hnsw",
-        postgresql_with={"m": 16, "ef_construction": 64},
-        postgresql_ops={"embedding": "vector_cosine_ops"})
+  Index(
+      "idx_embedding",
+      Model.embedding,
+      postgresql_using="hnsw",
+      postgresql_with={"m": 16, "ef_construction": 64},
+      postgresql_ops={"embedding": "vector_cosine_ops"},
+  )
   ```
   `m=16, ef_construction=64` are reasonable starting points; tune under load.
 - **IVFFlat** — lower RAM, slower to build, needs `ANALYZE` after population.

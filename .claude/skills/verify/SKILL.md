@@ -37,12 +37,14 @@ Stub Ollama (embeddings must be 768-dim to pass the repository's length check):
 import json, sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+
 class H(BaseHTTPRequestHandler):
     def do_GET(self):  # /health pings /api/version
         data = json.dumps({"version": "stub"}).encode()
         self.send_response(200 if self.path == "/api/version" else 404)
         self.send_header("Content-Length", str(len(data)))
-        self.end_headers(); self.wfile.write(data)
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -51,12 +53,16 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/generate":
             out = {"response": open(sys.argv[2]).read()}
         else:
-            self.send_response(404); self.end_headers(); return
+            self.send_response(404)
+            self.end_headers()
+            return
         data = json.dumps(out).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
-        self.end_headers(); self.wfile.write(data)
+        self.end_headers()
+        self.wfile.write(data)
+
 
 HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 ```
