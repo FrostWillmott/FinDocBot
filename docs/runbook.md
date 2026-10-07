@@ -40,7 +40,7 @@
    container on port 8000):
    - `docker compose up -d db ollama`
 3. Apply migrations:
-   - `make migrate` (Alembic; runs `alembic upgrade head` against `POSTGRES_DSN`)
+   - `make migrate` (Alembic; runs `alembic upgrade head` against `POSTGRES_DSN` from the environment or `.env`)
 4. Run API locally:
    - `make dev`
 5. Health check:
