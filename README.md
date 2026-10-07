@@ -4,27 +4,28 @@
 
 | Name                                                       |    Stmts |     Miss |   Branch |   BrPart |   Cover |   Missing |
 |----------------------------------------------------------- | -------: | -------: | -------: | -------: | ------: | --------: |
-| src/findocbot/adapters/api/routes.py                       |       96 |        0 |        6 |        0 |    100% |           |
-| src/findocbot/adapters/api/schemas.py                      |       30 |        0 |        0 |        0 |    100% |           |
-| src/findocbot/config.py                                    |       25 |        0 |        0 |        0 |    100% |           |
-| src/findocbot/domain/entities.py                           |       41 |        0 |        0 |        0 |    100% |           |
+| src/findocbot/adapters/api/routes.py                       |       97 |        2 |        6 |        0 |     98% |     72-73 |
+| src/findocbot/adapters/api/schemas.py                      |       34 |        0 |        0 |        0 |    100% |           |
+| src/findocbot/config.py                                    |       24 |        0 |        0 |        0 |    100% |           |
+| src/findocbot/domain/entities.py                           |       45 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/domain/exceptions.py                         |       13 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/infrastructure/cached\_embedding\_gateway.py |       63 |        0 |       10 |        0 |    100% |           |
 | src/findocbot/infrastructure/chunking.py                   |      103 |        1 |       40 |        5 |     96% |128-\>130, 158-\>163, 176-\>188, 183-\>185, 195 |
-| src/findocbot/infrastructure/container.py                  |       47 |        0 |        2 |        0 |    100% |           |
+| src/findocbot/infrastructure/container.py                  |       53 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/infrastructure/db.py                         |       26 |       13 |        6 |        0 |     41% |21-22, 28-30, 35-37, 41-51 |
 | src/findocbot/infrastructure/ollama\_gateway.py            |       99 |        0 |       20 |        0 |    100% |           |
 | src/findocbot/infrastructure/pdf\_parser.py                |       70 |        0 |       14 |        0 |    100% |           |
-| src/findocbot/infrastructure/postgres\_repositories.py     |      104 |       66 |       10 |        4 |     37% |23, 27, 44-58, 62-73, 77-88, 92-105, 109-116, 129-140, 149-\>exit, 162, 165, 169-197, 206-225, 249-256, 260-267, 271-290, 294-318 |
+| src/findocbot/infrastructure/postgres\_repositories.py     |      109 |       70 |       10 |        4 |     36% |24, 28, 47-65, 69-80, 84-95, 99-112, 116-123, 132-144, 157-168, 177-\>exit, 190, 193, 197-225, 234-253, 277-284, 288-295, 299-318, 322-346 |
+| src/findocbot/infrastructure/upload\_queue.py              |       40 |        0 |        8 |        2 |     96% |39-\>exit, 44-\>exit |
 | src/findocbot/main.py                                      |       27 |        1 |        2 |        0 |     97% |        54 |
 | src/findocbot/use\_cases/answer\_question.py               |       81 |        0 |        8 |        0 |    100% |           |
 | src/findocbot/use\_cases/dto.py                            |       17 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/manage\_documents.py              |       17 |        0 |        4 |        0 |    100% |           |
-| src/findocbot/use\_cases/ports.py                          |       32 |        0 |        0 |        0 |    100% |           |
+| src/findocbot/use\_cases/ports.py                          |       40 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/prompt\_safety.py                 |       12 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/use\_cases/search\_similar\_chunks.py        |       15 |        0 |        2 |        0 |    100% |           |
-| src/findocbot/use\_cases/upload\_pdf.py                    |       38 |        1 |        6 |        1 |     95% |        86 |
-| **TOTAL**                                                  |  **956** |   **82** |  **132** |   **10** | **91%** |           |
+| src/findocbot/use\_cases/upload\_pdf.py                    |       52 |        3 |        8 |        1 |     93% |84, 111-114 |
+| **TOTAL**                                                  | **1037** |   **90** |  **142** |   **12** | **91%** |           |
 
 
 ## Setup coverage badge
