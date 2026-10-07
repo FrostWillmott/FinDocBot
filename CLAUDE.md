@@ -18,7 +18,7 @@ All commands use `uv` via the Makefile:
 | Type check | `uv run mypy src/findocbot` |
 | Start infra (DB + Ollama) | `make up` |
 | Stop infra | `make down` |
-| Apply migrations to a running `db` | `make migrate` |
+| Apply migrations | `make migrate` |
 | Install pre-commit hooks | `make precommit-install` |
 
 The CI `test` job runs `ruff check`, `ruff format --check`, `mypy --strict`, and `pytest --cov-fail-under=90`. The `integration` job runs `pytest --integration -m integration` separately. `ruff format` also formats Python code blocks in Markdown, so docs fail the check too; the pre-commit ruff hooks cover Markdown for that reason.
@@ -86,9 +86,9 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 - **CPU-bound offloading**: PDF parsing and chunking run via `asyncio.to_thread()`
   to avoid blocking the event loop.
 - **Embedding dimension**: `EMBEDDING_DIM` (`Settings.embedding_dim`) sizes
-  `chunks.embedding` via a psql variable in `migrations/apply.sh`. Startup
-  verifies the column against the setting, and the chunk repository checks
-  every vector's length before insert/search.
+  `chunks.embedding` in the Alembic migrations. Startup verifies the column
+  against the setting, and the chunk repository checks every vector's length
+  before insert/search.
 - **Prompt safety**: untrusted text (chunks, history, question) goes through
   `use_cases/prompt_safety.neutralize` and sits inside tags, with the
   instructions last.
@@ -107,10 +107,12 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 
 ### Migrations
 
-Numbered SQL files in `migrations/`, applied in order by `migrations/apply.sh`:
-automatically when the `db` volume is empty, and by `make migrate` otherwise.
-`make migrate` re-runs every file, so each must be idempotent (`IF NOT EXISTS`).
-The integration tests apply the same files.
+Alembic, with raw-SQL revisions in `migrations/versions/` and the environment
+in `migrations/env.py` (reads `POSTGRES_DSN`, applies the psycopg driver).
+`make up` runs `alembic upgrade head` in the `api` service before it starts;
+`make migrate` runs it locally against `POSTGRES_DSN`. Revisions are tracked in
+the `alembic_version` table, so each is applied exactly once. The integration
+tests run the same revisions via `alembic.command.upgrade`.
 
 ### Config
 

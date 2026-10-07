@@ -37,4 +37,4 @@ logs:
 	docker compose logs -f api db ollama
 
 migrate:
-	docker compose exec db /docker-entrypoint-initdb.d/apply.sh
+	$(UV) run alembic upgrade head

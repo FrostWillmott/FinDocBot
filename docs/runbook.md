@@ -39,9 +39,11 @@
 2. Start infrastructure only (`make up` would also start the `api`
    container on port 8000):
    - `docker compose up -d db ollama`
-3. Run API locally:
+3. Apply migrations:
+   - `make migrate` (Alembic; runs `alembic upgrade head` against `POSTGRES_DSN`)
+4. Run API locally:
    - `make dev`
-4. Health check:
+5. Health check:
    - `curl http://localhost:8000/health` — 200 when PostgreSQL and Ollama
      both answer, 503 with the failing check marked `unavailable` otherwise.
 

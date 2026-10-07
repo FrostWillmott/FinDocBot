@@ -211,6 +211,15 @@ later reversed, add a superseding entry instead of editing the old one.
 
 ## 2026-10-07
 
+- **Migrations moved to Alembic with raw-SQL revisions** — `apply.sh`
+  re-ran every numbered `.sql` file with no version table, so a shipped file
+  could not be edited safely. Alembic records applied revisions in
+  `alembic_version`; `make up` runs `alembic upgrade head` in the `api`
+  service, `make migrate` runs it locally, and the integration tests drive
+  the same revisions. Migrations connect over the psycopg driver (a new
+  dependency) while the runtime pool stays on asyncpg; `0001` sizes
+  `chunks.embedding` from `EMBEDDING_DIM` exactly as the old psql variable
+  did.
 - **`postgres_dsn` has no default; DB and Ollama ports bind to loopback** —
   the settings default hardcoded a `postgres:postgres` password, and compose
   exposed Postgres and Ollama on all interfaces. `postgres_dsn` is now
