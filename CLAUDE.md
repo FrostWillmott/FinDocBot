@@ -112,9 +112,10 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 Alembic, with raw-SQL revisions in `migrations/versions/` and the environment
 in `migrations/env.py` (reads `POSTGRES_DSN`, applies the psycopg driver).
 `make up` runs `alembic upgrade head` in the `api` service before it starts;
-`make migrate` runs it locally against `POSTGRES_DSN`. Revisions are tracked in
-the `alembic_version` table, so each is applied exactly once. The integration
-tests run the same revisions via `alembic.command.upgrade`.
+`make migrate` runs it locally against `POSTGRES_DSN` (from the environment or
+`.env`). Revisions are tracked in the `alembic_version` table, so each is
+applied exactly once. The integration tests run the same revisions via
+`alembic.command.upgrade`.
 
 ### Config
 

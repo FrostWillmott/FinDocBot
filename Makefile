@@ -36,5 +36,7 @@ down:
 logs:
 	docker compose logs -f api db ollama
 
+# Alembic reads POSTGRES_DSN and EMBEDDING_DIM from the environment only, not
+# from .env as the app does, so pass .env through when it exists.
 migrate:
-	$(UV) run alembic upgrade head
+	$(UV) run $(if $(wildcard .env),--env-file .env) alembic upgrade head
