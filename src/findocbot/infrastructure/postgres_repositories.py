@@ -9,6 +9,7 @@ from findocbot.domain.entities import (
     ChatTurn,
     Chunk,
     Document,
+    DocumentStatus,
 )
 from findocbot.domain.exceptions import (
     DuplicateDocumentError,
@@ -28,6 +29,8 @@ def _document_from_row(row: asyncpg.Record) -> Document:
         id=str(row["id"]),
         filename=row["filename"],
         content_hash=row["content_hash"],
+        status=row["status"],
+        error=row["error"],
         created_at=row["created_at"],
     )
 
@@ -44,12 +47,16 @@ class PostgresDocumentRepository:
         try:
             await self._db.pool.execute(
                 """
-                INSERT INTO documents (id, filename, content_hash, created_at)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO documents (
+                    id, filename, content_hash, status, error, created_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6)
                 """,
                 document.id,
                 document.filename,
                 document.content_hash,
+                document.status,
+                document.error,
                 document.created_at,
             )
         except asyncpg.UniqueViolationError as exc:
@@ -62,7 +69,7 @@ class PostgresDocumentRepository:
         try:
             row = await self._db.pool.fetchrow(
                 """
-                SELECT id, filename, content_hash, created_at
+                SELECT id, filename, content_hash, status, error, created_at
                 FROM documents
                 WHERE content_hash = $1
                 """,
@@ -77,7 +84,7 @@ class PostgresDocumentRepository:
         try:
             row = await self._db.pool.fetchrow(
                 """
-                SELECT id, filename, content_hash, created_at
+                SELECT id, filename, content_hash, status, error, created_at
                 FROM documents
                 WHERE id = $1
                 """,
@@ -92,7 +99,7 @@ class PostgresDocumentRepository:
         try:
             rows = await self._db.pool.fetch(
                 """
-                SELECT id, filename, content_hash, created_at
+                SELECT id, filename, content_hash, status, error, created_at
                 FROM documents
                 ORDER BY created_at DESC, id
                 LIMIT $1 OFFSET $2
@@ -114,6 +121,27 @@ class PostgresDocumentRepository:
         except asyncpg.PostgresError as exc:
             raise StorageError("Failed to delete document") from exc
         return deleted_id is not None
+
+    async def set_status(
+        self,
+        document_id: str,
+        status: DocumentStatus,
+        error: str | None = None,
+    ) -> None:
+        """Update a document's ingestion status and optional error message."""
+        try:
+            await self._db.pool.execute(
+                """
+                UPDATE documents
+                SET status = $1, error = $2
+                WHERE id = $3
+                """,
+                status,
+                error,
+                document_id,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to update document status") from exc
 
 
 class PostgresChunkRepository:

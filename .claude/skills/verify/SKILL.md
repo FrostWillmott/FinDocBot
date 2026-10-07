@@ -31,6 +31,10 @@ POSTGRES_DSN=postgresql://postgres:postgres@127.0.0.1:55432/findocbot \
 
 curl -F "file=@docs/samples/aurora-ridge-annual-report-2025.pdf;type=application/pdf" \
   http://127.0.0.1:58000/documents/upload
+# Returns 202 with {"document_id": "...", "status": "pending"}; the worker
+# parses/embeds in the background, so poll the document:
+curl http://127.0.0.1:58000/documents/<document_id>
+# ...until "status" is "ready" (or "failed" with an "error").
 ```
 
 Stub Ollama (embeddings must be 768-dim to pass the repository's length check):

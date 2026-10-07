@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from findocbot.domain.entities import (
     ChatSession,
     ChatTurn,
     Chunk,
     Document,
+    DocumentStatus,
 )
 from findocbot.domain.exceptions import DuplicateDocumentError
 from findocbot.use_cases.ports import ChunkWithScore
@@ -64,6 +65,17 @@ class InMemoryDocumentRepository:
     async def delete(self, document_id: str) -> bool:
         """Remove document entity by id; return whether it existed."""
         return self.items.pop(document_id, None) is not None
+
+    async def set_status(
+        self,
+        document_id: str,
+        status: DocumentStatus,
+        error: str | None = None,
+    ) -> None:
+        """Update a stored document's status and error message."""
+        self.items[document_id] = replace(
+            self.items[document_id], status=status, error=error
+        )
 
 
 @dataclass

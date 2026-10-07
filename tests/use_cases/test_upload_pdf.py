@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import hashlib
 
-import pytest
+from fpdf import FPDF
 
 from findocbot.domain.entities import Document
-from findocbot.domain.exceptions import StorageError
+from findocbot.domain.exceptions import ModelProviderError, StorageError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
@@ -16,7 +16,7 @@ from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
 )
-from tests.use_cases.fakes import StubProvider
+from tests.use_cases.fakes import RecordingQueue, StubProvider
 
 
 class _FailingChunkRepository(InMemoryChunkRepository):
@@ -28,31 +28,9 @@ class _FailingChunkRepository(InMemoryChunkRepository):
         raise StorageError("insert failed")
 
 
-async def test_execute_chunk_storage_failure_deletes_document() -> None:
-    documents = InMemoryDocumentRepository()
-    upload = UploadPDFUseCase(
-        parser=PyPDFParser(),
-        chunker=ParagraphTokenChunker(chunk_tokens=120, overlap_ratio=0.1),
-        provider=StubProvider(),
-        documents=documents,
-        chunks=_FailingChunkRepository(),
-    )
-    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
-
-    with pytest.raises(StorageError):
-        await upload.execute("report.pdf", pdf_bytes)
-
-    assert documents.items == {}
-
-
-class _CountingProvider(StubProvider):
-    def __init__(self) -> None:
-        super().__init__()
-        self.embed_many_calls = 0
-
+class _FailingProvider(StubProvider):
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
-        self.embed_many_calls += 1
-        return await super().embed_many(texts)
+        raise ModelProviderError("Ollama unreachable at http://internal")
 
 
 class _RacingDocumentRepository(InMemoryDocumentRepository):
@@ -71,40 +49,55 @@ class _RacingDocumentRepository(InMemoryDocumentRepository):
 
 
 def _build_upload(
+    *,
     documents: InMemoryDocumentRepository | None = None,
     provider: StubProvider | None = None,
-) -> UploadPDFUseCase:
-    return UploadPDFUseCase(
+    chunks: InMemoryChunkRepository | None = None,
+    queue: RecordingQueue | None = None,
+) -> tuple[UploadPDFUseCase, RecordingQueue, InMemoryDocumentRepository]:
+    queue = queue if queue is not None else RecordingQueue()
+    documents = (
+        documents if documents is not None else InMemoryDocumentRepository()
+    )
+    upload = UploadPDFUseCase(
         parser=PyPDFParser(),
         chunker=ParagraphTokenChunker(chunk_tokens=120, overlap_ratio=0.1),
         provider=provider or StubProvider(),
-        documents=documents or InMemoryDocumentRepository(),
-        chunks=InMemoryChunkRepository(),
+        documents=documents,
+        chunks=chunks or InMemoryChunkRepository(),
+        queue=queue,
     )
+    return upload, queue, documents
 
 
-async def test_execute_same_bytes_twice_returns_first_document() -> None:
-    upload = _build_upload()
+async def test_submit_creates_pending_document_and_enqueues_job() -> None:
+    upload, queue, documents = _build_upload()
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
 
-    first = await upload.execute("report.pdf", pdf_bytes)
-    second = await upload.execute("report-copy.pdf", pdf_bytes)
+    document = await upload.submit("report.pdf", pdf_bytes)
+
+    assert document.status == "pending"
+    assert documents.items[document.id].status == "pending"
+    assert len(queue.jobs) == 1
+    assert queue.jobs[0].document_id == document.id
+    assert queue.jobs[0].content == pdf_bytes
+
+
+async def test_submit_same_bytes_twice_returns_first_and_enqueues_once() -> (
+    None
+):
+    upload, queue, documents = _build_upload()
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+
+    first = await upload.submit("report.pdf", pdf_bytes)
+    second = await upload.submit("report-copy.pdf", pdf_bytes)
 
     assert second == first
+    assert len(queue.jobs) == 1
+    assert list(documents.items) == [first.id]
 
 
-async def test_execute_same_bytes_twice_embeds_once() -> None:
-    provider = _CountingProvider()
-    upload = _build_upload(provider=provider)
-    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
-
-    await upload.execute("report.pdf", pdf_bytes)
-    await upload.execute("report.pdf", pdf_bytes)
-
-    assert provider.embed_many_calls == 1
-
-
-async def test_execute_concurrent_duplicate_returns_stored_document() -> None:
+async def test_submit_concurrent_duplicate_returns_stored_document() -> None:
     documents = _RacingDocumentRepository()
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
     stored = Document.create(
@@ -113,8 +106,60 @@ async def test_execute_concurrent_duplicate_returns_stored_document() -> None:
     )
     # Seeded directly: create() would spend the pre-check miss itself.
     documents.items[stored.id] = stored
-    upload = _build_upload(documents=documents)
+    upload, queue, _ = _build_upload(documents=documents)
 
-    result = await upload.execute("report.pdf", pdf_bytes)
+    result = await upload.submit("report.pdf", pdf_bytes)
 
-    assert (result, list(documents.items)) == (stored, [stored.id])
+    assert (result, len(queue.jobs)) == (stored, 0)
+
+
+async def test_process_marks_document_ready_and_stores_chunks() -> None:
+    chunks = InMemoryChunkRepository()
+    upload, queue, documents = _build_upload(chunks=chunks)
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    document = await upload.submit("report.pdf", pdf_bytes)
+
+    await upload.process(queue.jobs[0])
+
+    stored = documents.items[document.id]
+    assert stored.status == "ready"
+    assert stored.error is None
+    assert chunks.items
+
+
+async def test_process_empty_pdf_marks_document_failed() -> None:
+    upload, queue, documents = _build_upload()
+    pdf = FPDF()
+    pdf.add_page()
+    blank = bytes(pdf.output())
+    document = await upload.submit("blank.pdf", blank)
+
+    await upload.process(queue.jobs[0])
+
+    stored = documents.items[document.id]
+    assert stored.status == "failed"
+    assert "does not contain text" in (stored.error or "")
+
+
+async def test_process_chunk_storage_failure_marks_document_failed() -> None:
+    upload, queue, documents = _build_upload(chunks=_FailingChunkRepository())
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    document = await upload.submit("report.pdf", pdf_bytes)
+
+    await upload.process(queue.jobs[0])
+
+    stored = documents.items[document.id]
+    assert stored.status == "failed"
+    assert stored.error == "insert failed"
+
+
+async def test_process_provider_failure_sanitizes_error_message() -> None:
+    upload, queue, documents = _build_upload(provider=_FailingProvider())
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    document = await upload.submit("report.pdf", pdf_bytes)
+
+    await upload.process(queue.jobs[0])
+
+    stored = documents.items[document.id]
+    assert stored.status == "failed"
+    assert stored.error == "Model provider request failed."

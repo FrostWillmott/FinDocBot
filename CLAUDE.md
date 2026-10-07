@@ -57,6 +57,7 @@ Use cases declare their dependencies as `Protocol` classes in `use_cases/ports.p
 | `ChunkerPort` | Split text into (chunk, section) tuples |
 | `ModelProviderGateway` | Embeddings + structured generation |
 | `DocumentRepositoryPort` / `ChunkRepositoryPort` / `ChatHistoryRepositoryPort` | Persistence |
+| `UploadQueuePort` | Queue background ingestion jobs |
 
 Each has a real implementation in `infrastructure/`. Repository fakes live in
 `tests/in_memory.py`, provider stubs in the tests that use them; neither ships
@@ -99,11 +100,12 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 - **PDF → chunks**: the parser rebuilds paragraph breaks (blank lines) from line
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.
-- **Document persistence**: the document row is inserted only after embeddings
-  succeed; rolled back if chunk insertion fails. A SHA-256 of the uploaded bytes
+- **Background ingestion**: `POST /documents/upload` stores a `pending`
+  document and enqueues the bytes on an in-process asyncio queue; a worker
+  parses, chunks, embeds and persists them, then flips the status to `ready`
+  or `failed` (with a client-safe `error`). A SHA-256 of the uploaded bytes
   (`documents.content_hash`, unique) makes a re-upload return the stored
-  document before parsing; a concurrent duplicate insert raises
-  `DuplicateDocumentError` and also resolves to the stored one.
+  document instead of queueing a second copy.
 
 ### Migrations
 

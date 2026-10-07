@@ -14,7 +14,7 @@ from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
 )
-from tests.use_cases.fakes import StubProvider
+from tests.use_cases.fakes import RecordingQueue, StubProvider, index_document
 
 
 class FakeProviderGateway:
@@ -53,6 +53,7 @@ async def test_execute_after_upload_returns_matching_chunk_first() -> None:
         provider=provider,
         documents=docs,
         chunks=chunks,
+        queue=RecordingQueue(),
     )
     search = SearchSimilarChunksUseCase(provider=provider, chunks=chunks)
 
@@ -61,7 +62,7 @@ async def test_execute_after_upload_returns_matching_chunk_first() -> None:
         "Section 2\nOperational profit remained stable.\n\n"
         "Section 3\nAsset quality improved."
     )
-    await upload.execute("report.pdf", pdf_bytes)
+    await index_document(upload, "report.pdf", pdf_bytes)
 
     results = await search.execute(query="What about revenue?", top_k=1)
 

@@ -85,6 +85,9 @@ Hooks: `ruff check`, `ruff format`, `mypy` (strict), `pytest`.
 
 1. Upload PDF:
    - `POST /documents/upload` with `multipart/form-data` field `file`.
+     Returns `202 Accepted` with `document_id` and `status: "pending"`.
+   - Poll `GET /documents/{document_id}` until `status` is `ready` (or
+     `failed` with an `error`).
 2. Search:
    - `POST /search` with payload:
      - `{"query":"revenue in q4","top_k":3}`

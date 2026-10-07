@@ -23,7 +23,7 @@ from tests.in_memory import (
     InMemoryDocumentRepository,
     InMemoryHistoryRepository,
 )
-from tests.use_cases.fakes import StubProvider
+from tests.use_cases.fakes import RecordingQueue, StubProvider, index_document
 
 
 class FakeProviderGateway:
@@ -71,6 +71,7 @@ async def test_execute_matching_document_returns_grounded_answer() -> None:
         provider=provider,
         documents=docs,
         chunks=chunks,
+        queue=RecordingQueue(),
     )
     search = SearchSimilarChunksUseCase(provider=provider, chunks=chunks)
     ask = AnswerQuestionUseCase(
@@ -80,7 +81,7 @@ async def test_execute_matching_document_returns_grounded_answer() -> None:
     )
 
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent in the quarter.")
-    await upload.execute("report.pdf", pdf_bytes)
+    await index_document(upload, "report.pdf", pdf_bytes)
 
     response = await ask.execute(
         session_id=None,
@@ -110,6 +111,7 @@ async def _prompt_for_document(text: str, question: str) -> str:
         provider=provider,
         documents=InMemoryDocumentRepository(),
         chunks=chunks,
+        queue=RecordingQueue(),
     )
     ask = AnswerQuestionUseCase(
         provider=provider,
@@ -118,7 +120,7 @@ async def _prompt_for_document(text: str, question: str) -> str:
         ),
         history=InMemoryHistoryRepository(),
     )
-    await upload.execute("report.pdf", build_pdf_bytes(text))
+    await index_document(upload, "report.pdf", build_pdf_bytes(text))
     await ask.execute(session_id=None, question=question, top_k=2)
     return provider.prompts[0]
 

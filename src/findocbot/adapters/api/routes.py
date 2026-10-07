@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from typing import Protocol
 from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile
 from fastapi.responses import JSONResponse
 
 from findocbot.adapters.api.schemas import (
@@ -88,6 +88,8 @@ def _document_response(document: Document) -> DocumentResponse:
     return DocumentResponse(
         document_id=document.id,
         filename=document.filename,
+        status=document.status,
+        error=document.error,
         created_at=document.created_at,
     )
 
@@ -144,6 +146,7 @@ def build_router(container: ApiServices) -> APIRouter:
 
     @router.post("/documents/upload", response_model=UploadResponse)
     async def upload_document(
+        response: Response,
         file: UploadFile = PDF_UPLOAD_FILE,
     ) -> UploadResponse:
         if file.content_type != "application/pdf":
@@ -161,12 +164,17 @@ def build_router(container: ApiServices) -> APIRouter:
                     detail=f"File exceeds {_MAX_UPLOAD_MB} MB limit.",
                 )
         with _map_use_case_errors():
-            document = await container.upload_pdf.execute(
+            document = await container.upload_pdf.submit(
                 filename=file.filename or "uploaded.pdf",
                 content=bytes(content),
             )
+        # A fresh upload is accepted for background ingestion; a re-upload of
+        # the same bytes resolves to the already-stored document (200).
+        response.status_code = 202 if document.status == "pending" else 200
         return UploadResponse(
-            document_id=document.id, filename=document.filename
+            document_id=document.id,
+            filename=document.filename,
+            status=document.status,
         )
 
     @router.post("/search", response_model=list[ChunkResponse])

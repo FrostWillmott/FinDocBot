@@ -33,6 +33,7 @@ from tests.in_memory import (
     InMemoryDocumentRepository,
     InMemoryHistoryRepository,
 )
+from tests.use_cases.fakes import RecordingQueue, index_document
 
 # ---------------------------------------------------------------------------
 # Golden Q&A dataset
@@ -159,6 +160,7 @@ async def test_rag_pipeline_golden_dataset_meets_metric_thresholds() -> None:
         provider=provider,
         documents=docs,
         chunks=chunks_repo,
+        queue=RecordingQueue(),
     )
     search = SearchSimilarChunksUseCase(provider=provider, chunks=chunks_repo)
     ask = AnswerQuestionUseCase(
@@ -172,7 +174,7 @@ async def test_rag_pipeline_golden_dataset_meets_metric_thresholds() -> None:
         "Section 2\nOperational profit remained stable despite headwinds.\n\n"
         "Section 3\nAsset quality improved significantly in Q4."
     )
-    await upload.execute("annual_report.pdf", build_pdf_bytes(corpus))
+    await index_document(upload, "annual_report.pdf", build_pdf_bytes(corpus))
 
     precision_scores: list[float] = []
     faithfulness_scores: list[float] = []

@@ -211,6 +211,18 @@ later reversed, add a superseding entry instead of editing the old one.
 
 ## 2026-10-07
 
+- **Upload ingestion runs in a background in-process queue, not in the
+  request** — a 50 MB PDF can take minutes to embed on CPU-Ollama, too long
+  for a synchronous `POST /documents/upload`. The route now stores a
+  `pending` document, enqueues the bytes, and returns `202`; one worker task
+  drains a bounded `asyncio.Queue` and flips the document to `ready` or
+  `failed` (with a client-safe `error`; provider-internal messages never
+  reach the stored error). Chosen over Celery/RQ: no broker to run, and the
+  in-process worker still exercises background processing. The trade-off
+  is that queued bytes live in memory and are lost on restart, and parsing
+  errors that used to be a synchronous `400` now surface as `failed`
+  documents. Re-uploading the same bytes returns the stored document (`200`)
+  instead of queueing again.
 - **Migrations moved to Alembic with raw-SQL revisions** — `apply.sh`
   re-ran every numbered `.sql` file with no version table, so a shipped file
   could not be edited safely. Alembic records applied revisions in
