@@ -5,6 +5,19 @@ from __future__ import annotations
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _postgres_dsn_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give Settings a POSTGRES_DSN so tests run without a real .env.
+
+    ``postgres_dsn`` has no default (a password must not ship in source), so
+    any test that builds ``Settings()`` needs the variable present.
+    """
+    monkeypatch.setenv(
+        "POSTGRES_DSN",
+        "postgresql://postgres:postgres@localhost:5432/findocbot",
+    )
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--integration",

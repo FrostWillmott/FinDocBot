@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from findocbot.domain.entities import DocumentStatus
+
 
 class SearchRequest(BaseModel):
     """Search request payload."""
@@ -40,6 +42,7 @@ class UploadResponse(BaseModel):
 
     document_id: str
     filename: str
+    status: DocumentStatus
 
 
 class DocumentResponse(BaseModel):
@@ -47,6 +50,8 @@ class DocumentResponse(BaseModel):
 
     document_id: str
     filename: str
+    status: DocumentStatus
+    error: str | None = None
     created_at: datetime
 
 

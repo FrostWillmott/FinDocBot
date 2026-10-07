@@ -10,6 +10,7 @@ from findocbot.domain.entities import (
     ChatTurn,
     Chunk,
     Document,
+    DocumentStatus,
 )
 
 
@@ -19,6 +20,15 @@ class ChunkWithScore:
 
     chunk: Chunk
     score: float
+
+
+@dataclass(frozen=True)
+class UploadJob:
+    """Queued upload awaiting background ingestion."""
+
+    document_id: str
+    filename: str
+    content: bytes
 
 
 class PDFParserPort(Protocol):
@@ -73,6 +83,21 @@ class DocumentRepositoryPort(Protocol):
 
     async def delete(self, document_id: str) -> bool:
         """Remove a document and its chunks; return whether it existed."""
+
+    async def set_status(
+        self,
+        document_id: str,
+        status: DocumentStatus,
+        error: str | None = None,
+    ) -> None:
+        """Update a document's ingestion status and optional error message."""
+
+
+class UploadQueuePort(Protocol):
+    """Queue for background PDF ingestion."""
+
+    async def enqueue(self, job: UploadJob) -> None:
+        """Queue an upload for background processing."""
 
 
 class ChunkRepositoryPort(Protocol):

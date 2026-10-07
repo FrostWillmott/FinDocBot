@@ -12,13 +12,15 @@ Drive it with curl; don't run pytest here.
 
 ```bash
 S=<scratch dir>
-# Postgres with the repo's migrations, on a spare port
+# Postgres on a spare port
 docker run -d --rm --name findocbot-verify-db \
   -e POSTGRES_DB=findocbot -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
-  -e EMBEDDING_DIM=768 -p 127.0.0.1:55432:5432 \
-  -v "$PWD/migrations:/migrations:ro" \
-  -v "$PWD/migrations/apply.sh:/docker-entrypoint-initdb.d/apply.sh:ro" \
+  -p 127.0.0.1:55432:5432 \
   pgvector/pgvector:pg16
+
+# Apply the Alembic migrations to the throwaway database
+POSTGRES_DSN=postgresql://postgres:postgres@127.0.0.1:55432/findocbot \
+EMBEDDING_DIM=768 uv run alembic upgrade head
 
 # Stub Ollama on :51434 (script below); /api/generate returns $S/mode.json verbatim
 python3 $S/stub_ollama.py 51434 $S/mode.json &
@@ -29,6 +31,10 @@ POSTGRES_DSN=postgresql://postgres:postgres@127.0.0.1:55432/findocbot \
 
 curl -F "file=@docs/samples/aurora-ridge-annual-report-2025.pdf;type=application/pdf" \
   http://127.0.0.1:58000/documents/upload
+# Returns 202 with {"document_id": "...", "status": "pending"}; the worker
+# parses/embeds in the background, so poll the document:
+curl http://127.0.0.1:58000/documents/<document_id>
+# ...until "status" is "ready" (or "failed" with an "error").
 ```
 
 Stub Ollama (embeddings must be 768-dim to pass the repository's length check):

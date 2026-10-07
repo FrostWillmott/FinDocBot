@@ -6,13 +6,10 @@ services:
       POSTGRES_DB: findocbot
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./migrations:/migrations:ro
-      - ./migrations/apply.sh:/docker-entrypoint-initdb.d/apply.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d findocbot"]
       interval: 5s
@@ -23,7 +20,7 @@ services:
     image: ollama/ollama:0.35.1
     container_name: findocbot-ollama
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - ollama:/root/.ollama
     healthcheck:
@@ -58,6 +55,14 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       POSTGRES_DSN: postgresql://postgres:postgres@db:5432/findocbot
+      # Sizes chunks.embedding in migrations; keep in sync with .env.
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+    # Run migrations before serving; Alembic tracks applied revisions in a
+    # version table, so this is a no-op when nothing changed.
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn findocbot.main:create_app --factory
+             --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
     depends_on:

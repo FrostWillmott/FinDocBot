@@ -208,3 +208,32 @@ later reversed, add a superseding entry instead of editing the old one.
   adapter layer depended on the infrastructure composition root, and the
   fakes shipped in the production package. `main.py` stays the only place
   that knows the container. Behaviour is unchanged.
+
+## 2026-10-07
+
+- **Upload ingestion runs in a background in-process queue, not in the
+  request** — a 50 MB PDF can take minutes to embed on CPU-Ollama, too long
+  for a synchronous `POST /documents/upload`. The route now stores a
+  `pending` document, enqueues the bytes, and returns `202`; one worker task
+  drains a bounded `asyncio.Queue` and flips the document to `ready` or
+  `failed` (with a client-safe `error`; provider-internal messages never
+  reach the stored error). Chosen over Celery/RQ: no broker to run, and the
+  in-process worker still exercises background processing. The trade-off
+  is that queued bytes live in memory and are lost on restart, and parsing
+  errors that used to be a synchronous `400` now surface as `failed`
+  documents. Re-uploading the same bytes returns the stored document (`200`)
+  instead of queueing again.
+- **Migrations moved to Alembic with raw-SQL revisions** — `apply.sh`
+  re-ran every numbered `.sql` file with no version table, so a shipped file
+  could not be edited safely. Alembic records applied revisions in
+  `alembic_version`; `make up` runs `alembic upgrade head` in the `api`
+  service, `make migrate` runs it locally, and the integration tests drive
+  the same revisions. Migrations connect over the psycopg driver (a new
+  dependency) while the runtime pool stays on asyncpg; `0001` sizes
+  `chunks.embedding` from `EMBEDDING_DIM` exactly as the old psql variable
+  did.
+- **`postgres_dsn` has no default; DB and Ollama ports bind to loopback** —
+  the settings default hardcoded a `postgres:postgres` password, and compose
+  exposed Postgres and Ollama on all interfaces. `postgres_dsn` is now
+  required (read from env / `.env`), and both ports are `127.0.0.1`-bound so
+  nothing is reachable beyond the host.

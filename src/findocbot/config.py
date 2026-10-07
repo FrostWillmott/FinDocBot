@@ -23,9 +23,8 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 120.0
     # Output size of ollama_embed_model; also sizes chunks.embedding.
     embedding_dim: int = 768
-    postgres_dsn: PostgresDsn = PostgresDsn(
-        "postgresql://postgres:postgres@localhost:5432/findocbot"
-    )
+    # No default: a DSN with a hardcoded password must not ship in source.
+    postgres_dsn: PostgresDsn
 
     db_pool_max_size: int = 5
 
@@ -33,7 +32,6 @@ class Settings(BaseSettings):
     chunk_tokens: int = 300
     chunk_overlap_ratio: float = 0.15
 
-    top_k: int = 5
     max_history_pairs: int = 5
     embedding_cache_size: int = 1000
     embedding_batch_size: int = 50
@@ -43,4 +41,6 @@ class Settings(BaseSettings):
 
 def load_settings() -> Settings:
     """Load and validate runtime settings."""
-    return Settings()
+    # postgres_dsn has no default and is read from env/.env, not a code
+    # literal, so pydantic-settings populates it behind mypy's back.
+    return Settings()  # type: ignore[call-arg]

@@ -5,7 +5,10 @@ from __future__ import annotations
 import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import uuid4
+
+DocumentStatus = Literal["pending", "ready", "failed"]
 
 
 @dataclass(frozen=True)
@@ -16,15 +19,26 @@ class Document:
     filename: str
     # SHA-256 of the uploaded bytes; None for documents stored before it.
     content_hash: str | None = None
+    # Ingestion state: 'pending' while queued, 'ready' once searchable,
+    # 'failed' when parsing or embedding errored (see `error`).
+    status: DocumentStatus = "ready"
+    error: str | None = None
     created_at: datetime = field(
         default_factory=lambda: datetime.now(tz=UTC),
     )
 
     @staticmethod
-    def create(filename: str, content_hash: str | None = None) -> Document:
+    def create(
+        filename: str,
+        content_hash: str | None = None,
+        status: DocumentStatus = "ready",
+    ) -> Document:
         """Create a document with generated identifier."""
         return Document(
-            id=str(uuid4()), filename=filename, content_hash=content_hash
+            id=str(uuid4()),
+            filename=filename,
+            content_hash=content_hash,
+            status=status,
         )
 
 

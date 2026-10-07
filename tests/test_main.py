@@ -17,6 +17,7 @@ from findocbot.infrastructure.cached_embedding_gateway import (
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.container import AppContainer
 from findocbot.infrastructure.pdf_parser import PyPDFParser
+from findocbot.infrastructure.upload_queue import InProcessUploadQueue
 from findocbot.main import configure_logging, create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
 from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
@@ -102,13 +103,16 @@ def _build_test_container() -> AppContainer:
         search_use_case=search_chunks,
         history=history,
     )
+    upload_queue = InProcessUploadQueue()
     upload_pdf = UploadPDFUseCase(
         parser=parser,
         chunker=chunker,
         provider=cached_provider,
         documents=documents,
         chunks=chunks,
+        queue=upload_queue,
     )
+    upload_queue.set_processor(upload_pdf.process)
 
     return AppContainer(
         settings=settings,
@@ -118,6 +122,7 @@ def _build_test_container() -> AppContainer:
         search_chunks=search_chunks,
         answer_question=answer_question,
         manage_documents=ManageDocumentsUseCase(documents),
+        upload_queue=upload_queue,
     )
 
 
@@ -207,9 +212,12 @@ async def test_ask_after_pdf_upload_returns_answer_with_sources() -> None:
             "/documents/upload",
             files={"file": ("report.pdf", pdf_bytes, "application/pdf")},
         )
-        assert upload_resp.status_code == 200
+        assert upload_resp.status_code == 202
         upload_data = upload_resp.json()
         assert "document_id" in upload_data
+        # Ingestion is backgrounded; drain the queue so the chunks are
+        # searchable before asking.
+        await container.upload_queue.drain()
 
         # Ask a question that should match the uploaded content.
         ask_resp = await client.post(

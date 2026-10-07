@@ -6,11 +6,12 @@ Run with: pytest --integration
 
 from __future__ import annotations
 
-import asyncio
+import os
 from pathlib import Path
 
-import asyncpg
 import pytest
+from alembic import command
+from alembic.config import Config
 from testcontainers.postgres import PostgresContainer
 
 from findocbot.domain.entities import (
@@ -32,28 +33,21 @@ from findocbot.infrastructure.postgres_repositories import (
 )
 
 EMBEDDING_DIM = 768
-_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
-
-
-def _migration_sql(embedding_dim: int) -> str:
-    """Real migrations with the psql variable apply.sh would set."""
-    return "\n".join(
-        path.read_text().replace(":embedding_dim", str(embedding_dim))
-        for path in sorted(_MIGRATIONS_DIR.glob("*.sql"))
-    )
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_MIGRATIONS_DIR = _REPO_ROOT / "migrations"
 
 
 def _run_migration_sync(dsn: str) -> None:
-    """Apply schema migration to the test database (blocking)."""
+    """Apply the real Alembic migrations to the test database (blocking).
 
-    async def _migrate() -> None:
-        conn = await asyncpg.connect(dsn)
-        try:
-            await conn.execute(_migration_sql(EMBEDDING_DIM))
-        finally:
-            await conn.close()
-
-    asyncio.run(_migrate())
+    Alembic's env.py reads POSTGRES_DSN and EMBEDDING_DIM from the
+    environment, so both are set here before ``upgrade head`` runs.
+    """
+    os.environ["POSTGRES_DSN"] = dsn
+    os.environ["EMBEDDING_DIM"] = str(EMBEDDING_DIM)
+    config = Config(str(_REPO_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(_MIGRATIONS_DIR))
+    command.upgrade(config, "head")
 
 
 @pytest.fixture(scope="module")

@@ -12,6 +12,7 @@ from findocbot.domain.exceptions import ModelProviderError, StorageError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.container import AppContainer
 from findocbot.infrastructure.pdf_parser import PyPDFParser
+from findocbot.infrastructure.upload_queue import InProcessUploadQueue
 from findocbot.main import create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
 from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
@@ -70,11 +71,11 @@ class _FailingSearchChunkRepository(InMemoryChunkRepository):
         raise StorageError("database unavailable")
 
 
-def _build_app(
+def _build_container(
     provider: _StubProvider | None = None,
     chunks: InMemoryChunkRepository | None = None,
     health_checks: dict[str, Callable[[], Awaitable[None]]] | None = None,
-) -> httpx.ASGITransport:
+) -> AppContainer:
     provider = provider if provider is not None else _StubProvider()
     chunks = chunks if chunks is not None else InMemoryChunkRepository()
     documents = InMemoryDocumentRepository()
@@ -88,14 +89,17 @@ def _build_app(
         search_use_case=search_chunks,
         history=history,
     )
+    upload_queue = InProcessUploadQueue()
     upload_pdf = UploadPDFUseCase(
         parser=PyPDFParser(),
         chunker=ParagraphTokenChunker(chunk_tokens=120, overlap_ratio=0.1),
         provider=provider,
         documents=documents,
         chunks=chunks,
+        queue=upload_queue,
     )
-    container = AppContainer(
+    upload_queue.set_processor(upload_pdf.process)
+    return AppContainer(
         settings=Settings(),
         db=_FakeDB(),  # type: ignore[arg-type]
         provider=provider,
@@ -103,7 +107,18 @@ def _build_app(
         search_chunks=search_chunks,
         answer_question=answer_question,
         manage_documents=ManageDocumentsUseCase(documents),
+        upload_queue=upload_queue,
         health_checks=health_checks or {},
+    )
+
+
+def _build_app(
+    provider: _StubProvider | None = None,
+    chunks: InMemoryChunkRepository | None = None,
+    health_checks: dict[str, Callable[[], Awaitable[None]]] | None = None,
+) -> httpx.ASGITransport:
+    container = _build_container(
+        provider=provider, chunks=chunks, health_checks=health_checks
     )
     return httpx.ASGITransport(app=create_app(container=container))
 
@@ -143,34 +158,51 @@ async def test_search_storage_failure_returns_503() -> None:
         assert "database unavailable" in resp.json()["detail"]
 
 
-async def test_upload_pdf_without_text_returns_400() -> None:
+async def test_upload_blank_pdf_marks_document_failed_after_processing() -> (
+    None
+):
+    container = _build_container()
     pdf = FPDF()
     pdf.add_page()
     blank_pdf = bytes(pdf.output())
 
     async with httpx.AsyncClient(
-        transport=_build_app(), base_url="http://test"
+        transport=httpx.ASGITransport(app=create_app(container=container)),
+        base_url="http://test",
     ) as client:
         resp = await client.post(
             "/documents/upload",
             files={"file": ("blank.pdf", blank_pdf, "application/pdf")},
         )
-        assert resp.status_code == 400
-        assert "does not contain text" in resp.json()["detail"]
+        assert resp.status_code == 202
+        document_id = resp.json()["document_id"]
+
+        await container.upload_queue.drain()
+
+        stored = await client.get(f"/documents/{document_id}")
+        assert stored.json()["status"] == "failed"
+        assert "does not contain text" in stored.json()["error"]
 
 
-async def test_upload_non_pdf_bytes_with_pdf_content_type_returns_400() -> (
-    None
-):
+async def test_upload_non_pdf_bytes_marks_document_failed() -> None:
+    container = _build_container()
+
     async with httpx.AsyncClient(
-        transport=_build_app(), base_url="http://test"
+        transport=httpx.ASGITransport(app=create_app(container=container)),
+        base_url="http://test",
     ) as client:
         resp = await client.post(
             "/documents/upload",
             files={"file": ("fake.pdf", b"not a pdf", "application/pdf")},
         )
-        assert resp.status_code == 400
-        assert "not a readable PDF" in resp.json()["detail"]
+        assert resp.status_code == 202
+        document_id = resp.json()["document_id"]
+
+        await container.upload_queue.drain()
+
+        stored = await client.get(f"/documents/{document_id}")
+        assert stored.json()["status"] == "failed"
+        assert "not a readable PDF" in stored.json()["error"]
 
 
 async def test_upload_oversized_file_returns_413() -> None:

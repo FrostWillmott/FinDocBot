@@ -1,4 +1,4 @@
-# 🤖 FinDocBot
+# FinDocBot
 
 [![CI](https://github.com/FrostWillmott/FinDocBot/actions/workflows/ci.yml/badge.svg)](https://github.com/FrostWillmott/FinDocBot/actions)
 [![Coverage](https://raw.githubusercontent.com/FrostWillmott/FinDocBot/python-coverage-comment-action-data/badge.svg)](https://github.com/FrostWillmott/FinDocBot/tree/python-coverage-comment-action-data)
@@ -11,7 +11,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 - 📁 **PDF Upload**: Automatic parsing and indexing of financial reports.
 - 🔍 **Semantic Search**: Find relevant text fragments based on meaning, not just keywords.
@@ -23,7 +23,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Language**: Python 3.12+
 - **API Framework**: FastAPI
@@ -35,7 +35,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 ---
 
-## 🏁 Quick Start
+## Quick Start
 
 ### Prerequisites
 1. [Docker](https://www.docker.com/) and Docker Compose installed.
@@ -72,25 +72,34 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 ---
 
-## 📖 API Documentation
+## API Documentation
 
 ### Upload Document
-`POST /documents/upload` — Uploads a PDF file for indexing.
+`POST /documents/upload` — Uploads a PDF file for background indexing. It
+returns `202 Accepted` with the new document's `document_id` and
+`status: "pending"`. Parsing, chunking and embedding then run in a background
+worker; poll the document until its status becomes `ready` (searchable) or
+`failed` (with an `error` message).
 
 ```bash
 curl -X POST "http://localhost:8000/documents/upload" \
      -H "Content-Type: multipart/form-data" \
      -F "file=@/path/to/report.pdf"
+# {"document_id":"...","filename":"report.pdf","status":"pending"}
+
+curl "http://localhost:8000/documents/<document_id>"
+# {"document_id":"...","filename":"report.pdf","status":"ready","error":null,...}
 ```
 
-Uploading the same file again (byte for byte) returns the stored document's
-`document_id` and filename instead of indexing a second copy.
+Uploading the same file again (byte for byte) returns the stored document
+with `200` (its status is unchanged) instead of queueing a second copy.
 
 ### List, Inspect and Delete Documents
 `GET /documents?limit=50&offset=0` — stored documents, newest first
-(`limit` up to 200). `GET /documents/{document_id}` — one document.
-`DELETE /documents/{document_id}` — removes the document and its chunks, so
-search stops returning them (`204`; `404` if the id is unknown).
+(`limit` up to 200). `GET /documents/{document_id}` — one document, including
+its `status` (`pending`, `ready`, `failed`) and, on failure, an `error`
+message. `DELETE /documents/{document_id}` — removes the document and its
+chunks, so search stops returning them (`204`; `404` if the id is unknown).
 
 ```bash
 curl "http://localhost:8000/documents"
@@ -136,7 +145,7 @@ source chunks, each with its similarity score and document section.
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 The project strictly follows **Clean Architecture** principles, ensuring the core business logic remains independent of external frameworks, databases, and UI:
 
@@ -149,22 +158,19 @@ This decoupling allows for easy testing (e.g., swapping PostgreSQL for an in-mem
 
 ---
 
-## ⚡ Vector Index
+## Vector Index
 
 PostgreSQL uses an **HNSW** index (`m=16, ef_construction=64`) over the
 `chunks.embedding` column for fast approximate nearest-neighbour search.
-The migration is applied automatically by `docker compose up` and
-`make migrate`. The vector size comes from `EMBEDDING_DIM` (768 for
-`nomic-embed-text`); the API refuses to start if the column and the setting
-disagree.
-
-`docker compose up` runs migrations only on an empty database volume. After
-pulling a new migration (e.g. `003_sessions.sql`), run `make migrate` against
-an existing volume.
+Migrations are versioned with **Alembic**; `make up` runs `alembic upgrade
+head` in the `api` service before it starts, and `make migrate` applies them
+against an already-running database. The vector size comes from
+`EMBEDDING_DIM` (768 for `nomic-embed-text`); the API refuses to start if the
+column and the setting disagree.
 
 ---
 
-## 🗂️ Structured Output
+## Structured Output
 
 `POST /ask` returns a `confidence` field (`high` / `medium` / `low`) alongside the answer.
 The LLM is constrained via Ollama's `format` parameter to emit a JSON object matching the
@@ -179,7 +185,7 @@ schema, and the response is validated with Pydantic before reaching the client:
 
 ---
 
-## 🧪 RAG Evaluation
+## RAG Evaluation
 
 `tests/test_rag_evaluation.py` demonstrates a methodology for measuring retrieval
 precision and faithfulness over a golden Q&A dataset. It runs against the
@@ -202,7 +208,7 @@ make test
 
 ---
 
-## 🧪 Testing & Code Quality
+## Testing & Code Quality
 
 - **Run tests**: `make test` (add `--integration` for PostgreSQL tests via Docker; CI runs them in a separate job)
 - **Coverage report**: `make cover` (pytest-cov, terminal report with missing lines; CI enforces ≥90% and refreshes the badge above on every push to `master`)
@@ -211,7 +217,7 @@ make test
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - [Runbook](docs/runbook.md) — bring-up/teardown, quality checks, migrations.
 - [Manual testing checklist](docs/manual-testing.md) — full E2E pass, including failure modes (Ollama down → 502, Postgres down → 503).
@@ -222,7 +228,7 @@ Coding conventions (typing, error handling, testing, pgvector and LLM-integratio
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
