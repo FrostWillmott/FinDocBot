@@ -115,10 +115,11 @@ The integration tests apply the same files.
 ### Config
 
 `Settings` (pydantic-settings) loads from env / `.env`. Key knobs:
-`embedding_dim`, `top_k`, `max_history_pairs`, `embedding_cache_size`,
-`embedding_batch_size`, `embedding_cache_ttl_seconds`, `ollama_num_ctx`,
-`ollama_num_predict`, `ollama_timeout_seconds`, `db_pool_max_size`,
-`chunk_tokens`, `chunk_overlap_ratio`, `log_level`.
+`postgres_dsn` (required — no default), `embedding_dim`,
+`max_history_pairs`, `embedding_cache_size`, `embedding_batch_size`,
+`embedding_cache_ttl_seconds`, `ollama_num_ctx`, `ollama_num_predict`,
+`ollama_timeout_seconds`, `db_pool_max_size`, `chunk_tokens`,
+`chunk_overlap_ratio`, `log_level`.
 
 ### Testing
 

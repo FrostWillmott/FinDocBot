@@ -208,3 +208,11 @@ later reversed, add a superseding entry instead of editing the old one.
   adapter layer depended on the infrastructure composition root, and the
   fakes shipped in the production package. `main.py` stays the only place
   that knows the container. Behaviour is unchanged.
+
+## 2026-10-07
+
+- **`postgres_dsn` has no default; DB and Ollama ports bind to loopback** —
+  the settings default hardcoded a `postgres:postgres` password, and compose
+  exposed Postgres and Ollama on all interfaces. `postgres_dsn` is now
+  required (read from env / `.env`), and both ports are `127.0.0.1`-bound so
+  nothing is reachable beyond the host.
