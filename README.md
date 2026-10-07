@@ -1,4 +1,4 @@
-# 🤖 FinDocBot
+# FinDocBot
 
 [![CI](https://github.com/FrostWillmott/FinDocBot/actions/workflows/ci.yml/badge.svg)](https://github.com/FrostWillmott/FinDocBot/actions)
 [![Coverage](https://raw.githubusercontent.com/FrostWillmott/FinDocBot/python-coverage-comment-action-data/badge.svg)](https://github.com/FrostWillmott/FinDocBot/tree/python-coverage-comment-action-data)
@@ -11,7 +11,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 - 📁 **PDF Upload**: Automatic parsing and indexing of financial reports.
 - 🔍 **Semantic Search**: Find relevant text fragments based on meaning, not just keywords.
@@ -23,7 +23,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Language**: Python 3.12+
 - **API Framework**: FastAPI
@@ -35,7 +35,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 ---
 
-## 🏁 Quick Start
+## Quick Start
 
 ### Prerequisites
 1. [Docker](https://www.docker.com/) and Docker Compose installed.
@@ -72,7 +72,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 ---
 
-## 📖 API Documentation
+## API Documentation
 
 ### Upload Document
 `POST /documents/upload` — Uploads a PDF file for indexing.
@@ -136,7 +136,7 @@ source chunks, each with its similarity score and document section.
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 The project strictly follows **Clean Architecture** principles, ensuring the core business logic remains independent of external frameworks, databases, and UI:
 
@@ -149,7 +149,7 @@ This decoupling allows for easy testing (e.g., swapping PostgreSQL for an in-mem
 
 ---
 
-## ⚡ Vector Index
+## Vector Index
 
 PostgreSQL uses an **HNSW** index (`m=16, ef_construction=64`) over the
 `chunks.embedding` column for fast approximate nearest-neighbour search.
@@ -164,7 +164,7 @@ an existing volume.
 
 ---
 
-## 🗂️ Structured Output
+## Structured Output
 
 `POST /ask` returns a `confidence` field (`high` / `medium` / `low`) alongside the answer.
 The LLM is constrained via Ollama's `format` parameter to emit a JSON object matching the
@@ -179,7 +179,7 @@ schema, and the response is validated with Pydantic before reaching the client:
 
 ---
 
-## 🧪 RAG Evaluation
+## RAG Evaluation
 
 `tests/test_rag_evaluation.py` demonstrates a methodology for measuring retrieval
 precision and faithfulness over a golden Q&A dataset. It runs against the
@@ -202,7 +202,7 @@ make test
 
 ---
 
-## 🧪 Testing & Code Quality
+## Testing & Code Quality
 
 - **Run tests**: `make test` (add `--integration` for PostgreSQL tests via Docker; CI runs them in a separate job)
 - **Coverage report**: `make cover` (pytest-cov, terminal report with missing lines; CI enforces ≥90% and refreshes the badge above on every push to `master`)
@@ -211,7 +211,7 @@ make test
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - [Runbook](docs/runbook.md) — bring-up/teardown, quality checks, migrations.
 - [Manual testing checklist](docs/manual-testing.md) — full E2E pass, including failure modes (Ollama down → 502, Postgres down → 503).
@@ -222,7 +222,7 @@ Coding conventions (typing, error handling, testing, pgvector and LLM-integratio
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
