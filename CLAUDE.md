@@ -144,5 +144,7 @@ applied exactly once. The integration tests run the same revisions via
   `tests/infrastructure/test_postgres_repositories.py`; API tests build an
   `httpx.ASGITransport` around `create_app(container=...)` inline.
 
-Conventions are codified in `.claude/rules/` (see `_LEVELS.md` for rule levels).
+Conventions are codified in `.claude/rules/` (see `_LEVELS.md` for rule levels),
+vendored from developer-os `rules-library/`; change a module there first, then
+copy it here.
 Non-obvious technical decisions are logged in `DECISIONS.md`.
