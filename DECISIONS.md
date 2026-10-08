@@ -237,3 +237,11 @@ later reversed, add a superseding entry instead of editing the old one.
   exposed Postgres and Ollama on all interfaces. `postgres_dsn` is now
   required (read from env / `.env`), and both ports are `127.0.0.1`-bound so
   nothing is reachable beyond the host.
+
+## 2026-10-08
+
+- **`.claude/rules/` stays a vendored copy of developer-os `rules-library/`,
+  not a link** — Claude Code loads only rule files present in the repo, so a
+  link would silently drop enforcement for every session here; developer-os
+  itself distributes modules by copying (`new-project.sh`). Changes land in
+  developer-os first and are copied over.
