@@ -26,12 +26,12 @@ Rule levels are defined in `_LEVELS.md`.
   (`user_with_orders`, not `make_user_factory`).
 
 ## Mocking  [MUST]
-- Mock at system boundaries only: external HTTP APIs, the clock, randomness,
-  email/SMS. Don't mock internal functions or classes you own.
+- Mock at system boundaries only — external HTTP APIs, the clock, randomness,
+  email/SMS; the code under test's own functions stay real.
 - Prefer dependency injection over `unittest.mock.patch` — injecting a fake is
   explicit; patch is invisible and breaks on rename.
-- Never mock the database in integration tests — a mock that passes while the
-  real DB fails is worse than no test.
+- Integration tests hit the real database — a mock that passes while the real
+  DB fails is worse than no test.
 
 ## Async  [MUST-UNLESS]
 - Use `pytest-asyncio` with `asyncio_mode = "auto"` in `pyproject.toml`; don't
