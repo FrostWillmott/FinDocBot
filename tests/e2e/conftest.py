@@ -14,6 +14,7 @@ from findocbot.config import Settings
 from findocbot.infrastructure.container import create_container
 from findocbot.main import create_app
 from tests.migrations import run_migrations
+from tests.ollama_pull import pull_model
 
 # docker-compose.yml leads for both image tags; bump them there first.
 _POSTGRES_IMAGE = "pgvector/pgvector:pg16"
@@ -37,11 +38,7 @@ def e2e_settings() -> Iterator[Settings]:
         OllamaContainer(image=_OLLAMA_IMAGE) as ollama,
     ):
         for model in (_EMBED_MODEL, _CHAT_MODEL):
-            # Not ``pull_model``: it discards the exit code, so a failed
-            # pull would surface later as an unrelated embed error.
-            result = ollama.exec(["ollama", "pull", model])
-            if result.exit_code != 0:
-                raise RuntimeError(f"ollama pull {model}: {result.output!r}")
+            pull_model(ollama, model)
 
         # _env_file=None: a developer's .env must not change what CI runs.
         settings = Settings(
