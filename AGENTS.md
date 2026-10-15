@@ -171,5 +171,7 @@ Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `
 
 ### Domain docs
 
-`CONTEXT.md` (glossary) and `docs/adr/` don't exist until `/domain-modeling`
-creates them lazily. See `docs/agents/domain.md`.
+`CONTEXT.md` (glossary: Document, Chunk, Upload, Ingestion, Document status)
+is at the repo root. `docs/adr/` doesn't exist until `/domain-modeling` records
+the first ADR; until then `DECISIONS.md` is the decision log. See
+`docs/agents/domain.md`.
