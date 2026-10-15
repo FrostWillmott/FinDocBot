@@ -4,7 +4,7 @@
 
 | Name                                                       |    Stmts |     Miss |   Branch |   BrPart |   Cover |   Missing |
 |----------------------------------------------------------- | -------: | -------: | -------: | -------: | ------: | --------: |
-| src/findocbot/adapters/api/routes.py                       |       97 |        2 |        6 |        0 |     98% |     72-73 |
+| src/findocbot/adapters/api/routes.py                       |       98 |        2 |        6 |        0 |     98% |     72-73 |
 | src/findocbot/adapters/api/schemas.py                      |       34 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/config.py                                    |       24 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/domain/entities.py                           |       45 |        0 |        0 |        0 |    100% |           |
@@ -19,12 +19,12 @@
 | src/findocbot/main.py                                      |       27 |        1 |        2 |        0 |     97% |        54 |
 | src/findocbot/use\_cases/answer\_question.py               |       81 |        0 |        8 |        0 |    100% |           |
 | src/findocbot/use\_cases/dto.py                            |       17 |        0 |        0 |        0 |    100% |           |
-| src/findocbot/use\_cases/ingestion.py                      |       86 |        1 |       14 |        3 |     96% |105, 112-\>exit, 117-\>exit |
+| src/findocbot/use\_cases/ingestion.py                      |       90 |        1 |       14 |        3 |     96% |116, 123-\>exit, 128-\>exit |
 | src/findocbot/use\_cases/manage\_documents.py              |       17 |        0 |        4 |        0 |    100% |           |
 | src/findocbot/use\_cases/ports.py                          |       33 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/prompt\_safety.py                 |       12 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/use\_cases/search\_similar\_chunks.py        |       15 |        0 |        2 |        0 |    100% |           |
-| **TOTAL**                                                  | **1020** |   **88** |  **140** |   **12** | **91%** |           |
+| **TOTAL**                                                  | **1025** |   **88** |  **140** |   **12** | **91%** |           |
 
 
 ## Setup coverage badge
