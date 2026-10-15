@@ -10,11 +10,11 @@ from findocbot.use_cases.search_similar_chunks import (
 )
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 from tests.factories import build_pdf_bytes
+from tests.fakes import RecordingQueue, StubProvider, index_document
 from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
 )
-from tests.use_cases.fakes import RecordingQueue, StubProvider, index_document
 
 
 class FakeProviderGateway:

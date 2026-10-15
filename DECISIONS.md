@@ -245,3 +245,15 @@ later reversed, add a superseding entry instead of editing the old one.
   link would silently drop enforcement for every session here; developer-os
   itself distributes modules by copying (`new-project.sh`). Changes land in
   developer-os first and are copied over.
+
+## 2026-10-15
+
+- **Tests move to a three-layer layout (`tests/unit|integration|e2e`)** — the
+  vendored `testing.md` now mandates splitting tests by the I/O they need, so
+  each layer (`unit` = no I/O, `integration` = real Postgres, `e2e` = HTTP
+  surface) mirrors `src/findocbot/` within itself. Shared helpers
+  (`tests/factories`, `tests/in_memory`, `tests/fakes`) stay at the `tests/`
+  root. Supersedes the 2026-10-01 "tests mirror the source tree" entry: the
+  mirror is now within each layer, not the top-level layout. True end-to-end
+  (real DB + real Ollama through HTTP) remains future work — `tests/e2e/`
+  currently holds the `ASGITransport` tests.

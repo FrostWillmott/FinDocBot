@@ -187,7 +187,7 @@ schema, and the response is validated with Pydantic before reaching the client:
 
 ## RAG Evaluation
 
-`tests/test_rag_evaluation.py` demonstrates a methodology for measuring retrieval
+`tests/unit/test_rag_evaluation.py` demonstrates a methodology for measuring retrieval
 precision and faithfulness over a golden Q&A dataset. It runs against the
 in-memory stack (no external services) using deterministic fake embeddings and
 answers.

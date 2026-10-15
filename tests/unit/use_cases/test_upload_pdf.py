@@ -12,11 +12,11 @@ from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 from tests.factories import build_pdf_bytes
+from tests.fakes import RecordingQueue, StubProvider
 from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
 )
-from tests.use_cases.fakes import RecordingQueue, StubProvider
 
 
 class _FailingChunkRepository(InMemoryChunkRepository):
