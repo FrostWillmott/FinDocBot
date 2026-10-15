@@ -404,3 +404,15 @@ later reversed, add a superseding entry instead of editing the old one.
   (a GitHub setting, not in this repo) required the checks `test` and
   `integration`; with the `integration` job gone it now requires `test` only,
   and that job carries the integration tests.
+
+- **The e2e fixture retries `ollama pull` (3 attempts, pausing 10 s then 20 s)
+  and reports the registry's own error line** — the Ollama registry is an
+  external service; one `e2e` run failed on `503: upstream connect error`
+  before any test ran and passed on a rerun. The retry lives in
+  `tests/ollama_pull.py` rather than inline so it can be unit-tested with a
+  fake container and an injected pause (no `time.sleep` in the tests). The exit
+  code stays checked, which the container library's own `pull_model` does not
+  do. Every failure is retried, a misspelled model included, which costs about
+  half a minute before it fails; the job's 20-minute timeout bounds the worst
+  case. The error message is the last line of the pull output, not the raw
+  spinner bytes the pull prints while it redraws.
