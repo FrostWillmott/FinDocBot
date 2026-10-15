@@ -1,0 +1,14 @@
+{"id": "hy01", "category": "exact", "question": "Որքա՞ն էր Բանկի ակտիվ աշխատակիցների թվաքանակը 2024 թվականի վերջի դրությամբ։", "document": "idbank-annual-report-2024.pdf", "gold": "վերջի դրությամբ 883"}
+{"id": "hy02", "category": "exact", "question": "Ո՞վ է «ԱյԴի Բանկ» ՓԲԸ Խորհրդի նախագահը։", "document": "idbank-annual-report-2024.pdf", "gold": "Արթուր Ջավադյան"}
+{"id": "hy03", "category": "exact", "question": "Որքա՞ն դրամ հավաքվեց «Կյանքի ճանապարհ» հկ-ի համար՝ էպիլեպսիա ունեցող երեխաների խնդիրներով զբաղվելու նպատակով։", "document": "idbank-annual-report-2024.pdf", "gold": "4,101,050 դրամ"}
+{"id": "hy04", "category": "exact", "question": "Քանի՞ արցախցի ընտանիք և քանի անչափահաս երեխա ընդգրկվեց «Կողք կողքի» ծրագրում։", "document": "idbank-annual-report-2024.pdf", "gold": "42 արցախցի ընտանիքներից 150"}
+{"id": "hy05", "category": "paraphrase", "question": "Ի՞նչ մասնաբաժին են կազմում IDBank-ի քարտերով և հարթակներով անկանխիկ վճարումները հայկական շուկայում։", "document": "idbank-annual-report-2024.pdf", "gold": "բոլոր անկանխիկ գործարքների 25%-ը"}
+{"id": "hy06", "category": "paraphrase", "question": "Ո՞ր տեղն է զբաղեցնում IDBank-ը բանկային համակարգում ակտիվների շահութաբերությամբ։", "document": "idbank-annual-report-2024.pdf", "gold": "4-րդ տեղը ROA-ով 4.0%"}
+{"id": "hy07", "category": "paraphrase", "question": "Որքա՞ն է սահմանվել Բանկի արտաքին աուդիտի վարձատրությունը 2024 թվականին։", "document": "idbank-annual-report-2024.pdf", "gold": "43,000,000 ՀՀ դրամ"}
+{"id": "hy08", "category": "paraphrase", "question": "Ո՞ր աուդիտորական ընկերությունն է կատարել Բանկի ֆինանսական հաշվետվությունների աուդիտը։", "document": "idbank-annual-report-2024.pdf", "gold": "Էրնսթ ընդ Յանգ"}
+{"id": "hy09", "category": "table", "question": "Որքա՞ն է Բանկի ընդամենը ակտիվները 2024 թվականի վերջին՝ հազար դրամով։", "document": "idbank-annual-report-2024.pdf", "gold": "422,459,658"}
+{"id": "hy10", "category": "table", "question": "Որքա՞ն է 2024 թվականի շահույթը տարվա համար՝ հազար դրամով։", "document": "idbank-annual-report-2024.pdf", "gold": "15,799,185"}
+{"id": "hy11", "category": "table", "question": "Որքա՞ն էին դրամական միջոցները և դրանց համարժեքները տարեվերջի դրությամբ։", "document": "idbank-annual-report-2024.pdf", "gold": "39,267,755"}
+{"id": "hy12", "category": "table", "question": "Որքա՞ն է Բանկի սեփական կապիտալը 2024թ. դեկտեմբերի 31-ի դրությամբ՝ հազար դրամով։", "document": "idbank-annual-report-2024.pdf", "gold": "74,461,712"}
+{"id": "hy13", "category": "qualitative", "question": "Ի՞նչ երկարաժամկետ վարկանիշ ունի Բանկը կոնտրագենտի ռիսկի գծով։", "document": "idbank-annual-report-2024.pdf", "gold": "Ba2 - կոնտրագենտի ռիսկի երկարաժամկետ վարկանիշ"}
+{"id": "hy14", "category": "qualitative", "question": "Ո՞րն էր հավատարմության նորարարական գործիքը, որի հաջող ներդրումը կարևոր իրադարձություն էր անցած տարվա համար։", "document": "idbank-annual-report-2024.pdf", "gold": "idcoin-ի հաջող ներդրումն"}
