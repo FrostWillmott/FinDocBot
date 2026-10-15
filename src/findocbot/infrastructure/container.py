@@ -12,6 +12,7 @@ from findocbot.infrastructure.cached_embedding_gateway import (
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.db import PostgresPool
 from findocbot.infrastructure.ollama_gateway import OllamaGateway
+from findocbot.infrastructure.ollama_reranker import OllamaReranker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.infrastructure.postgres_repositories import (
     PostgresChatHistoryRepository,
@@ -96,8 +97,21 @@ def create_container(settings: Settings) -> AppContainer:
     chunks = PostgresChunkRepository(db, settings.embedding_dim)
     history = PostgresChatHistoryRepository(db)
 
+    reranker = (
+        OllamaReranker(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_rerank_model,
+            timeout_seconds=settings.ollama_timeout_seconds,
+        )
+        if settings.ollama_rerank_model
+        else None
+    )
     search_chunks = SearchSimilarChunksUseCase(
-        provider=provider, chunks=chunks
+        provider=provider,
+        chunks=chunks,
+        reranker=reranker,
+        rerank_candidates=settings.rerank_candidates,
+        rerank_timeout_seconds=settings.rerank_timeout_seconds,
     )
     answer_question = AnswerQuestionUseCase(
         provider=provider,

@@ -57,6 +57,13 @@ class ModelProviderGateway(Protocol):
         """Generate a JSON-structured response matching the given schema."""
 
 
+class RerankerPort(Protocol):
+    """Score passages for relevance to a query."""
+
+    async def rerank(self, query: str, passages: list[str]) -> list[float]:
+        """Return one score per passage, higher meaning more relevant."""
+
+
 class DocumentRepositoryPort(Protocol):
     """Persistence operations for documents."""
 

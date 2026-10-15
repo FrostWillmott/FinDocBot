@@ -17,11 +17,12 @@ from findocbot.main import create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
 from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
-from findocbot.use_cases.ports import ChunkWithScore
+from findocbot.use_cases.ports import ChunkWithScore, RerankerPort
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
 from tests.factories import build_pdf_bytes
+from tests.fakes import ScriptedReranker, chunks_in_vector_order
 from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
@@ -90,6 +91,7 @@ def _build_container(
     chunks: InMemoryChunkRepository | None = None,
     health_checks: dict[str, Callable[[], Awaitable[None]]] | None = None,
     documents: InMemoryDocumentRepository | None = None,
+    reranker: RerankerPort | None = None,
 ) -> AppContainer:
     provider = provider if provider is not None else _StubProvider()
     chunks = chunks if chunks is not None else InMemoryChunkRepository()
@@ -99,7 +101,7 @@ def _build_container(
     history = InMemoryHistoryRepository()
 
     search_chunks = SearchSimilarChunksUseCase(
-        provider=provider, chunks=chunks
+        provider=provider, chunks=chunks, reranker=reranker
     )
     answer_question = AnswerQuestionUseCase(
         provider=provider,
@@ -129,9 +131,13 @@ def _build_app(
     provider: _StubProvider | None = None,
     chunks: InMemoryChunkRepository | None = None,
     health_checks: dict[str, Callable[[], Awaitable[None]]] | None = None,
+    reranker: RerankerPort | None = None,
 ) -> httpx.ASGITransport:
     container = _build_container(
-        provider=provider, chunks=chunks, health_checks=health_checks
+        provider=provider,
+        chunks=chunks,
+        health_checks=health_checks,
+        reranker=reranker,
     )
     return httpx.ASGITransport(app=create_app(container=container))
 
@@ -439,3 +445,51 @@ async def test_upload_failed_document_again_responds_202_same_id() -> None:
             202,
             first.json()["document_id"],
         )
+
+
+class _AxisProvider(_StubProvider):
+    """Embeds every query as the first axis, as StubProvider in unit tests."""
+
+    async def embed_one(self, text: str) -> list[float]:
+        return [1.0, 0.0, 0.0]
+
+
+async def test_search_with_reranker_returns_chunks_in_reranked_order() -> None:
+    chunks = await chunks_in_vector_order(["a", "b", "c"])
+    reranker = ScriptedReranker({"a": 0.1, "b": 0.9, "c": 0.5})
+    transport = _build_app(
+        provider=_AxisProvider(), chunks=chunks, reranker=reranker
+    )
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        resp = await client.post("/search", json={"query": "q", "top_k": 2})
+
+    assert [hit["text"] for hit in resp.json()] == ["b", "c"]
+
+
+async def test_search_without_reranker_keeps_vector_order() -> None:
+    chunks = await chunks_in_vector_order(["a", "b", "c"])
+    transport = _build_app(provider=_AxisProvider(), chunks=chunks)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        resp = await client.post("/search", json={"query": "q", "top_k": 2})
+
+    assert [hit["text"] for hit in resp.json()] == ["a", "b"]
+
+
+async def test_ask_with_reranker_cites_sources_in_reranked_order() -> None:
+    chunks = await chunks_in_vector_order(["a", "b", "c"])
+    reranker = ScriptedReranker({"a": 0.1, "b": 0.9, "c": 0.5})
+    transport = _build_app(
+        provider=_AxisProvider(), chunks=chunks, reranker=reranker
+    )
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as client:
+        resp = await client.post(
+            "/ask", json={"question": "which?", "top_k": 2}
+        )
+
+    assert [source["text"] for source in resp.json()["sources"]] == ["b", "c"]
