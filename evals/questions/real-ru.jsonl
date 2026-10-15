@@ -1,0 +1,14 @@
+{"id": "ru01", "category": "exact", "question": "Какой накопленный объём инвестиций ЕАБР в Республике Армения по итогам 2022–2024 годов?", "document": "eabr-annual-report-2024.pdf", "gold": "329 млн долларов США"}
+{"id": "ru02", "category": "exact", "question": "Каков инвестиционный портфель ЕАБР в Российской Федерации по состоянию на конец 2024 года?", "document": "eabr-annual-report-2024.pdf", "gold": "722 млн долларов США"}
+{"id": "ru03", "category": "exact", "question": "Сколько составляет капитал до востребования в уставном капитале Банка?", "document": "eabr-annual-report-2024.pdf", "gold": "капитал до востребования — 6,1 млрд"}
+{"id": "ru04", "category": "exact", "question": "По скольким проектам накоплен инвестиционный портфель Банка?", "document": "eabr-annual-report-2024.pdf", "gold": "305 проектам"}
+{"id": "ru05", "category": "paraphrase", "question": "Какую оценку присвоило ЕАБР китайское рейтинговое агентство в сентябре 2024 года?", "document": "eabr-annual-report-2024.pdf", "gold": "CCXI присвоило"}
+{"id": "ru06", "category": "paraphrase", "question": "Какой ESG-рейтинг подтвердило MSCI для Банка в сентябре 2024 года?", "document": "eabr-annual-report-2024.pdf", "gold": "26 сентября 2024 года MSCI"}
+{"id": "ru07", "category": "paraphrase", "question": "На сколько сократился казначейский портфель Банка в 2024 году?", "document": "eabr-annual-report-2024.pdf", "gold": "1 млрд 829 млн долларов США"}
+{"id": "ru08", "category": "paraphrase", "question": "Какая доля работников успешно прошла тестирование по навыкам комплаенс-контроля?", "document": "eabr-annual-report-2024.pdf", "gold": "прошли 93% работников Банка"}
+{"id": "ru09", "category": "table", "question": "Какова прибыль на акцию Банка за 2024 год?", "document": "eabr-annual-report-2024.pdf", "gold": "0,1513"}
+{"id": "ru10", "category": "table", "question": "Каков объём денежных средств и их эквивалентов на 31 декабря 2024 года (в тыс. долларов США)?", "document": "eabr-annual-report-2024.pdf", "gold": "1 074 446"}
+{"id": "ru11", "category": "table", "question": "Каково фактическое значение минимального уровня ликвидности ФН1 за 2021–2024 годы?", "document": "eabr-annual-report-2024.pdf", "gold": "1 465 2 101 1 647 2 351"}
+{"id": "ru12", "category": "table", "question": "Сколько новых интеграционных проектов и на какую сумму было в 2024 году?", "document": "eabr-annual-report-2024.pdf", "gold": "2024 11 8 1 014 866"}
+{"id": "ru13", "category": "qualitative", "question": "Как изменил ставку рефинансирования Национальный банк Таджикистана в 2024 году?", "document": "eabr-annual-report-2024.pdf", "gold": "снизил ставку рефинансирования с 10%"}
+{"id": "ru14", "category": "qualitative", "question": "Каков накопленный объём грантов Фонда технического содействия и по скольким проектам?", "document": "eabr-annual-report-2024.pdf", "gold": "18,3 млн долларов США в рамках 118 проектов"}

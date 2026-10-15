@@ -417,6 +417,29 @@ later reversed, add a superseding entry instead of editing the old one.
   case. The error message is the last line of the pull output, not the raw
   spinner bytes the pull prints while it redraws.
 
+- **A reranker is evaluated before it is built: `evals/` compares vector
+  retrieval with and without one, and the first run says to try prefixing the
+  document title first** — the candidate is the community GGUF of
+  Qwen3-Reranker-4B (`awenleven/Qwen3-Reranker-4B:Q4_K_M`). Ollama has no
+  rerank endpoint, so the harness drives it through `/api/generate` in raw mode
+  with the Qwen prompt and reads P(yes) from the first token's `logprobs`
+  (every case variant of yes/no summed; a first probe that kept only the last
+  variant gave wrong rankings). First run, 2026-10-15, on a synthetic corpus of
+  18 reports (108 chunks) and 40 frozen questions, top-20 pool:
+  with chunks as stored the reranker lifts hit@1 from 24/40 to 28/40, hit@5
+  from 26/40 to 36–39/40 and MRR from 0.64 to 0.78–0.79, but only on the two
+  categories whose chunks name neither company nor year (it ties at 8/8 on the
+  other three); with the document title prepended to every chunk, plain vector
+  search already reaches 38/40 at hit@1 and 40/40 at hit@3, and the reranker
+  adds the last two (40/40). So most of what a reranker buys here is a missing
+  context problem with a cheaper fix. Cost: about 0.4 s per pair, so roughly
+  9 s for a 20-candidate query on this machine (an earlier 5-chunk probe saw
+  0.11 s; not explained). **Indicative only**: the corpus and questions were
+  written by the project, n is 8 per category, the pool is 18% of the corpus,
+  and the "title" is the PDF file name, which real files rarely make useful.
+  Nothing in `src/` changed; the next step is the same evaluation on real PDFs
+  and questions where retrieval fails (`evals/README.md`).
+
 - **Reranking is an opt-in step inside search, off until `OLLAMA_RERANK_MODEL`
   is set** — the manual evaluation in `evals/` (synthetic corpus, first run
   2026-10-15) showed a reranker mostly compensates for chunks that name

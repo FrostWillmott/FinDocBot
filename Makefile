@@ -2,7 +2,7 @@ UV := uv
 APP_MODULE := findocbot.main:create_app
 APP_FLAGS := --factory
 
-.PHONY: sync dev lint fmt test e2e cover precommit-install up down logs migrate
+.PHONY: sync dev lint fmt test e2e eval-retrieval cover precommit-install up down logs migrate
 
 sync:
 	$(UV) sync --all-groups
@@ -24,6 +24,14 @@ test:
 # Needs Docker; starts Postgres and Ollama and pulls ~670 MB of models.
 e2e:
 	$(UV) run pytest -q --e2e -m e2e
+
+# Retrieval evaluation (see evals/README.md); needs a local Ollama with the
+# embed model and the reranker model, and is not run in CI.
+eval-retrieval:
+	$(UV) run python -m evals.synthetic
+	$(UV) run python -m evals.retrieval_eval --pdf-dir evals/data/synthetic \
+		--questions evals/questions/synthetic.jsonl \
+		--variants plain,titled --instructions default,task
 
 # Unit and integration tests together (the latter need Docker); the gate is
 # fail_under in pyproject.toml.

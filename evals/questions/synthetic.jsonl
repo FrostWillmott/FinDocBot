@@ -1,0 +1,40 @@
+{"id": "q01", "category": "exact_wording", "question": "What was Halcyon Foods's total revenue in fiscal 2024?", "document": "halcyon-foods-2024.pdf", "gold": "USD 2,478 million"}
+{"id": "q02", "category": "exact_wording", "question": "What was the net profit of Orchard Row Retail in fiscal 2024?", "document": "orchard-row-retail-2024.pdf", "gold": "USD 202 million"}
+{"id": "q03", "category": "exact_wording", "question": "What was Marlowe Insurance's total revenue in fiscal 2024?", "document": "marlowe-insurance-2024.pdf", "gold": "USD 2,165 million"}
+{"id": "q04", "category": "exact_wording", "question": "What was the net profit of Brightwater Utilities in fiscal 2025?", "document": "brightwater-utilities-2025.pdf", "gold": "USD 186 million"}
+{"id": "q05", "category": "exact_wording", "question": "What was Orchard Row Retail's total revenue in fiscal 2025?", "document": "orchard-row-retail-2025.pdf", "gold": "USD 2,697 million"}
+{"id": "q06", "category": "exact_wording", "question": "What was the net profit of Brightwater Utilities in fiscal 2024?", "document": "brightwater-utilities-2024.pdf", "gold": "USD 176 million"}
+{"id": "q07", "category": "exact_wording", "question": "What was Northwind Freight's total revenue in fiscal 2025?", "document": "northwind-freight-2025.pdf", "gold": "USD 3,716 million"}
+{"id": "q08", "category": "exact_wording", "question": "What was the net profit of Northwind Freight in fiscal 2024?", "document": "northwind-freight-2024.pdf", "gold": "USD 126 million"}
+{"id": "q09", "category": "paraphrase", "question": "How much did Orchard Row Retail bring in from sales during 2024?", "document": "orchard-row-retail-2024.pdf", "gold": "USD 3,609 million"}
+{"id": "q10", "category": "paraphrase", "question": "What was Brightwater Utilities's bottom line after tax in 2024?", "document": "brightwater-utilities-2024.pdf", "gold": "USD 176 million"}
+{"id": "q11", "category": "paraphrase", "question": "How much did Brightwater Utilities bring in from sales during 2025?", "document": "brightwater-utilities-2025.pdf", "gold": "USD 3,222 million"}
+{"id": "q12", "category": "paraphrase", "question": "What was Northwind Freight's bottom line after tax in 2023?", "document": "northwind-freight-2023.pdf", "gold": "USD 200 million"}
+{"id": "q13", "category": "paraphrase", "question": "How much did Northwind Freight bring in from sales during 2025?", "document": "northwind-freight-2025.pdf", "gold": "USD 3,716 million"}
+{"id": "q14", "category": "paraphrase", "question": "What was Kestrel Semiconductors's bottom line after tax in 2025?", "document": "kestrel-semiconductors-2025.pdf", "gold": "USD 83 million"}
+{"id": "q15", "category": "paraphrase", "question": "How much did Kestrel Semiconductors bring in from sales during 2024?", "document": "kestrel-semiconductors-2024.pdf", "gold": "USD 3,392 million"}
+{"id": "q16", "category": "paraphrase", "question": "What was Marlowe Insurance's bottom line after tax in 2023?", "document": "marlowe-insurance-2023.pdf", "gold": "USD 107 million"}
+{"id": "q17", "category": "year_only_context", "question": "How much cash did Northwind Freight hold at the end of 2024?", "document": "northwind-freight-2024.pdf", "gold": "USD 256 million"}
+{"id": "q18", "category": "year_only_context", "question": "What was Northwind Freight's net debt in 2023?", "document": "northwind-freight-2023.pdf", "gold": "USD 477 million"}
+{"id": "q19", "category": "year_only_context", "question": "How much cash did Orchard Row Retail hold at the end of 2023?", "document": "orchard-row-retail-2023.pdf", "gold": "USD 319 million"}
+{"id": "q20", "category": "year_only_context", "question": "What was Halcyon Foods's net debt in 2025?", "document": "halcyon-foods-2025.pdf", "gold": "USD 461 million"}
+{"id": "q21", "category": "year_only_context", "question": "How much cash did Kestrel Semiconductors hold at the end of 2023?", "document": "kestrel-semiconductors-2023.pdf", "gold": "USD 418 million"}
+{"id": "q22", "category": "year_only_context", "question": "What was Brightwater Utilities's net debt in 2023?", "document": "brightwater-utilities-2023.pdf", "gold": "USD 177 million"}
+{"id": "q23", "category": "year_only_context", "question": "How much cash did Kestrel Semiconductors hold at the end of 2024?", "document": "kestrel-semiconductors-2024.pdf", "gold": "USD 926 million"}
+{"id": "q24", "category": "year_only_context", "question": "What was Kestrel Semiconductors's net debt in 2025?", "document": "kestrel-semiconductors-2025.pdf", "gold": "USD 706 million"}
+{"id": "q25", "category": "no_company_or_year", "question": "What revenue did Kestrel Semiconductors's Automotive chips segment report in 2025?", "document": "kestrel-semiconductors-2025.pdf", "gold": "USD 517 million"}
+{"id": "q26", "category": "no_company_or_year", "question": "What revenue did Marlowe Insurance's Casualty cover segment report in 2023?", "document": "marlowe-insurance-2023.pdf", "gold": "USD 434 million"}
+{"id": "q27", "category": "no_company_or_year", "question": "What revenue did Marlowe Insurance's Property cover segment report in 2025?", "document": "marlowe-insurance-2025.pdf", "gold": "USD 658 million"}
+{"id": "q28", "category": "no_company_or_year", "question": "What revenue did Northwind Freight's Ocean freight segment report in 2024?", "document": "northwind-freight-2024.pdf", "gold": "USD 514 million"}
+{"id": "q29", "category": "no_company_or_year", "question": "What revenue did Brightwater Utilities's Water services segment report in 2023?", "document": "brightwater-utilities-2023.pdf", "gold": "USD 640 million"}
+{"id": "q30", "category": "no_company_or_year", "question": "What revenue did Kestrel Semiconductors's Industrial chips segment report in 2024?", "document": "kestrel-semiconductors-2024.pdf", "gold": "USD 1,139 million"}
+{"id": "q31", "category": "no_company_or_year", "question": "What revenue did Marlowe Insurance's Property cover segment report in 2024?", "document": "marlowe-insurance-2024.pdf", "gold": "USD 1,286 million"}
+{"id": "q32", "category": "no_company_or_year", "question": "What revenue did Halcyon Foods's Beverages segment report in 2025?", "document": "halcyon-foods-2025.pdf", "gold": "USD 1,468 million"}
+{"id": "q33", "category": "topical", "question": "How much is at stake in the a warehouse lease claim in Gdansk?", "document": "northwind-freight-2024.pdf", "gold": "USD 72 million"}
+{"id": "q34", "category": "topical", "question": "How much is at stake in the a data protection inquiry in Dublin?", "document": "orchard-row-retail-2024.pdf", "gold": "USD 112 million"}
+{"id": "q35", "category": "topical", "question": "How much is at stake in the a tariff refund claim in Leeds?", "document": "brightwater-utilities-2024.pdf", "gold": "USD 42 million"}
+{"id": "q36", "category": "topical", "question": "How much is at stake in the an export licence review in Austin?", "document": "kestrel-semiconductors-2024.pdf", "gold": "USD 25 million"}
+{"id": "q37", "category": "topical", "question": "How much is at stake in the a supplier price dispute in Hsinchu?", "document": "kestrel-semiconductors-2025.pdf", "gold": "USD 62 million"}
+{"id": "q38", "category": "topical", "question": "How much is at stake in the a customs classification dispute in Rotterdam?", "document": "northwind-freight-2023.pdf", "gold": "USD 120 million"}
+{"id": "q39", "category": "topical", "question": "How much is at stake in the a lease guarantee claim in Glasgow?", "document": "orchard-row-retail-2023.pdf", "gold": "USD 59 million"}
+{"id": "q40", "category": "topical", "question": "How much is at stake in the a labelling investigation in Lyon?", "document": "halcyon-foods-2023.pdf", "gold": "USD 109 million"}

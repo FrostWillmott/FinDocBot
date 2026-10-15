@@ -214,6 +214,7 @@ make test
 
 - **Run tests**: `make test` (unit); `uv run pytest --integration -m integration` (PostgreSQL via Docker); `make e2e` (real Postgres + Ollama via Docker; pulls ~670 MB of models)
 - **Coverage report**: `make cover` (unit and integration tests together, so it needs Docker; pytest-cov, terminal report with missing lines; CI enforces the `fail_under` threshold in `pyproject.toml` and refreshes the badge above on every push to `master`)
+- **Retrieval evaluation**: `make eval-retrieval` (manual; compares vector retrieval with and without a reranker on a synthetic corpus, needs a local Ollama; see [`evals/README.md`](evals/README.md))
 - **Linting & Formatting**: `make lint` / `make fmt`
 - **Static type checking**: `uv run mypy src/findocbot` (strict mode, enforced in CI)
 
