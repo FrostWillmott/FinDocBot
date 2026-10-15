@@ -12,6 +12,10 @@ from findocbot.use_cases.prompt_safety import neutralize
 # Same limits as the answer prompt applies to the same untrusted text.
 _MAX_QUERY_CHARS = 2000
 _MAX_PASSAGE_CHARS = 4000
+# Explicit, because the community GGUF defaults to a 40200-token window and
+# Ollama then allocates an 8.7 GB runner for a 2.5 GB model (3.8 GB at 8192,
+# measured); it also covers the longest prompt the limits above allow.
+_NUM_CTX = 8192
 # The reranker's own instruction (the model card's default): it is what the
 # model was trained with, and the evaluation harness measured it.
 _INSTRUCTION = (
@@ -66,7 +70,11 @@ class OllamaReranker:
                     "prompt": _prompt(query, passage),
                     "raw": True,
                     "stream": False,
-                    "options": {"temperature": 0, "num_predict": 1},
+                    "options": {
+                        "temperature": 0,
+                        "num_predict": 1,
+                        "num_ctx": _NUM_CTX,
+                    },
                     "logprobs": True,
                     "top_logprobs": 20,
                 },

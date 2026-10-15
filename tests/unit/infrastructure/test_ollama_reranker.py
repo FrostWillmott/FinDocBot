@@ -133,3 +133,17 @@ async def test_rerank_connection_refused_raises_model_provider_error() -> None:
 
     with pytest.raises(ModelProviderError, match="unreachable"):
         await reranker.rerank("q", ["p"])
+
+
+@respx.mock
+async def test_rerank_sets_an_explicit_context_window() -> None:
+    route = respx.post(f"{BASE_URL}/api/generate").mock(
+        return_value=rerank_reply({"yes": 0.5, "no": 0.5})
+    )
+    reranker = OllamaReranker(base_url=BASE_URL, model="reranker")
+
+    await reranker.rerank("q", ["p"])
+
+    options = _sent_body(route)["options"]
+    assert isinstance(options, dict)
+    assert options["num_ctx"] == 8192

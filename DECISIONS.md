@@ -458,4 +458,9 @@ later reversed, add a superseding entry instead of editing the old one.
   query that already costs about 0.4 s per candidate. Built test-first at
   three seams (the adapter against a faked Ollama, the search use case with a
   scripted reranker, and `/search` and `/ask` over HTTP), plus an integration
-  test of the container wiring against real Postgres.
+  test of the container wiring against real Postgres. The first run
+  against the real local Ollama found what the fakes could not: without an
+  explicit `num_ctx` the community GGUF loads with its 40200-token window
+  and an 8.7 GB runner (3.8 GB at 8192), which on a 16 GB machine shared with
+  other models made a 20-candidate query take minutes instead of about 13 s.
+  The adapter now sets `num_ctx` to 8192.
