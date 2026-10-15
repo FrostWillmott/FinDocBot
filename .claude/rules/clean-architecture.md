@@ -2,8 +2,8 @@
 
 Apply ONLY to projects that deliberately want the full layered split. Many
 projects are fine with a lighter 3-layer split — do
-not impose this one by default. If a project's `CLAUDE.md` says it diverges,
-follow the `CLAUDE.md`.
+not impose this one by default. If a project's `AGENTS.md` says it diverges,
+follow the `AGENTS.md`.
 
 ## Layers (dependencies point inward only)
 - **Domain** — business entities, value objects, domain rules. No framework or
