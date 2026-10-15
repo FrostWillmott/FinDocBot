@@ -100,7 +100,7 @@ async def test_chunk_search_after_insert_returns_closest_first(
     embeddings[0][1] = 0.9
     embeddings[1][0] = 0.9
 
-    await repo.add_chunks_with_embeddings(chunks, embeddings)
+    await repo.replace_document_chunks(doc.id, chunks, embeddings)
 
     query_embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
     results = await repo.search_by_embedding(query_embedding, top_k=2)
@@ -173,7 +173,7 @@ async def test_chunk_insert_wrong_dim_raises_before_writing(
     chunk = Chunk.create(document_id=doc.id, chunk_index=0, text="x")
 
     with pytest.raises(EmbeddingDimensionError, match="has 3 dimensions"):
-        await repo.add_chunks_with_embeddings([chunk], [[0.1, 0.2, 0.3]])
+        await repo.replace_document_chunks(doc.id, [chunk], [[0.1, 0.2, 0.3]])
 
     assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
 
@@ -248,7 +248,8 @@ async def test_document_delete_removes_its_chunks_from_search(
     await documents.create(doc)
     chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
     embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    await chunks.add_chunks_with_embeddings(
+    await chunks.replace_document_chunks(
+        doc.id,
         [Chunk.create(document_id=doc.id, chunk_index=0, text="x")],
         [embedding],
     )
@@ -267,7 +268,8 @@ async def test_chunk_search_non_ready_document_returns_nothing(
     await PostgresDocumentRepository(db_pool).create(doc)
     chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
     embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    await chunks.add_chunks_with_embeddings(
+    await chunks.replace_document_chunks(
+        doc.id,
         [Chunk.create(document_id=doc.id, chunk_index=0, text="x")],
         [embedding],
     )
@@ -285,12 +287,88 @@ async def test_chunk_search_after_document_marked_ready_returns_its_chunk(
     chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
     chunk = Chunk.create(document_id=doc.id, chunk_index=0, text="x")
     embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    await chunks.add_chunks_with_embeddings([chunk], [embedding])
+    await chunks.replace_document_chunks(doc.id, [chunk], [embedding])
 
     await documents.set_status(doc.id, "ready")
 
     results = await chunks.search_by_embedding(embedding, top_k=5)
     assert [result.chunk.id for result in results] == [chunk.id]
+
+
+@pytest.mark.integration
+async def test_document_reset_failed_claims_a_failed_document_once(
+    db_pool: PostgresPool,
+) -> None:
+    doc = Document.create(filename="a.pdf", status="pending")
+    documents = PostgresDocumentRepository(db_pool)
+    await documents.create(doc)
+    await documents.set_status(doc.id, "failed", "boom")
+
+    first = await documents.reset_failed(doc.id)
+    second = await documents.reset_failed(doc.id)
+
+    assert first is not None
+    assert (first.status, first.error, second) == ("pending", None, None)
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("status", ["pending", "ready"])
+async def test_document_reset_failed_non_failed_document_returns_none(
+    db_pool: PostgresPool, status: DocumentStatus
+) -> None:
+    doc = Document.create(filename="a.pdf", status=status)
+    documents = PostgresDocumentRepository(db_pool)
+    await documents.create(doc)
+
+    assert await documents.reset_failed(doc.id) is None
+
+
+@pytest.mark.integration
+async def test_chunk_replace_leaves_exactly_the_new_set(
+    db_pool: PostgresPool,
+) -> None:
+    doc = Document.create(filename="a.pdf")
+    await PostgresDocumentRepository(db_pool).create(doc)
+    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
+    await chunks.replace_document_chunks(
+        doc.id,
+        [
+            Chunk.create(document_id=doc.id, chunk_index=i, text=f"old {i}")
+            for i in range(2)
+        ],
+        [embedding, embedding],
+    )
+
+    await chunks.replace_document_chunks(
+        doc.id,
+        [Chunk.create(document_id=doc.id, chunk_index=0, text="new")],
+        [embedding],
+    )
+
+    rows = await db_pool.pool.fetch(
+        "SELECT content FROM chunks WHERE document_id = $1", doc.id
+    )
+    assert [row["content"] for row in rows] == ["new"]
+
+
+@pytest.mark.integration
+async def test_chunk_replace_with_nothing_clears_the_previous_chunks(
+    db_pool: PostgresPool,
+) -> None:
+    doc = Document.create(filename="a.pdf")
+    await PostgresDocumentRepository(db_pool).create(doc)
+    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
+    await chunks.replace_document_chunks(
+        doc.id,
+        [Chunk.create(document_id=doc.id, chunk_index=0, text="old")],
+        [embedding],
+    )
+
+    await chunks.replace_document_chunks(doc.id, [], [])
+
+    assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
 
 
 @pytest.mark.integration

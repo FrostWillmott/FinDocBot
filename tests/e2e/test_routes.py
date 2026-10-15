@@ -418,3 +418,24 @@ async def test_upload_unexpected_ingestion_error_marks_document_failed() -> (
         "failed",
         "Ingestion failed unexpectedly.",
     )
+
+
+async def test_upload_failed_document_again_responds_202_same_id() -> None:
+    container = _build_container()
+    pdf = FPDF()
+    pdf.add_page()
+    blank = bytes(pdf.output())
+    files = {"file": ("blank.pdf", blank, "application/pdf")}
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(container=container)),
+        base_url="http://test",
+    ) as client:
+        first = await client.post("/documents/upload", files=files)
+        await container.ingestion.drain()
+
+        retry = await client.post("/documents/upload", files=files)
+
+        assert (retry.status_code, retry.json()["document_id"]) == (
+            202,
+            first.json()["document_id"],
+        )

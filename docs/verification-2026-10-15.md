@@ -111,3 +111,30 @@ documents, `EXPLAIN ANALYZE` of the joined query still shows
 lookup on `documents`), and `LIMIT 5` and `LIMIT 20` both return the full row count.
 
 **Verdict: PASS.**
+
+## Re-uploading a failed document retries it (#38)
+
+**Change.** A duplicate upload of a `failed` document now goes back to `pending`
+(claimed atomically by `reset_failed`), is queued again and answers 202; any chunks the
+failed attempt left are replaced in the same transaction as the new ones. Before, the
+stored `failed` document came back with 200 and nothing ran.
+
+**Method.** Real uvicorn, worker and Postgres, against the commit before the change
+(`57ba9ef`) and the working tree, on a fresh database each. Two scenarios:
+
+1. *Orphan chunks.* A sample PDF is ingested to `ready` (5 chunks), its row is forced to
+   `failed` with SQL (the state a failed status update leaves), and the same bytes are
+   uploaded again.
+2. *Transient outage.* The stub Ollama is stopped, the upload fails (`Model provider
+   request failed.`), the stub is started again, and the same bytes are uploaded again.
+
+| Scenario, step | Before | After |
+|----------------|--------|-------|
+| Orphan chunks: re-upload | 200 `failed`, same `document_id` | 202 `pending`, same `document_id` |
+| Orphan chunks: settled | `failed`, 5 chunks | `ready`, **5 chunks** (not 10) |
+| Outage: first upload | `failed`, 0 chunks | `failed`, 0 chunks |
+| Outage: re-upload with Ollama up | 200 `failed` | 202 `pending` |
+| Outage: settled | `failed`, 0 chunks | `ready`, 5 chunks |
+
+**Verdict: PASS.** The regular flow above, rerun on the change, printed the same output
+as before.

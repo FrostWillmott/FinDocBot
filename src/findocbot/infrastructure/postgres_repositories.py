@@ -143,6 +143,22 @@ class PostgresDocumentRepository:
         except asyncpg.PostgresError as exc:
             raise StorageError("Failed to update document status") from exc
 
+    async def reset_failed(self, document_id: str) -> Document | None:
+        """Mark a failed document pending again; None if it was not failed."""
+        try:
+            row = await self._db.pool.fetchrow(
+                """
+                UPDATE documents
+                SET status = 'pending', error = NULL
+                WHERE id = $1 AND status = 'failed'
+                RETURNING id, filename, content_hash, status, error, created_at
+                """,
+                document_id,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to reset document status") from exc
+        return None if row is None else _document_from_row(row)
+
 
 class PostgresChunkRepository:
     """Persist and search chunks with pgvector."""
@@ -180,23 +196,29 @@ class PostgresChunkRepository:
                 f"{self._embedding_dim}; check OLLAMA_EMBED_MODEL."
             )
 
-    async def add_chunks_with_embeddings(
+    async def replace_document_chunks(
         self,
+        document_id: str,
         chunks: list[Chunk],
         embeddings: list[list[float]],
     ) -> None:
-        """Insert chunks and matching vectors in a single batch."""
+        """Replace the document's chunks with these in one transaction."""
         if len(chunks) != len(embeddings):
             raise ValueError("Chunks and embeddings count mismatch.")
 
-        if not chunks:
-            return
         for embedding in embeddings:
             self._check_dim(embedding)
 
         try:
             async with self._db.pool.acquire() as conn:
                 async with conn.transaction():
+                    # A retry after a failed ingestion may find chunks the
+                    # failed attempt left behind; chunks have no uniqueness
+                    # on (document_id, chunk_index), so clear them here.
+                    await conn.execute(
+                        "DELETE FROM chunks WHERE document_id = $1",
+                        document_id,
+                    )
                     await conn.executemany(
                         """
                         INSERT INTO chunks (

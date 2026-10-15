@@ -9,7 +9,7 @@ from tests.in_memory import InMemoryChunkRepository
 async def test_search_by_embedding_zero_vector_returns_zero_score() -> None:
     repo = InMemoryChunkRepository()
     chunk = Chunk.create(document_id="doc-1", chunk_index=0, text="hello")
-    await repo.add_chunks_with_embeddings([chunk], [[1.0, 2.0, 3.0]])
+    await repo.replace_document_chunks("doc-1", [chunk], [[1.0, 2.0, 3.0]])
 
     results = await repo.search_by_embedding([0.0, 0.0, 0.0], top_k=1)
 

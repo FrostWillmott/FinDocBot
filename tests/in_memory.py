@@ -78,6 +78,15 @@ class InMemoryDocumentRepository:
             self.items[document_id], status=status, error=error
         )
 
+    async def reset_failed(self, document_id: str) -> Document | None:
+        """Mark a failed document pending again; None if it was not failed."""
+        document = self.items.get(document_id)
+        if document is None or document.status != "failed":
+            return None
+        reset = replace(document, status="pending", error=None)
+        self.items[document_id] = reset
+        return reset
+
 
 class SignallingDocumentRepository(InMemoryDocumentRepository):
     """Sets ``ready`` once any document is marked ready."""
@@ -112,12 +121,18 @@ class InMemoryChunkRepository:
         """Initialize in-memory chunk storage."""
         self.items: list[_StoredChunk] = []
 
-    async def add_chunks_with_embeddings(
+    async def replace_document_chunks(
         self,
+        document_id: str,
         chunks: list[Chunk],
         embeddings: list[list[float]],
     ) -> None:
-        """Store chunks with their embedding vectors."""
+        """Replace the document's stored chunks with these."""
+        self.items = [
+            item
+            for item in self.items
+            if item.chunk.document_id != document_id
+        ]
         for chunk, embedding in zip(chunks, embeddings, strict=True):
             self.items.append(_StoredChunk(chunk=chunk, embedding=embedding))
 

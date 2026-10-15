@@ -24,8 +24,9 @@ from tests.in_memory import (
 
 
 class _FailingChunkRepository(InMemoryChunkRepository):
-    async def add_chunks_with_embeddings(
+    async def replace_document_chunks(
         self,
+        document_id: str,
         chunks: list,
         embeddings: list[list[float]],
     ) -> None:
@@ -35,6 +36,28 @@ class _FailingChunkRepository(InMemoryChunkRepository):
 class _FailingProvider(StubProvider):
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         raise ModelProviderError("Ollama unreachable at http://internal")
+
+
+class _RecoveringProvider(StubProvider):
+    """Fails the first embedding call, as if Ollama was briefly down."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._down = True
+
+    async def embed_many(self, texts: list[str]) -> list[list[float]]:
+        if self._down:
+            self._down = False
+            raise ModelProviderError("Ollama unreachable")
+        return await super().embed_many(texts)
+
+
+class _LostClaimRepository(InMemoryDocumentRepository):
+    """Another request wins the retry claim between lookup and reset."""
+
+    async def reset_failed(self, document_id: str) -> Document | None:
+        await super().reset_failed(document_id)
+        return None
 
 
 class _BuggyProvider(StubProvider):
@@ -294,3 +317,76 @@ async def test_worker_unrecordable_failure_keeps_processing_next_job() -> None:
         await ingestion.stop()
 
     assert documents.items[second.id].status == "ready"
+
+
+async def _failed_document(
+    ingestion: IngestionUseCase, pdf_bytes: bytes
+) -> Document:
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
+    await ingestion.drain()
+    return document
+
+
+async def test_submit_failed_document_again_requeues_it_as_pending() -> None:
+    ingestion, _ = _build_ingestion(provider=_RecoveringProvider())
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    first = await _failed_document(ingestion, pdf_bytes)
+
+    retry = await ingestion.submit("report.pdf", pdf_bytes)
+
+    assert (
+        retry.queued,
+        retry.document.id,
+        retry.document.status,
+        retry.document.error,
+    ) == (True, first.id, "pending", None)
+
+
+async def test_drain_retried_document_becomes_ready() -> None:
+    ingestion, documents = _build_ingestion(provider=_RecoveringProvider())
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    first = await _failed_document(ingestion, pdf_bytes)
+    await ingestion.submit("report.pdf", pdf_bytes)
+
+    await ingestion.drain()
+
+    stored = documents.items[first.id]
+    assert (stored.status, stored.error) == ("ready", None)
+
+
+async def test_drain_retry_replaces_chunks_left_by_the_failed_attempt() -> (
+    None
+):
+    chunks = InMemoryChunkRepository()
+    ingestion, documents = _build_ingestion(chunks=chunks)
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    first = await _failed_document(ingestion, pdf_bytes)
+    # The state a failed status update leaves behind: ready chunks, failed row.
+    await documents.set_status(first.id, "failed", "status update failed")
+    await ingestion.submit("report.pdf", pdf_bytes)
+
+    await ingestion.drain()
+
+    # The one-paragraph PDF is a single chunk; a leftover would make two.
+    assert len(chunks.items) == 1
+
+
+async def test_submit_failed_document_lost_claim_is_not_queued() -> None:
+    chunks = InMemoryChunkRepository()
+    ingestion, _ = _build_ingestion(
+        documents=_LostClaimRepository(),
+        provider=_RecoveringProvider(),
+        chunks=chunks,
+    )
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    await _failed_document(ingestion, pdf_bytes)
+
+    result = await ingestion.submit("report.pdf", pdf_bytes)
+    await ingestion.drain()
+
+    # The row shown is the winner's (pending); this request queued nothing.
+    assert (result.queued, result.document.status, len(chunks.items)) == (
+        False,
+        "pending",
+        0,
+    )
