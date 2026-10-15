@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, replace
 
 from findocbot.domain.entities import (
@@ -76,6 +77,26 @@ class InMemoryDocumentRepository:
         self.items[document_id] = replace(
             self.items[document_id], status=status, error=error
         )
+
+
+class SignallingDocumentRepository(InMemoryDocumentRepository):
+    """Sets ``ready`` once any document is marked ready."""
+
+    def __init__(self) -> None:
+        """Initialize storage and the readiness signal."""
+        super().__init__()
+        self.ready = asyncio.Event()
+
+    async def set_status(
+        self,
+        document_id: str,
+        status: DocumentStatus,
+        error: str | None = None,
+    ) -> None:
+        """Update the status, then signal when a document became ready."""
+        await super().set_status(document_id, status, error)
+        if status == "ready":
+            self.ready.set()
 
 
 @dataclass

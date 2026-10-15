@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 # makes ``submit`` wait, which holds the upload request open.
 _QUEUE_MAXSIZE = 100
 
+# Stored as the document's ``error`` when ingestion fails for a reason we did
+# not anticipate; the cause (driver or parser internals) goes to the log only.
+_UNEXPECTED_ERROR_MESSAGE = "Ingestion failed unexpectedly."
+
 
 @dataclass(frozen=True)
 class _Job:
@@ -129,9 +133,10 @@ class IngestionUseCase:
             try:
                 await self._process(job)
             except Exception:
-                # An unexpected bug must not kill the worker; log it and
-                # keep processing. Expected failures are already turned
-                # into a 'failed' document status by ``_process``.
+                # Last resort: ``_process`` already records every failure it
+                # can, so this only sees one it could not (for example the
+                # status update itself raising). An unexpected bug must not
+                # kill the worker; log it and keep processing.
                 logger.exception(
                     "Upload worker failed on job %s", job.document_id
                 )
@@ -150,18 +155,33 @@ class IngestionUseCase:
             await self._ingest(job)
             await self._documents.set_status(job.document_id, "ready")
         except FinDocBotError as error:
-            try:
-                await self._documents.set_status(
-                    job.document_id, "failed", _safe_error_message(error)
-                )
-            except FinDocBotError:
-                # The database is unavailable too; nothing can record the
-                # failure, so log it and let the worker move on.
-                logger.exception(
-                    "Could not record ingestion failure for %s: %s",
-                    job.document_id,
-                    error,
-                )
+            await self._mark_failed(job, _safe_error_message(error), error)
+        except Exception as error:
+            # Deliberately broad: this is the outermost boundary of a
+            # background job with no caller to report to, and a driver or
+            # parser bug must not leave the document 'pending' for ever. The
+            # traceback is logged; the client sees only a fixed message.
+            logger.exception(
+                "Unexpected error ingesting document %s", job.document_id
+            )
+            await self._mark_failed(job, _UNEXPECTED_ERROR_MESSAGE, error)
+
+    async def _mark_failed(
+        self, job: _Job, message: str, cause: Exception
+    ) -> None:
+        """Store a failure on the document; log if even that cannot be done."""
+        try:
+            await self._documents.set_status(
+                job.document_id, "failed", message
+            )
+        except FinDocBotError:
+            # The database is unavailable too; nothing can record the
+            # failure, so log it and let the worker move on.
+            logger.exception(
+                "Could not record ingestion failure for %s: %s",
+                job.document_id,
+                cause,
+            )
 
     async def _ingest(self, job: _Job) -> None:
         """Run the parse → chunk → embed → persist pipeline for one upload."""
