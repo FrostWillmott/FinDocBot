@@ -18,7 +18,7 @@ working tree. Output compared line by line.
 | `POST /ask` | PASS | 200, stub answer, `high`, 2 sources |
 | `GET /documents` | PASS | 200, statuses `['failed', 'ready']` |
 | SIGINT shutdown (worker stopped by the lifespan) | PASS | "Application shutdown complete", no traceback, in both runs |
-| Duplicate of a still-pending upload | SKIP | Not observable with a stub that answers instantly; pinned in `tests/e2e/test_routes.py` (issue #39) |
+| Duplicate of a still-pending upload | PASS | See "Duplicate of a pending upload (#39)" below |
 | Unexpected error during ingestion | PASS | See "Unexpected error during ingestion (#36)" below |
 
 ## Captured output
@@ -63,3 +63,25 @@ driver ran against the commit before the fix (`274beb4`) and the working tree.
 
 **Verdict: PASS.** The regular flow above, rerun on the fix, printed the same output
 as before.
+
+## Duplicate of a pending upload (#39)
+
+**Change.** `IngestionUseCase.submit` returns a `Submission` saying whether it queued
+ingestion; the route answers 202 only when it did, so a duplicate of a pending upload
+now gets 200, as `README.md` and `DECISIONS.md` say. Before, the route read
+`document.status` and answered 202.
+
+**Method.** The stub Ollama delays `/api/embed` by 3 seconds so the document stays
+`pending` long enough to upload the same bytes again. The same driver ran against the
+commit before the fix (`473d12c`) and the working tree, on a fresh database each.
+
+| Step | Before | After |
+|------|--------|-------|
+| First upload | 202 `pending` | 202 `pending` |
+| Same bytes while `pending` | **202** `pending`, same `document_id` | **200** `pending`, same `document_id` |
+| Document settles | `ready` | `ready` |
+| Same bytes after `ready` | 200 `ready`, same `document_id` | 200 `ready`, same `document_id` |
+| Documents listed / chunks stored | 1 / 5 | 1 / 5 |
+
+**Verdict: PASS.** The regular flow above, rerun on the fix, printed the same output as
+before.

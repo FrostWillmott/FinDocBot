@@ -349,14 +349,9 @@ async def test_get_document_after_upload_returns_its_filename() -> None:
         assert resp.json()["filename"] == "r.pdf"
 
 
-# The first two tests pin today's behaviour of the duplicate-upload path
-# (issue #39); the fix flips an assertion on purpose.
-
-
-async def test_upload_duplicate_of_pending_document_responds_202_same_id() -> (
+async def test_upload_duplicate_of_pending_document_responds_200_same_id() -> (
     None
 ):
-    # Defect #39: DECISIONS.md says a duplicate returns 200.
     async with httpx.AsyncClient(
         transport=_build_app(), base_url="http://test"
     ) as client:
@@ -364,7 +359,7 @@ async def test_upload_duplicate_of_pending_document_responds_202_same_id() -> (
         second = await _upload_pdf(client)
 
         assert (second.status_code, second.json()["document_id"]) == (
-            202,
+            200,
             first.json()["document_id"],
         )
 

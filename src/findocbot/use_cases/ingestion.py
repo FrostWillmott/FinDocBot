@@ -39,6 +39,16 @@ class _Job:
     content: bytes
 
 
+@dataclass(frozen=True)
+class Submission:
+    """Outcome of ``IngestionUseCase.submit``."""
+
+    document: Document
+    # True when this request queued ingestion; False when the bytes resolved
+    # to a document stored earlier, whatever its status.
+    queued: bool
+
+
 def _safe_error_message(error: FinDocBotError) -> str:
     """Return a client-safe message for an ingestion failure.
 
@@ -78,18 +88,19 @@ class IngestionUseCase:
         )
         self._worker: asyncio.Task[None] | None = None
 
-    async def submit(self, filename: str, content: bytes) -> Document:
+    async def submit(self, filename: str, content: bytes) -> Submission:
         """Register an upload and queue it for background ingestion.
 
-        Returns a document with ``status="pending"``; the worker flips it to
-        ``ready`` or ``failed`` after processing. Re-uploading the same bytes
-        returns the stored document without queueing it again, so uploads
-        stay idempotent and cost no extra parsing or embedding.
+        A new upload returns a ``pending`` document with ``queued=True``; the
+        worker flips it to ``ready`` or ``failed`` after processing.
+        Re-uploading the same bytes returns the stored document with
+        ``queued=False`` and does not queue it again, so uploads stay
+        idempotent and cost no extra parsing or embedding.
         """
         content_hash = hashlib.sha256(content).hexdigest()
         existing = await self._documents.find_by_content_hash(content_hash)
         if existing is not None:
-            return existing
+            return Submission(document=existing, queued=False)
 
         document = Document.create(
             filename=filename,
@@ -103,9 +114,9 @@ class IngestionUseCase:
             stored = await self._documents.find_by_content_hash(content_hash)
             if stored is None:
                 raise
-            return stored
+            return Submission(document=stored, queued=False)
         await self._queue.put(_Job(document_id=document.id, content=content))
-        return document
+        return Submission(document=document, queued=True)
 
     async def start(self) -> None:
         """Spawn the worker task if it is not already running."""

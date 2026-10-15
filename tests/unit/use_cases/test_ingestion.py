@@ -104,11 +104,17 @@ def _build_ingestion(
     return ingestion, documents
 
 
+async def _submit(
+    ingestion: IngestionUseCase, filename: str, content: bytes
+) -> Document:
+    return (await ingestion.submit(filename, content)).document
+
+
 async def test_submit_new_upload_creates_pending_document() -> None:
     ingestion, documents = _build_ingestion()
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
 
-    document = await ingestion.submit("report.pdf", pdf_bytes)
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
 
     assert (document.status, documents.items[document.id].status) == (
         "pending",
@@ -123,8 +129,8 @@ async def test_submit_same_bytes_twice_returns_first_and_ingests_once() -> (
     ingestion, documents = _build_ingestion(chunks=chunks)
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
 
-    first = await ingestion.submit("report.pdf", pdf_bytes)
-    second = await ingestion.submit("report-copy.pdf", pdf_bytes)
+    first = await _submit(ingestion, "report.pdf", pdf_bytes)
+    second = await _submit(ingestion, "report-copy.pdf", pdf_bytes)
     await ingestion.drain()
 
     # The one-paragraph PDF is a single chunk, so a second ingestion would
@@ -134,6 +140,16 @@ async def test_submit_same_bytes_twice_returns_first_and_ingests_once() -> (
         [first.id],
         1,
     )
+
+
+async def test_submit_same_bytes_twice_queues_only_the_first() -> None:
+    ingestion, _ = _build_ingestion()
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+
+    first = await ingestion.submit("report.pdf", pdf_bytes)
+    second = await ingestion.submit("report-copy.pdf", pdf_bytes)
+
+    assert (first.queued, second.queued) == (True, False)
 
 
 async def test_submit_concurrent_duplicate_returns_stored_document() -> None:
@@ -151,14 +167,18 @@ async def test_submit_concurrent_duplicate_returns_stored_document() -> None:
     result = await ingestion.submit("report.pdf", pdf_bytes)
     await ingestion.drain()
 
-    assert (result, len(chunks.items)) == (stored, 0)
+    assert (result.document, result.queued, len(chunks.items)) == (
+        stored,
+        False,
+        0,
+    )
 
 
 async def test_drain_upload_marks_document_ready_and_stores_chunks() -> None:
     chunks = InMemoryChunkRepository()
     ingestion, documents = _build_ingestion(chunks=chunks)
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
-    document = await ingestion.submit("report.pdf", pdf_bytes)
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
 
     await ingestion.drain()
 
@@ -173,7 +193,7 @@ async def test_drain_empty_pdf_marks_document_failed() -> None:
     pdf = FPDF()
     pdf.add_page()
     blank = bytes(pdf.output())
-    document = await ingestion.submit("blank.pdf", blank)
+    document = await _submit(ingestion, "blank.pdf", blank)
 
     await ingestion.drain()
 
@@ -185,7 +205,7 @@ async def test_drain_empty_pdf_marks_document_failed() -> None:
 async def test_drain_chunk_storage_failure_marks_document_failed() -> None:
     ingestion, documents = _build_ingestion(chunks=_FailingChunkRepository())
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
-    document = await ingestion.submit("report.pdf", pdf_bytes)
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
 
     await ingestion.drain()
 
@@ -197,7 +217,7 @@ async def test_drain_chunk_storage_failure_marks_document_failed() -> None:
 async def test_drain_provider_failure_sanitizes_error_message() -> None:
     ingestion, documents = _build_ingestion(provider=_FailingProvider())
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
-    document = await ingestion.submit("report.pdf", pdf_bytes)
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
 
     await ingestion.drain()
 
@@ -208,8 +228,8 @@ async def test_drain_provider_failure_sanitizes_error_message() -> None:
 
 async def test_drain_unexpected_error_marks_document_failed() -> None:
     ingestion, documents = _build_ingestion(provider=_BuggyProvider())
-    document = await ingestion.submit(
-        "report.pdf", build_pdf_bytes("Revenue grew by 20 percent.")
+    document = await _submit(
+        ingestion, "report.pdf", build_pdf_bytes("Revenue grew by 20 percent.")
     )
 
     await ingestion.drain()
@@ -226,8 +246,8 @@ async def test_drain_unexpected_error_logs_the_traceback(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     ingestion, _ = _build_ingestion(provider=_BuggyProvider())
-    await ingestion.submit(
-        "report.pdf", build_pdf_bytes("Revenue grew by 20 percent.")
+    await _submit(
+        ingestion, "report.pdf", build_pdf_bytes("Revenue grew by 20 percent.")
     )
 
     with caplog.at_level(logging.ERROR):
@@ -245,8 +265,8 @@ async def test_drain_failure_that_cannot_be_recorded_is_logged_not_raised(
     ingestion, _ = _build_ingestion(
         documents=_UnrecordableFailureRepository(), provider=_FailingProvider()
     )
-    document = await ingestion.submit(
-        "report.pdf", build_pdf_bytes("Revenue grew by 20 percent.")
+    document = await _submit(
+        ingestion, "report.pdf", build_pdf_bytes("Revenue grew by 20 percent.")
     )
 
     with caplog.at_level(logging.ERROR):
@@ -262,9 +282,9 @@ async def test_worker_unrecordable_failure_keeps_processing_next_job() -> None:
     ingestion, _ = _build_ingestion(documents=documents)
     pdf = FPDF()
     pdf.add_page()
-    await ingestion.submit("blank.pdf", bytes(pdf.output()))
-    second = await ingestion.submit(
-        "report.pdf", build_pdf_bytes("Revenue grew by 20 percent.")
+    await _submit(ingestion, "blank.pdf", bytes(pdf.output()))
+    second = await _submit(
+        ingestion, "report.pdf", build_pdf_bytes("Revenue grew by 20 percent.")
     )
 
     await ingestion.start()
