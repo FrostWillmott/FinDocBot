@@ -151,6 +151,8 @@ Non-obvious technical decisions are logged in `DECISIONS.md`.
 
 ## Agent skills
 
+Skills ship via the `mattpocock-skills` Claude Code plugin (project scope), not files in this repo.
+
 ### Issue tracker
 
 Issues live in GitHub Issues for `FrostWillmott/FinDocBot`; skills read and write them via the `gh` CLI. See `docs/agents/issue-tracker.md`.
