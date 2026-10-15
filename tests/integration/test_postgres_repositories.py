@@ -323,25 +323,3 @@ async def test_ping_closed_pool_raises_storage_error(pg_dsn: str) -> None:
 
     with pytest.raises(StorageError, match="Database is unavailable"):
         await db.ping()
-
-
-@pytest.fixture
-def unstarted_repo() -> PostgresChunkRepository:
-    # The pool is never started: the check must fire before any DB access.
-    return PostgresChunkRepository(PostgresPool("postgresql://unused"), 3)
-
-
-async def test_chunk_insert_wrong_dim_raises_without_db_access(
-    unstarted_repo: PostgresChunkRepository,
-) -> None:
-    chunk = Chunk.create(document_id="d", chunk_index=0, text="x")
-
-    with pytest.raises(EmbeddingDimensionError, match="has 2 dimensions"):
-        await unstarted_repo.add_chunks_with_embeddings([chunk], [[0.1, 0.2]])
-
-
-async def test_chunk_search_wrong_dim_raises_without_db_access(
-    unstarted_repo: PostgresChunkRepository,
-) -> None:
-    with pytest.raises(EmbeddingDimensionError, match="EMBEDDING_DIM is 3"):
-        await unstarted_repo.search_by_embedding([0.1] * 4, top_k=1)

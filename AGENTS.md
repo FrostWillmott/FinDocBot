@@ -120,21 +120,21 @@ them together — `.env.example` says so next to the setting.
 
 ### Testing
 
+- Tests use a three-layer layout — `tests/unit/` (no I/O), `tests/integration/`
+  (real DB), `tests/e2e/` (HTTP surface) — mirroring `src/findocbot/` within
+  each layer.
 - **Integration tests** are gated behind `@pytest.mark.integration` and the
   `--integration` flag (see `tests/conftest.py`). They need Docker for PostgreSQL.
 - **In-memory fakes** (`tests/in_memory.py`) cover the repositories; model
-  provider stubs sit in `tests/use_cases/fakes.py` and in individual tests —
-  no Docker needed for unit tests.
-- Tests mirror `src/findocbot/`: `infrastructure/chunking.py` →
-  `tests/infrastructure/test_chunking.py`, `main.py` → `tests/test_main.py`
-  (app wiring smoke). Cross-cutting `tests/test_rag_evaluation.py` sits at the
-  root. Test directories are packages, so shared helpers import as
-  `tests.factories` (PDF builder), `tests.in_memory` and `tests.use_cases.fakes`.
+  provider stubs sit in `tests/fakes.py` and in individual tests — no Docker
+  needed for unit tests.
+- Shared helpers live at the `tests/` root: `tests.factories` (PDF builder),
+  `tests.in_memory` and `tests.fakes`.
 - Test names follow `test_{what}_{condition}_{expected}`.
 - `tests/conftest.py` holds only the `--integration` option and marker. The
   Postgres fixtures (`pg_dsn` via testcontainers, `db_pool`) live in
-  `tests/infrastructure/test_postgres_repositories.py`; API tests build an
-  `httpx.ASGITransport` around `create_app(container=...)` inline.
+  `tests/integration/test_postgres_repositories.py`; API tests build an
+  `httpx.ASGITransport` around `create_app(container=...)` inline in `tests/e2e/`.
 
 Conventions are codified in `.claude/rules/` (see `_LEVELS.md` for rule levels),
 vendored from developer-os `rules-library/`; change a module there first, then
