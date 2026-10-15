@@ -15,7 +15,7 @@
 | src/findocbot/infrastructure/db.py                         |       26 |       13 |        6 |        0 |     41% |21-22, 28-30, 35-37, 41-51 |
 | src/findocbot/infrastructure/ollama\_gateway.py            |       99 |        0 |       20 |        0 |    100% |           |
 | src/findocbot/infrastructure/pdf\_parser.py                |       70 |        0 |       14 |        0 |    100% |           |
-| src/findocbot/infrastructure/postgres\_repositories.py     |      109 |       70 |       10 |        4 |     36% |24, 28, 47-65, 69-80, 84-95, 99-112, 116-123, 132-144, 157-168, 177-\>exit, 190, 193, 197-225, 234-253, 277-284, 288-295, 299-318, 322-346 |
+| src/findocbot/infrastructure/postgres\_repositories.py     |      109 |       70 |       10 |        4 |     36% |24, 28, 47-65, 69-80, 84-95, 99-112, 116-123, 132-144, 157-168, 177-\>exit, 190, 193, 197-225, 234-258, 282-289, 293-300, 304-323, 327-351 |
 | src/findocbot/main.py                                      |       27 |        1 |        2 |        0 |     97% |        54 |
 | src/findocbot/use\_cases/answer\_question.py               |       81 |        0 |        8 |        0 |    100% |           |
 | src/findocbot/use\_cases/dto.py                            |       17 |        0 |        0 |        0 |    100% |           |
