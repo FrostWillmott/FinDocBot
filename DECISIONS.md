@@ -397,4 +397,7 @@ later reversed, add a superseding entry instead of editing the old one.
   job is not counted (it needs a real Ollama). Chosen over merging coverage
   files from parallel jobs, which keeps the jobs apart but needs artifact
   upload and download steps and a combining job. Raise the number as coverage
-  grows; never lower it to go green.
+  grows; never lower it to go green. The repository ruleset `main protection`
+  (a GitHub setting, not in this repo) required the checks `test` and
+  `integration`; with the `integration` job gone it now requires `test` only,
+  and that job carries the integration tests.
