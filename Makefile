@@ -2,7 +2,7 @@ UV := uv
 APP_MODULE := findocbot.main:create_app
 APP_FLAGS := --factory
 
-.PHONY: sync dev lint fmt test cover precommit-install up down logs migrate
+.PHONY: sync dev lint fmt test e2e cover precommit-install up down logs migrate
 
 sync:
 	$(UV) sync --all-groups
@@ -20,6 +20,10 @@ fmt:
 
 test:
 	$(UV) run pytest -q
+
+# Needs Docker; starts Postgres and Ollama and pulls ~670 MB of models.
+e2e:
+	$(UV) run pytest -q --e2e -m e2e
 
 cover:
 	$(UV) run pytest -q --cov --cov-report=term-missing
