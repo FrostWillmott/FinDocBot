@@ -381,3 +381,26 @@ later reversed, add a superseding entry instead of editing the old one.
   documents, and the first one's worker would later overwrite that with
   `ready`), and every `pending` row at startup belongs to a process that is
   gone.
+
+- **Coverage is measured over the unit and integration suites together, in the
+  `test` job, and the threshold lives in `pyproject.toml`** — supersedes the
+  2026-07-24 entries that enforced it on the unit run alone (≥80%, then ≥90%)
+  and kept the integration job apart. The PostgreSQL repositories and `db.py`
+  are exercised only by integration tests, so the unit-only figure counted
+  about a hundred statements it could never reach and had settled 0.22 points
+  over the gate; the next ordinary change would have turned CI red. Together
+  the suites reach 95.9%, and `fail_under = 93` leaves about three points of
+  headroom. It is the one place the number is written (CI runs `make cover`,
+  which reads it), so `--cov-fail-under` is gone from the workflow, and the
+  separate `integration` job is gone too: the `test` job runs the same tests.
+  The "main protection" ruleset on `master` required a check named
+  `integration`, which no longer reports, so its required checks are now
+  just `test`; put the two back together if a job of that name returns.
+  Unit-only feedback stays `make test`; `make cover` now needs Docker. The e2e
+  job is not counted (it needs a real Ollama). Chosen over merging coverage
+  files from parallel jobs, which keeps the jobs apart but needs artifact
+  upload and download steps and a combining job. Raise the number as coverage
+  grows; never lower it to go green. The repository ruleset `main protection`
+  (a GitHub setting, not in this repo) required the checks `test` and
+  `integration`; with the `integration` job gone it now requires `test` only,
+  and that job carries the integration tests.

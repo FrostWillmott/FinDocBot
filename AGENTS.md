@@ -11,7 +11,7 @@ targets (`sync`, `dev`, `lint`, `fmt`, `test`, `e2e`, `cover`, `up`, `down`,
 - Integration tests (Docker): `uv run pytest -q --integration -m integration`
 - Type check: `uv run mypy src/findocbot`
 
-The CI `test` job runs `ruff check`, `ruff format --check`, `mypy --strict`, and `pytest --cov-fail-under=90`. The `integration` job runs `pytest --integration -m integration` separately, and the `e2e` job runs `make e2e` (real Postgres and Ollama in containers). `ruff format` also formats Python code blocks in Markdown, so docs fail the check too; the pre-commit ruff hooks cover Markdown for that reason.
+The CI `test` job runs `ruff check`, `ruff format --check`, `mypy --strict`, and `make cover` (unit and integration tests together, gated by `fail_under` in `pyproject.toml`); the `e2e` job runs `make e2e` (real Postgres and Ollama in containers). `ruff format` also formats Python code blocks in Markdown, so docs fail the check too; the pre-commit ruff hooks cover Markdown for that reason.
 
 ## Architecture
 
@@ -139,7 +139,7 @@ them together — `.env.example` says so next to the setting.
   for PostgreSQL; **e2e tests** (`@pytest.mark.e2e`, `--e2e`) need only Docker —
   the fixture starts Postgres and Ollama containers and pulls the models
   (~670 MB), so no local Ollama is required. Each is skipped unless its flag is
-  passed (see `tests/conftest.py`); CI runs them in separate jobs. The e2e
+  passed (see `tests/conftest.py`). CI runs the integration tests in the `test` job, under the coverage gate, and the e2e tests in their own job. The e2e
   database is wiped before every test.
 - **In-memory fakes** (`tests/in_memory.py`) cover the repositories; model
   provider stubs sit in `tests/fakes.py` and in individual tests — no Docker

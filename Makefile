@@ -25,8 +25,10 @@ test:
 e2e:
 	$(UV) run pytest -q --e2e -m e2e
 
+# Unit and integration tests together (the latter need Docker); the gate is
+# fail_under in pyproject.toml.
 cover:
-	$(UV) run pytest -q --cov --cov-report=term-missing
+	$(UV) run pytest -q --integration --cov --cov-report=term-missing
 
 precommit-install:
 	$(UV) run pre-commit install
