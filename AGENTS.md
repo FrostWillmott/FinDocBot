@@ -100,7 +100,10 @@ decision there is superseded, refresh the corresponding line here.
   parses, chunks, embeds and persists them, then flips the status to `ready`
   or `failed` (with a client-safe `error`); an error nobody anticipated
   also ends as `failed`, with a fixed message and its traceback in the log.
-  Tests run queued work with `drain()`. Terms are in `CONTEXT.md`. A SHA-256 of the uploaded bytes
+  Tests run queued work with `drain()`. Search only considers chunks of
+  `ready` documents (a join in `PostgresChunkRepository.search_by_embedding`);
+  the in-memory fake has no document status, so that rule is covered by
+  integration tests only. Terms are in `CONTEXT.md`. A SHA-256 of the uploaded bytes
   (`documents.content_hash`, unique) makes a re-upload return the stored
   document instead of queueing a second copy.
 

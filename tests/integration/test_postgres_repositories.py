@@ -14,6 +14,7 @@ from findocbot.domain.entities import (
     ChatTurn,
     Chunk,
     Document,
+    DocumentStatus,
 )
 from findocbot.domain.exceptions import (
     DuplicateDocumentError,
@@ -255,6 +256,41 @@ async def test_document_delete_removes_its_chunks_from_search(
     await documents.delete(doc.id)
 
     assert await chunks.search_by_embedding(embedding, top_k=5) == []
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("status", ["pending", "failed"])
+async def test_chunk_search_non_ready_document_returns_nothing(
+    db_pool: PostgresPool, status: DocumentStatus
+) -> None:
+    doc = Document.create(filename="a.pdf", status=status)
+    await PostgresDocumentRepository(db_pool).create(doc)
+    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
+    await chunks.add_chunks_with_embeddings(
+        [Chunk.create(document_id=doc.id, chunk_index=0, text="x")],
+        [embedding],
+    )
+
+    assert await chunks.search_by_embedding(embedding, top_k=5) == []
+
+
+@pytest.mark.integration
+async def test_chunk_search_after_document_marked_ready_returns_its_chunk(
+    db_pool: PostgresPool,
+) -> None:
+    doc = Document.create(filename="a.pdf", status="pending")
+    documents = PostgresDocumentRepository(db_pool)
+    await documents.create(doc)
+    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
+    chunk = Chunk.create(document_id=doc.id, chunk_index=0, text="x")
+    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
+    await chunks.add_chunks_with_embeddings([chunk], [embedding])
+
+    await documents.set_status(doc.id, "ready")
+
+    results = await chunks.search_by_embedding(embedding, top_k=5)
+    assert [result.chunk.id for result in results] == [chunk.id]
 
 
 @pytest.mark.integration
