@@ -91,6 +91,12 @@ class DocumentRepositoryPort(Protocol):
         or does not exist, get None.
         """
 
+    async def fail_pending(self, message: str) -> int:
+        """Mark every pending document failed with this message.
+
+        Returns how many documents were changed.
+        """
+
 
 class ChunkRepositoryPort(Protocol):
     """Persistence operations for chunks with vectors."""

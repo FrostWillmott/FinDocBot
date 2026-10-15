@@ -363,3 +363,21 @@ later reversed, add a superseding entry instead of editing the old one.
   `add_chunks_with_embeddings`), because chunks have no uniqueness on
   `(document_id, chunk_index)` and the failed attempt may have left some (see
   the ready-only search entry), which would otherwise come back as duplicates.
+
+- **A restart marks documents it left `pending` as `failed`, with "Ingestion
+  was interrupted by a restart; upload again."** — the ingestion queue is in
+  memory (2026-10-07 entry), so after a crash or a restart the queued bytes are
+  gone and their documents stayed `pending` for ever (#37). Chosen over
+  persisting the bytes, which that entry rejected to avoid a broker and a
+  durable store. `IngestionUseCase.recover_interrupted` runs as a startup step
+  (`startup_checks`: after the database is up, before the worker starts; a
+  failure aborts startup like the schema check) rather than inside `start()`,
+  which would hide a state change in a lifecycle call and, after a `stop()`,
+  fail jobs still waiting in the queue. The message says "upload again"
+  because a re-upload of a failed document is now a retry (#38), where the
+  unexpected-error message deliberately did not suggest it. This also covers a
+  shutdown that cancelled a job mid-way. Assumptions, accepted: one API
+  instance (a second instance starting would fail the first one's in-flight
+  documents, and the first one's worker would later overwrite that with
+  `ready`), and every `pending` row at startup belongs to a process that is
+  gone.

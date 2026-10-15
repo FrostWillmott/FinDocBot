@@ -32,6 +32,11 @@ _QUEUE_MAXSIZE = 100
 # not anticipate; the cause (driver or parser internals) goes to the log only.
 _UNEXPECTED_ERROR_MESSAGE = "Ingestion failed unexpectedly."
 
+# What a document says after the process holding its queued bytes went away.
+# Uploading again is a real remedy: a duplicate of a failed document is
+# retried.
+_INTERRUPTED_MESSAGE = "Ingestion was interrupted by a restart; upload again."
+
 
 @dataclass(frozen=True)
 class _Job:
@@ -67,7 +72,9 @@ class IngestionUseCase:
     ``submit`` stores a ``pending`` document and queues its bytes; one worker
     parses, chunks, embeds and persists them, then marks the document
     ``ready`` or ``failed``. Queued bytes live in memory, so jobs not yet
-    handled do not survive a restart; see DECISIONS.md.
+    handled do not survive a restart; ``recover_interrupted`` then marks their
+    documents ``failed`` at startup. That assumes a single API instance (see
+    DECISIONS.md).
     """
 
     def __init__(
@@ -135,6 +142,20 @@ class IngestionUseCase:
             return Submission(document=current or existing, queued=False)
         await self._queue.put(_Job(document_id=claimed.id, content=content))
         return Submission(document=claimed, queued=True)
+
+    async def recover_interrupted(self) -> None:
+        """Mark documents left pending by a previous process as failed.
+
+        Run once at startup, before the worker starts: a pending document
+        then has no job anywhere (the queue was in memory), so it would stay
+        pending for ever. Uploading the same bytes again retries it.
+        """
+        count = await self._documents.fail_pending(_INTERRUPTED_MESSAGE)
+        if count:
+            logger.warning(
+                "Marked %d document(s) interrupted by a restart as failed",
+                count,
+            )
 
     async def start(self) -> None:
         """Spawn the worker task if it is not already running."""

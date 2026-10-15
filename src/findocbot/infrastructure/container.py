@@ -41,7 +41,8 @@ class AppContainer:
     search_chunks: SearchSimilarChunksUseCase
     answer_question: AnswerQuestionUseCase
     manage_documents: ManageDocumentsUseCase
-    # Run after the database is up; a failure aborts application startup.
+    # Checks and recovery steps, run after the database is up and before the
+    # worker starts; a failure aborts application startup.
     startup_checks: list[Callable[[], Awaitable[None]]] = field(
         default_factory=list
     )
@@ -120,7 +121,7 @@ def create_container(settings: Settings) -> AppContainer:
         search_chunks=search_chunks,
         answer_question=answer_question,
         manage_documents=ManageDocumentsUseCase(documents),
-        startup_checks=[chunks.verify_schema],
+        startup_checks=[chunks.verify_schema, ingestion.recover_interrupted],
         health_checks={
             "database": db.ping,
             "model_provider": ollama_gateway.ping,

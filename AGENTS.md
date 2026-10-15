@@ -98,7 +98,10 @@ decision there is superseded, refresh the corresponding line here.
   queue, and reports whether it queued (`Submission.queued`; the route answers
   202 only then, 200 for a duplicate). A duplicate of a `failed` document is
   retried: `reset_failed` claims it atomically, and the job replaces any chunks
-  the failed attempt left; the container starts the worker via `start()`/`stop()`. The worker
+  the failed attempt left. At startup `IngestionUseCase.recover_interrupted`,
+  registered in `startup_checks`, marks documents a previous process left
+  `pending` as `failed` (the queue was in memory, and one API instance is
+  assumed). The container starts the worker via `start()`/`stop()`. The worker
   parses, chunks, embeds and persists them, then flips the status to `ready`
   or `failed` (with a client-safe `error`); an error nobody anticipated
   also ends as `failed`, with a fixed message and its traceback in the log.
@@ -145,7 +148,7 @@ them together — `.env.example` says so next to the setting.
   `tests.in_memory`, `tests.fakes` and `tests.migrations` (Alembic helper).
 - Test names follow `test_{what}_{condition}_{expected}`.
 - `tests/conftest.py` holds only the `--integration`/`--e2e` options and markers.
-  The Postgres fixtures live in `tests/integration/test_postgres_repositories.py`;
+  The Postgres fixtures live in `tests/integration/conftest.py`;
   the e2e infra (real Postgres + Ollama) is in `tests/e2e/conftest.py`; API
   adapter tests build an `httpx.ASGITransport` around `create_app(container=...)`.
 
