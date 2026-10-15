@@ -213,7 +213,7 @@ make test
 ## Testing & Code Quality
 
 - **Run tests**: `make test` (unit); `uv run pytest --integration -m integration` (PostgreSQL via Docker); `make e2e` (real Postgres + Ollama via Docker; pulls ~670 MB of models)
-- **Coverage report**: `make cover` (pytest-cov, terminal report with missing lines; CI enforces ≥90% and refreshes the badge above on every push to `master`)
+- **Coverage report**: `make cover` (unit and integration tests together, so it needs Docker; pytest-cov, terminal report with missing lines; CI enforces the `fail_under` threshold in `pyproject.toml` and refreshes the badge above on every push to `master`)
 - **Linting & Formatting**: `make lint` / `make fmt`
 - **Static type checking**: `uv run mypy src/findocbot` (strict mode, enforced in CI)
 

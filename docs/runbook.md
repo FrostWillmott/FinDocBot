@@ -66,10 +66,11 @@
   - `uv run mypy src/findocbot`
 - Tests:
   - `make test`
-- Coverage (CI enforces ≥90%):
+- Coverage over unit and integration tests together (requires Docker; CI enforces the
+  `fail_under` threshold in `pyproject.toml`):
   - `make cover`
-- Integration tests (requires Docker; CI runs them in a separate job):
-  - `uv run pytest --integration`
+- Integration tests alone (requires Docker):
+  - `uv run pytest --integration -m integration`
 - End-to-end tests (requires Docker; starts Postgres and Ollama and pulls ~670 MB of models; CI runs them in a separate job):
   - `make e2e`
 - Full manual E2E pass: see [manual-testing.md](manual-testing.md)
