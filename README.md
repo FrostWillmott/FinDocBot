@@ -19,12 +19,12 @@
 | src/findocbot/main.py                                      |       27 |        1 |        2 |        0 |     97% |        54 |
 | src/findocbot/use\_cases/answer\_question.py               |       81 |        0 |        8 |        0 |    100% |           |
 | src/findocbot/use\_cases/dto.py                            |       17 |        0 |        0 |        0 |    100% |           |
-| src/findocbot/use\_cases/ingestion.py                      |       80 |        3 |       14 |        3 |     94% |101, 108-\>exit, 113-\>exit, 157-160 |
+| src/findocbot/use\_cases/ingestion.py                      |       86 |        1 |       14 |        3 |     96% |105, 112-\>exit, 117-\>exit |
 | src/findocbot/use\_cases/manage\_documents.py              |       17 |        0 |        4 |        0 |    100% |           |
 | src/findocbot/use\_cases/ports.py                          |       33 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/prompt\_safety.py                 |       12 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/use\_cases/search\_similar\_chunks.py        |       15 |        0 |        2 |        0 |    100% |           |
-| **TOTAL**                                                  | **1014** |   **90** |  **140** |   **12** | **90%** |           |
+| **TOTAL**                                                  | **1020** |   **88** |  **140** |   **12** | **91%** |           |
 
 
 ## Setup coverage badge
