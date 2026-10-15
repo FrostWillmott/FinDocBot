@@ -393,6 +393,9 @@ later reversed, add a superseding entry instead of editing the old one.
   headroom. It is the one place the number is written (CI runs `make cover`,
   which reads it), so `--cov-fail-under` is gone from the workflow, and the
   separate `integration` job is gone too: the `test` job runs the same tests.
+  The "main protection" ruleset on `master` required a check named
+  `integration`, which no longer reports, so its required checks are now
+  just `test`; put the two back together if a job of that name returns.
   Unit-only feedback stays `make test`; `make cover` now needs Docker. The e2e
   job is not counted (it needs a real Ollama). Chosen over merging coverage
   files from parallel jobs, which keeps the jobs apart but needs artifact
