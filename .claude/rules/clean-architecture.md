@@ -19,6 +19,9 @@ follow the `AGENTS.md`.
 
 ## Rules to enforce
 - Flag any framework/infrastructure import appearing in domain or use-case layers.
+  "Framework" means delivery/persistence frameworks (FastAPI, SQLAlchemy, Django);
+  Pydantic is a validation library, so it is permitted in use cases to validate
+  model output.
 - Use constructor injection for dependencies; DI containers optional, only for
   complex apps.
 - Propose `Protocol`/ABC at boundaries for dependency inversion; DTOs to cross

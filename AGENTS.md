@@ -4,22 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-All commands use `uv` via the Makefile:
+All commands run through `make` — the Makefile is the source of truth for
+targets (`sync`, `dev`, `lint`, `fmt`, `test`, `cover`, `up`, `down`, `logs`,
+`migrate`, `precommit-install`). Two checks have no make target:
 
-| Task | Command |
-|------|---------|
-| Install deps | `make sync` |
-| Run API (dev) | `make dev` |
-| Lint + format check | `make lint` |
-| Auto-fix lint/format | `make fmt` |
-| Unit tests | `make test` |
-| Unit tests + coverage | `make cover` |
-| Integration tests (Docker) | `uv run pytest -q --integration -m integration` |
-| Type check | `uv run mypy src/findocbot` |
-| Start infra (DB + Ollama) | `make up` |
-| Stop infra | `make down` |
-| Apply migrations | `make migrate` |
-| Install pre-commit hooks | `make precommit-install` |
+- Integration tests (Docker): `uv run pytest -q --integration -m integration`
+- Type check: `uv run mypy src/findocbot`
 
 The CI `test` job runs `ruff check`, `ruff format --check`, `mypy --strict`, and `pytest --cov-fail-under=90`. The `integration` job runs `pytest --integration -m integration` separately. `ruff format` also formats Python code blocks in Markdown, so docs fail the check too; the pre-commit ruff hooks cover Markdown for that reason.
 
@@ -72,6 +62,9 @@ cache with TTL (an `OrderedDict`, no third-party cache library). It caches only
 
 ### Key patterns
 
+Current-state index — `DECISIONS.md` is the append-only *why* log; when a
+decision there is superseded, refresh the corresponding line here.
+
 - **Error mapping**: `adapters/api/routes.py:_map_use_case_errors()` maps domain
   exceptions to HTTP status codes — `ModelProviderError` → 502,
   `InfrastructureError` → 503, `NotFoundError` → 404, `FinDocBotError` → 400.
@@ -119,12 +112,11 @@ applied exactly once. The integration tests run the same revisions via
 
 ### Config
 
-`Settings` (pydantic-settings) loads from env / `.env`. Key knobs:
-`postgres_dsn` (required — no default), `embedding_dim`,
-`max_history_pairs`, `embedding_cache_size`, `embedding_batch_size`,
-`embedding_cache_ttl_seconds`, `ollama_num_ctx`, `ollama_num_predict`,
-`ollama_timeout_seconds`, `db_pool_max_size`, `chunk_tokens`,
-`chunk_overlap_ratio`, `log_level`.
+`Settings` (pydantic-settings, `src/findocbot/config.py`) loads from env /
+`.env`; the class is the source of truth for field names and defaults.
+`postgres_dsn` is required (no default). `CHUNK_TOKENS` is coupled to
+`OLLAMA_NUM_CTX` and the per-source prompt cap (`_MAX_SOURCE_CHARS`), so raise
+them together — `.env.example` says so next to the setting.
 
 ### Testing
 
@@ -163,4 +155,5 @@ Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` at the repo root plus `docs/adr/`. See `docs/agents/domain.md`.
+`CONTEXT.md` (glossary) and `docs/adr/` don't exist until `/domain-modeling`
+creates them lazily. See `docs/agents/domain.md`.
