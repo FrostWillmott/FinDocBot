@@ -299,3 +299,13 @@ later reversed, add a superseding entry instead of editing the old one.
   The worker's own catch-all stays as the last resort for a failure the
   status update itself cannot record. `asyncio.CancelledError` is not caught,
   so a shutdown mid-job still leaves the document `pending` (#37).
+
+- **`submit` reports whether it queued ingestion, and the route answers 202
+  only then; any duplicate answers 200** — the 2026-10-04 entry and the README
+  already say a duplicate returns 200, but since ingestion moved to the
+  background (2026-10-07) the route read `document.status`, so a duplicate of a
+  still-`pending` upload got 202 (#39). `IngestionUseCase.submit` now returns a
+  `Submission(document, queued)`; the pre-check hit and the concurrent-insert
+  race both report `queued=False`. The flag says "queued", not "new", so a
+  future retry of a `failed` document on re-upload (#38) can queue it and answer
+  202 without changing the route's rule.
