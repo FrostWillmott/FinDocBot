@@ -9,7 +9,6 @@ import httpx
 from fpdf import FPDF
 
 from findocbot.config import Settings
-from findocbot.domain.entities import DocumentStatus
 from findocbot.domain.exceptions import ModelProviderError, StorageError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.container import AppContainer
@@ -27,6 +26,7 @@ from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
     InMemoryHistoryRepository,
+    SignallingDocumentRepository,
 )
 
 
@@ -83,24 +83,6 @@ class _FirstEmbedBreaksProvider(_StubProvider):
             self._broken = False
             raise RuntimeError("boom")
         return await super().embed_many(texts)
-
-
-class _SignallingDocumentRepository(InMemoryDocumentRepository):
-    """Sets ``ready`` once any document is marked ready."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.ready = asyncio.Event()
-
-    async def set_status(
-        self,
-        document_id: str,
-        status: DocumentStatus,
-        error: str | None = None,
-    ) -> None:
-        await super().set_status(document_id, status, error)
-        if status == "ready":
-            self.ready.set()
 
 
 def _build_container(
@@ -367,9 +349,8 @@ async def test_get_document_after_upload_returns_its_filename() -> None:
         assert resp.json()["filename"] == "r.pdf"
 
 
-# The next three tests pin today's behaviour of the ingestion path so the
-# ingestion refactor cannot change it by accident. Each one marks a known
-# defect: the fix flips its assertion on purpose.
+# The first two tests pin today's behaviour of the duplicate-upload path
+# (issue #39); the fix flips an assertion on purpose.
 
 
 async def test_upload_duplicate_of_pending_document_responds_202_same_id() -> (
@@ -405,11 +386,10 @@ async def test_upload_duplicate_of_pending_document_is_ingested_once() -> None:
     assert len(chunks.items) == 1
 
 
-async def test_upload_unexpected_ingestion_error_leaves_document_pending() -> (
+async def test_upload_unexpected_ingestion_error_marks_document_failed() -> (
     None
 ):
-    # Defect #36: the fix marks it failed with a client-safe message.
-    documents = _SignallingDocumentRepository()
+    documents = SignallingDocumentRepository()
     container = _build_container(
         provider=_FirstEmbedBreaksProvider(), documents=documents
     )
@@ -439,4 +419,7 @@ async def test_upload_unexpected_ingestion_error_leaves_document_pending() -> (
     finally:
         await container.shutdown()
 
-    assert stored.json()["status"] == "pending"
+    assert (stored.json()["status"], stored.json()["error"]) == (
+        "failed",
+        "Ingestion failed unexpectedly.",
+    )

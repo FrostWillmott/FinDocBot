@@ -19,7 +19,7 @@ working tree. Output compared line by line.
 | `GET /documents` | PASS | 200, statuses `['failed', 'ready']` |
 | SIGINT shutdown (worker stopped by the lifespan) | PASS | "Application shutdown complete", no traceback, in both runs |
 | Duplicate of a still-pending upload | SKIP | Not observable with a stub that answers instantly; pinned in `tests/e2e/test_routes.py` (issue #39) |
-| Unexpected error during ingestion | SKIP | Needs a provider that raises a non-domain error; pinned in `tests/e2e/test_routes.py` (issue #36) |
+| Unexpected error during ingestion | PASS | See "Unexpected error during ingestion (#36)" below |
 
 ## Captured output
 
@@ -38,3 +38,28 @@ list 200 ['failed', 'ready']
 ```
 
 The real-Ollama check is `pytest --e2e -m e2e`; this report covers the stubbed run only.
+
+## Unexpected error during ingestion (#36)
+
+**Change.** `IngestionUseCase` marks a document `failed` with the fixed text
+`Ingestion failed unexpectedly.` when ingestion raises an error it did not
+anticipate; before, the document stayed `pending` for ever.
+
+**Method.** Real uvicorn, real worker, throwaway Postgres, the same stub Ollama. A
+launcher (`verify_app`) wraps the real app factory with one injected fault: the PDF
+parser raises `RuntimeError("secret internal detail ...")` for bytes starting with
+`BOOM`, standing in for a pypdf bug outside the mapped list. The stub cannot provoke
+a non-domain error by itself: a wrong embedding count is a `ModelProviderError`, and
+stopping Postgres would also stop the status update from being recorded. The same
+driver ran against the commit before the fix (`274beb4`) and the working tree.
+
+| Flow | Before | After |
+|------|--------|-------|
+| Upload the faulty bytes | 202 `pending` | 202 `pending` |
+| Upload the sample PDF right after | `ready` | `ready` (the worker kept going) |
+| Poll the faulty document | `pending`, `error` null | `failed`, `error` "Ingestion failed unexpectedly." |
+| Responses containing "secret internal detail" | 0 | 0 |
+| Server log | "Upload worker failed on job ..." with traceback | "Unexpected error ingesting document ..." with traceback |
+
+**Verdict: PASS.** The regular flow above, rerun on the fix, printed the same output
+as before.
