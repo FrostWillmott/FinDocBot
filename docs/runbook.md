@@ -70,6 +70,8 @@
   - `make cover`
 - Integration tests (requires Docker; CI runs them in a separate job):
   - `uv run pytest --integration`
+- End-to-end tests (requires Docker; starts Postgres and Ollama and pulls ~670 MB of models; CI runs them in a separate job):
+  - `make e2e`
 - Full manual E2E pass: see [manual-testing.md](manual-testing.md)
 
 ## Pre-commit

@@ -265,6 +265,27 @@ later reversed, add a superseding entry instead of editing the old one.
   dedicated `e2e` job (the slow one — the model pull is ~670 MB). Supersedes the
   "remains future work" note above.
 
+- **The e2e `/ask` test asserts the cited sources, not the answer text, and the
+  embed model is pinned to `nomic-embed-text:v1.5`** — a 0.5B model sampled at
+  Ollama's default temperature words its answer differently on every run, so
+  only retrieval is deterministic: the sample's revenue figure must appear in
+  `sources`. A 200 still needs the model to emit valid JSON, so the test can
+  still flake with a 502. A seed or temperature setting would remove that, but
+  it is a `Settings` field with no consumer outside this test, so it was left
+  out. `Settings` defaults to `nomic-embed-text:latest`; the test pins the tag
+  so a re-pushed model cannot shift retrieval under the assertion.
+- **Each e2e test ingests the sample PDF itself and the database is truncated
+  before every test** — one shared ingested document would save a few seconds
+  per test but needs module-scoped async fixtures (pytest-asyncio
+  `loop_scope`) and a connection pool that outlives each test's event loop.
+  Isolation was worth more than the seconds.
+- **CI actions are pinned by commit SHA; the coverage action is pinned to the
+  moving `v3` tag as it resolved on this date** — that commit sits 65 commits
+  past the last v3 release (`v3.41`) and 46 before `v4.1`, with no release tag
+  of its own. Pinning it keeps the code CI already ran, where `v3.41` would
+  quietly step back. Move to a tagged release when it is worth reviewing the
+  change. Bump SHA and trailing version comment together.
+
 - **Ingestion is one module with a private queue; the queue port is gone** —
   `UploadPDFUseCase`, `InProcessUploadQueue` and `UploadQueuePort` became
   `IngestionUseCase`. Dedup, the worker, every status transition and error

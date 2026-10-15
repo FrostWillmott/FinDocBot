@@ -11,6 +11,7 @@ from testcontainers.postgres import PostgresContainer
 from findocbot.infrastructure.db import PostgresPool
 from tests.migrations import run_migrations
 
+# Mirrors Settings.embedding_dim, which leads (the e2e tests read it there).
 EMBEDDING_DIM = 768
 
 
@@ -18,6 +19,7 @@ EMBEDDING_DIM = 768
 def pg_dsn() -> str:
     """Spin up pgvector container once per test module."""
     with PostgresContainer(
+        # docker-compose.yml leads for the image tag; bump it there first.
         image="pgvector/pgvector:pg16",
         dbname="findocbot",
     ) as postgres:
