@@ -46,6 +46,7 @@ Use cases declare their dependencies as `Protocol` classes in `use_cases/ports.p
 | `PDFParserPort` | Extract text from PDF bytes |
 | `ChunkerPort` | Split text into (chunk, section) tuples |
 | `ModelProviderGateway` | Embeddings + structured generation |
+| `RerankerPort` | Score passages against a query (optional; `OllamaReranker`) |
 | `DocumentRepositoryPort` / `ChunkRepositoryPort` / `ChatHistoryRepositoryPort` | Persistence |
 
 Each has a real implementation in `infrastructure/`. Repository fakes live in
@@ -92,6 +93,12 @@ decision there is superseded, refresh the corresponding line here.
 - **PDF → chunks**: the parser rebuilds paragraph breaks (blank lines) from line
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.
+- **Reranking (opt-in)**: with `OLLAMA_RERANK_MODEL` set, `SearchSimilarChunksUseCase`
+  fetches `max(top_k, RERANK_CANDIDATES)` candidates, asks a `RerankerPort`
+  (`OllamaReranker`: Qwen3-Reranker prompt through `/api/generate`, P(yes) from
+  the first token's `logprobs`) to score them, and keeps the best `top_k`; the
+  result `score` is then the reranker's. A reranker error or a
+  `RERANK_TIMEOUT_SECONDS` timeout falls back to vector order. Off by default.
 - **Background ingestion**: `IngestionUseCase` owns the whole lifecycle, with
   no port for its queue. `POST /documents/upload` calls `submit`, which stores a
   `pending` document and enqueues the bytes on a private in-process asyncio

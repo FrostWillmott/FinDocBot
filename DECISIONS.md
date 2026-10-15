@@ -416,3 +416,23 @@ later reversed, add a superseding entry instead of editing the old one.
   half a minute before it fails; the job's 20-minute timeout bounds the worst
   case. The error message is the last line of the pull output, not the raw
   spinner bytes the pull prints while it redraws.
+
+- **Reranking is an opt-in step inside search, off until `OLLAMA_RERANK_MODEL`
+  is set** — the manual evaluation in `evals/` (synthetic corpus, first run
+  2026-10-15) showed a reranker mostly compensates for chunks that name
+  neither company nor year, which prefixing the title fixes more cheaply, so
+  it ships switchable and off by default until real documents say
+  otherwise. `RerankerPort` is a separate, narrow port (not another method on
+  `ModelProviderGateway`); `OllamaReranker` drives the community GGUF of
+  Qwen3-Reranker through `/api/generate` in raw mode, because Ollama has no
+  rerank endpoint, and reads P(yes) from the first token's `logprobs`
+  (needs a recent Ollama). It opens a client per `rerank` call, so it has no
+  lifecycle to start or stop. Failure policy: a `ModelProviderError` or a
+  deadline of `RERANK_TIMEOUT_SECONDS` keeps the vector order and logs a
+  warning, since search without reranking is still correct. The result `score`
+  is the reranker's P(yes) when reranking ran, the cosine similarity
+  otherwise. Not retried and not cached: a retry would add whole seconds to a
+  query that already costs about 0.4 s per candidate. Built test-first at
+  three seams (the adapter against a faked Ollama, the search use case with a
+  scripted reranker, and `/search` and `/ask` over HTTP), plus an integration
+  test of the container wiring against real Postgres.
