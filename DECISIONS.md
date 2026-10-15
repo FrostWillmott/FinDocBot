@@ -325,3 +325,20 @@ later reversed, add a superseding entry instead of editing the old one.
   until it is deleted, so a retry on re-upload (#38) has to clear them first;
   and the in-memory chunk repository has no document status, so the rule is
   covered by integration tests only.
+
+- **Re-uploading a `failed` document retries it; a `pending` or `ready` one is
+  still returned as it is** — a transient failure (Ollama down while
+  embedding) otherwise made that content permanently stuck until the client
+  deleted it (#38). Supersedes the part of the 2026-10-04 dedup entry that
+  says a re-upload costs no parsing or embedding: for a `failed` document it
+  now does, and a deterministic failure such as an unreadable PDF is
+  re-parsed on every re-upload (bounded, accepted). `submit` claims the retry
+  with `DocumentRepositoryPort.reset_failed`, one conditional `UPDATE ... WHERE
+  status = 'failed'`, so concurrent re-uploads queue it once; the loser
+  re-reads the row and reports `queued=False`. Only `failed` is retried: a
+  `pending` document may really be in flight, and one stranded by a restart
+  cannot be told apart from it (#37). The ingestion job replaces the document's
+  chunks in one transaction (`replace_document_chunks`, replacing
+  `add_chunks_with_embeddings`), because chunks have no uniqueness on
+  `(document_id, chunk_index)` and the failed attempt may have left some (see
+  the ready-only search entry), which would otherwise come back as duplicates.

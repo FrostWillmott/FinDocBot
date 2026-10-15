@@ -92,7 +92,9 @@ curl "http://localhost:8000/documents/<document_id>"
 ```
 
 Uploading the same file again (byte for byte) returns the stored document
-with `200` (its status is unchanged) instead of queueing a second copy.
+with `200` (its status is unchanged) instead of queueing a second copy. If the
+stored document is `failed`, the upload retries it instead: the document goes
+back to `pending` and the response is `202`.
 
 ### List, Inspect and Delete Documents
 `GET /documents?limit=50&offset=0` — stored documents, newest first

@@ -96,7 +96,9 @@ decision there is superseded, refresh the corresponding line here.
   no port for its queue. `POST /documents/upload` calls `submit`, which stores a
   `pending` document and enqueues the bytes on a private in-process asyncio
   queue, and reports whether it queued (`Submission.queued`; the route answers
-  202 only then, 200 for a duplicate); the container starts the worker via `start()`/`stop()`. The worker
+  202 only then, 200 for a duplicate). A duplicate of a `failed` document is
+  retried: `reset_failed` claims it atomically, and the job replaces any chunks
+  the failed attempt left; the container starts the worker via `start()`/`stop()`. The worker
   parses, chunks, embeds and persists them, then flips the status to `ready`
   or `failed` (with a client-safe `error`); an error nobody anticipated
   also ends as `failed`, with a fixed message and its traceback in the log.
