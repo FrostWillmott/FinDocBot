@@ -47,7 +47,6 @@ Use cases declare their dependencies as `Protocol` classes in `use_cases/ports.p
 | `ChunkerPort` | Split text into (chunk, section) tuples |
 | `ModelProviderGateway` | Embeddings + structured generation |
 | `DocumentRepositoryPort` / `ChunkRepositoryPort` / `ChatHistoryRepositoryPort` | Persistence |
-| `UploadQueuePort` | Queue background ingestion jobs |
 
 Each has a real implementation in `infrastructure/`. Repository fakes live in
 `tests/in_memory.py`, provider stubs in the tests that use them; neither ships
@@ -93,10 +92,13 @@ decision there is superseded, refresh the corresponding line here.
 - **PDF → chunks**: the parser rebuilds paragraph breaks (blank lines) from line
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.
-- **Background ingestion**: `POST /documents/upload` stores a `pending`
-  document and enqueues the bytes on an in-process asyncio queue; a worker
+- **Background ingestion**: `IngestionUseCase` owns the whole lifecycle, with
+  no port for its queue. `POST /documents/upload` calls `submit`, which stores a
+  `pending` document and enqueues the bytes on a private in-process asyncio
+  queue; the container starts the worker via `start()`/`stop()`. The worker
   parses, chunks, embeds and persists them, then flips the status to `ready`
-  or `failed` (with a client-safe `error`). A SHA-256 of the uploaded bytes
+  or `failed` (with a client-safe `error`); tests run queued work with
+  `drain()`. Terms are in `CONTEXT.md`. A SHA-256 of the uploaded bytes
   (`documents.content_hash`, unique) makes a re-upload return the stored
   document instead of queueing a second copy.
 
