@@ -138,3 +138,27 @@ stored `failed` document came back with 200 and nothing ran.
 
 **Verdict: PASS.** The regular flow above, rerun on the change, printed the same output
 as before.
+
+## Documents left pending by a restart are failed at startup (#37)
+
+**Change.** `IngestionUseCase.recover_interrupted`, registered in `startup_checks`, marks
+every document still `pending` as `failed` ("Ingestion was interrupted by a restart;
+upload again.") before the worker starts. Before, a restart left them `pending` for
+ever, because their queued bytes lived in the process that went away.
+
+**Method.** Real uvicorn, worker and Postgres, the stub Ollama delaying embeddings by 4
+seconds so a document is still `pending` mid-ingestion. The server is killed with
+SIGKILL (a real crash, not the lifespan shutdown), restarted on the same database
+without truncating, and the same bytes are uploaded again. Run against the commit before
+the change (`a89b04d`) and the working tree.
+
+| Step | Before | After |
+|------|--------|-------|
+| Upload, while ingesting | 202, `pending` | 202, `pending` |
+| After the crash and restart | `pending`, no error | `failed`, "Ingestion was interrupted by a restart; upload again." |
+| Re-upload of the same bytes | 200 `pending` | 202 `pending` (retried, as in #38) |
+| Settled | `pending`, 0 chunks | `ready`, 5 chunks |
+| Startup log | none | `WARNING ... Marked 1 document(s) interrupted by a restart as failed` |
+
+**Verdict: PASS.** The regular flow above, rerun on the change, printed the same output
+as before.
