@@ -464,3 +464,23 @@ later reversed, add a superseding entry instead of editing the old one.
   and an 8.7 GB runner (3.8 GB at 8192), which on a 16 GB machine shared with
   other models made a 20-candidate query take minutes instead of about 13 s.
   The adapter now sets `num_ctx` to 8192.
+
+- **The reranker stays off by default after the real-document runs; the
+  embedder is the next thing to evaluate** — the same harness on three public
+  annual reports (`evals/documents.md`, 14 questions each, top-20 pool,
+  2026-10-15) gives hit@1 vector → rerank of 5/14 → 10/14 on the English
+  report (547 chunks, MRR 0.50 → 0.79), 3/14 → 9/14 on the Russian one (130
+  chunks, MRR 0.32 → 0.64) and 1/14 → 9/14 on the Armenian one (59 chunks, MRR
+  0.19 → 0.65). On Russian and Armenian the reranker already reaches the
+  ceiling set by the pool (the gold chunk is in the top 20 for 9/14 and 10/14
+  questions), so candidate recall of `nomic-embed-text` is what limits
+  those languages, not the ordering. A multilingual embedder (bge-m3 or
+  qwen3-embedding) is the next run; it changes `EMBEDDING_DIM` and needs a
+  re-embed, so it is not a settings flip. Default stays off because turning it
+  on costs a 2.5 GB model and seconds per search (about 0.7 s per candidate
+  idle on an M1 Pro; the Russian and Armenian runs shared the machine with
+  other jobs and show 2–5 s per pair, which is contention, not the model);
+  whether to flip it is the project owner's call. **Indicative only**: the
+  questions were written by the project, n is 14 per language, and the
+  Armenian ones have not been reviewed by a native speaker. The `default` and
+  `task` instruction variants give the same result within noise.
