@@ -309,3 +309,19 @@ later reversed, add a superseding entry instead of editing the old one.
   race both report `queued=False`. The flag says "queued", not "new", so a
   future retry of a `failed` document on re-upload (#38) can queue it and answer
   202 without changing the route's rule.
+
+- **Search only considers chunks of `ready` documents, enforced in the search
+  query** — chunks are committed before the document is marked `ready`, so for
+  a moment, and for good if that update fails, a `pending` or `failed`
+  document's chunks answered questions (#40). `search_by_embedding` now joins
+  `documents` and filters on status, so "searchable" is defined in one place
+  and matches `CONTEXT.md`. Chosen over committing the chunks and the status
+  in one transaction: that needs one operation spanning the document and chunk
+  repositories and wiring the in-memory fakes together, where this touches one
+  query. Trade-offs: pgvector filters after the HNSW scan, so `top_k` can
+  return fewer rows when many of the nearest chunks belong to non-ready
+  documents (checked on 10,000 chunks with 10% non-ready: the index is still
+  used and the full count returns); chunks of a `failed` document stay stored
+  until it is deleted, so a retry on re-upload (#38) has to clear them first;
+  and the in-memory chunk repository has no document status, so the rule is
+  covered by integration tests only.

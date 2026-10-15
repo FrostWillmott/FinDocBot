@@ -85,3 +85,29 @@ commit before the fix (`473d12c`) and the working tree, on a fresh database each
 
 **Verdict: PASS.** The regular flow above, rerun on the fix, printed the same output as
 before.
+
+## Search only returns chunks of ready documents (#40)
+
+**Change.** `PostgresChunkRepository.search_by_embedding` joins `documents` and keeps
+rows whose status is `ready`. Before, any stored chunk was searchable, including those
+of a `pending` or `failed` document.
+
+**Method.** Real uvicorn, worker and Postgres, the stub Ollama. After a sample PDF
+reached `ready`, its status was forced with SQL (`pending`, `failed`, `ready`) to stand
+in for the window where chunks are committed but the status update has not happened or
+failed. `/search` and `/ask` ran at each status, against the commit before the fix
+(`4ac2933`) and the working tree.
+
+| Document status | `/search` hits / `/ask` sources before | after |
+|-----------------|----------------------------------------|-------|
+| `ready` | 5 / 5 | 5 / 5 |
+| forced `pending` | 5 / 5 | **0 / 0** |
+| forced `failed` | 5 / 5 | **0 / 0** |
+| `ready` again | 5 / 5 | 5 / 5 |
+
+**Query plan.** On 10,000 random 768-dimension chunks, 10% of them in `pending`
+documents, `EXPLAIN ANALYZE` of the joined query still shows
+`Index Scan using idx_chunks_embedding_hnsw` (a nested loop with a memoized primary-key
+lookup on `documents`), and `LIMIT 5` and `LIMIT 20` both return the full row count.
+
+**Verdict: PASS.**
