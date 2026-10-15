@@ -17,6 +17,14 @@
    - `OLLAMA_BASE_URL`
    - `OLLAMA_CHAT_MODEL`
    - `OLLAMA_EMBED_MODEL`
+   - `OLLAMA_RERANK_MODEL` — optional reranker (empty = off). When set,
+     `/search` and `/ask` fetch `RERANK_CANDIDATES` (20) candidates by vector
+     search, rerank them and keep the best `top_k`; the reported `score` is then
+     the reranker's, not the cosine similarity. If the reranker fails or takes
+     longer than `RERANK_TIMEOUT_SECONDS` (30), search keeps the vector order
+     and logs a warning. It costs about 0.4 s per candidate on an M1 Pro, so
+     run Ollama natively, not in the CPU-only container, and see
+     `evals/README.md` before turning it on.
    - `OLLAMA_NUM_CTX` / `OLLAMA_NUM_PREDICT` — prompt window and answer
      token cap for generation; a prompt longer than the window is silently
      cut from the start, so raise it together with `top_k`.

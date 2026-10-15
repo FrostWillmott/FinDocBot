@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "qwen2.5:7b"
     ollama_embed_model: str = "nomic-embed-text:latest"
+    # Reranking is off until a reranker model is named; see evals/README.md
+    # for how it compares with plain vector search before turning it on.
+    ollama_rerank_model: str | None = None
+    # Vector-search candidates handed to the reranker (never fewer than top_k).
+    rerank_candidates: int = 20
+    # Whole-rerank deadline; past it search keeps the vector order.
+    rerank_timeout_seconds: float = 30.0
     # Ollama silently drops the start of a prompt longer than num_ctx, i.e.
     # the retrieved sources. Sized for the worst case: see DECISIONS.md.
     ollama_num_ctx: int = 16384

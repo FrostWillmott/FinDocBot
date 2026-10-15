@@ -439,3 +439,28 @@ later reversed, add a superseding entry instead of editing the old one.
   and the "title" is the PDF file name, which real files rarely make useful.
   Nothing in `src/` changed; the next step is the same evaluation on real PDFs
   and questions where retrieval fails (`evals/README.md`).
+
+- **Reranking is an opt-in step inside search, off until `OLLAMA_RERANK_MODEL`
+  is set** — the manual evaluation in `evals/` (synthetic corpus, first run
+  2026-10-15) showed a reranker mostly compensates for chunks that name
+  neither company nor year, which prefixing the title fixes more cheaply, so
+  it ships switchable and off by default until real documents say
+  otherwise. `RerankerPort` is a separate, narrow port (not another method on
+  `ModelProviderGateway`); `OllamaReranker` drives the community GGUF of
+  Qwen3-Reranker through `/api/generate` in raw mode, because Ollama has no
+  rerank endpoint, and reads P(yes) from the first token's `logprobs`
+  (needs a recent Ollama). It opens a client per `rerank` call, so it has no
+  lifecycle to start or stop. Failure policy: a `ModelProviderError` or a
+  deadline of `RERANK_TIMEOUT_SECONDS` keeps the vector order and logs a
+  warning, since search without reranking is still correct. The result `score`
+  is the reranker's P(yes) when reranking ran, the cosine similarity
+  otherwise. Not retried and not cached: a retry would add whole seconds to a
+  query that already costs about 0.4 s per candidate. Built test-first at
+  three seams (the adapter against a faked Ollama, the search use case with a
+  scripted reranker, and `/search` and `/ask` over HTTP), plus an integration
+  test of the container wiring against real Postgres. The first run
+  against the real local Ollama found what the fakes could not: without an
+  explicit `num_ctx` the community GGUF loads with its 40200-token window
+  and an 8.7 GB runner (3.8 GB at 8192), which on a 16 GB machine shared with
+  other models made a 20-candidate query take minutes instead of about 13 s.
+  The adapter now sets `num_ctx` to 8192.
