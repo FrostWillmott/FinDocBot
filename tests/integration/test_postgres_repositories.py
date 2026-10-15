@@ -6,12 +6,7 @@ Run with: pytest --integration
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 import pytest
-from alembic import command
-from alembic.config import Config
 from testcontainers.postgres import PostgresContainer
 
 from findocbot.domain.entities import (
@@ -31,23 +26,9 @@ from findocbot.infrastructure.postgres_repositories import (
     PostgresChunkRepository,
     PostgresDocumentRepository,
 )
+from tests.migrations import run_migrations
 
 EMBEDDING_DIM = 768
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-_MIGRATIONS_DIR = _REPO_ROOT / "migrations"
-
-
-def _run_migration_sync(dsn: str) -> None:
-    """Apply the real Alembic migrations to the test database (blocking).
-
-    Alembic's env.py reads POSTGRES_DSN and EMBEDDING_DIM from the
-    environment, so both are set here before ``upgrade head`` runs.
-    """
-    os.environ["POSTGRES_DSN"] = dsn
-    os.environ["EMBEDDING_DIM"] = str(EMBEDDING_DIM)
-    config = Config(str(_REPO_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(_MIGRATIONS_DIR))
-    command.upgrade(config, "head")
 
 
 @pytest.fixture(scope="module")
@@ -60,7 +41,7 @@ def pg_dsn() -> str:
         # driver=None yields a plain postgresql:// DSN; the default appends
         # +psycopg2, which asyncpg rejects.
         dsn = postgres.get_connection_url(driver=None)
-        _run_migration_sync(dsn)
+        run_migrations(dsn, EMBEDDING_DIM)
         yield dsn
 
 

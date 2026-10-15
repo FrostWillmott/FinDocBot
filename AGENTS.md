@@ -123,18 +123,20 @@ them together — `.env.example` says so next to the setting.
 - Tests use a three-layer layout — `tests/unit/` (no I/O), `tests/integration/`
   (real DB), `tests/e2e/` (HTTP surface) — mirroring `src/findocbot/` within
   each layer.
-- **Integration tests** are gated behind `@pytest.mark.integration` and the
-  `--integration` flag (see `tests/conftest.py`). They need Docker for PostgreSQL.
+- **Integration tests** (`@pytest.mark.integration`, `--integration`) need Docker
+  for PostgreSQL; **e2e tests** (`@pytest.mark.e2e`, `--e2e`) need Docker plus a
+  real Ollama. Each is skipped unless its flag is passed (see `tests/conftest.py`);
+  CI runs them in separate jobs.
 - **In-memory fakes** (`tests/in_memory.py`) cover the repositories; model
   provider stubs sit in `tests/fakes.py` and in individual tests — no Docker
   needed for unit tests.
 - Shared helpers live at the `tests/` root: `tests.factories` (PDF builder),
-  `tests.in_memory` and `tests.fakes`.
+  `tests.in_memory`, `tests.fakes` and `tests.migrations` (Alembic helper).
 - Test names follow `test_{what}_{condition}_{expected}`.
-- `tests/conftest.py` holds only the `--integration` option and marker. The
-  Postgres fixtures (`pg_dsn` via testcontainers, `db_pool`) live in
-  `tests/integration/test_postgres_repositories.py`; API tests build an
-  `httpx.ASGITransport` around `create_app(container=...)` inline in `tests/e2e/`.
+- `tests/conftest.py` holds only the `--integration`/`--e2e` options and markers.
+  The Postgres fixtures live in `tests/integration/test_postgres_repositories.py`;
+  the e2e infra (real Postgres + Ollama) is in `tests/e2e/conftest.py`; API
+  adapter tests build an `httpx.ASGITransport` around `create_app(container=...)`.
 
 Conventions are codified in `.claude/rules/` (see `_LEVELS.md` for rule levels),
 vendored from developer-os `rules-library/`; change a module there first, then

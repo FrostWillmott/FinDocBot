@@ -257,3 +257,10 @@ later reversed, add a superseding entry instead of editing the old one.
   mirror is now within each layer, not the top-level layout. True end-to-end
   (real DB + real Ollama through HTTP) remains future work — `tests/e2e/`
   currently holds the `ASGITransport` tests.
+
+- **A real end-to-end test lands (`tests/e2e/test_end_to_end.py`)** — gated by
+  `@pytest.mark.e2e` / `--e2e`, it spins up a real Postgres (testcontainers) and
+  a real Ollama (`nomic-embed-text` + `qwen2.5:0.5b`, pulled at test start), then
+  drives upload → poll → search → ask through the HTTP surface. CI runs it in a
+  dedicated `e2e` job (the slow one — the model pull is ~670 MB). Supersedes the
+  "remains future work" note above.
