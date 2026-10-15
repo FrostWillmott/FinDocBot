@@ -87,6 +87,15 @@ class InMemoryDocumentRepository:
         self.items[document_id] = reset
         return reset
 
+    async def fail_pending(self, message: str) -> int:
+        """Mark every pending document failed; return how many changed."""
+        pending = [d for d in self.items.values() if d.status == "pending"]
+        for document in pending:
+            self.items[document.id] = replace(
+                document, status="failed", error=message
+            )
+        return len(pending)
+
 
 class SignallingDocumentRepository(InMemoryDocumentRepository):
     """Sets ``ready`` once any document is marked ready."""

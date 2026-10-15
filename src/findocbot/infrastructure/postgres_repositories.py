@@ -79,6 +79,22 @@ class PostgresDocumentRepository:
             raise StorageError("Failed to look up document") from exc
         return None if row is None else _document_from_row(row)
 
+    async def fail_pending(self, message: str) -> int:
+        """Mark every pending document failed; return how many changed."""
+        try:
+            rows = await self._db.pool.fetch(
+                """
+                UPDATE documents
+                SET status = 'failed', error = $1
+                WHERE status = 'pending'
+                RETURNING id
+                """,
+                message,
+            )
+        except asyncpg.PostgresError as exc:
+            raise StorageError("Failed to fail pending documents") from exc
+        return len(rows)
+
     async def get(self, document_id: str) -> Document | None:
         """Return the document with this id, if any."""
         try:

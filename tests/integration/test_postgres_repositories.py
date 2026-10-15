@@ -7,7 +7,6 @@ Run with: pytest --integration
 from __future__ import annotations
 
 import pytest
-from testcontainers.postgres import PostgresContainer
 
 from findocbot.domain.entities import (
     ChatSession,
@@ -27,34 +26,7 @@ from findocbot.infrastructure.postgres_repositories import (
     PostgresChunkRepository,
     PostgresDocumentRepository,
 )
-from tests.migrations import run_migrations
-
-EMBEDDING_DIM = 768
-
-
-@pytest.fixture(scope="module")
-def pg_dsn() -> str:
-    """Spin up pgvector container once per test module."""
-    with PostgresContainer(
-        image="pgvector/pgvector:pg16",
-        dbname="findocbot",
-    ) as postgres:
-        # driver=None yields a plain postgresql:// DSN; the default appends
-        # +psycopg2, which asyncpg rejects.
-        dsn = postgres.get_connection_url(driver=None)
-        run_migrations(dsn, EMBEDDING_DIM)
-        yield dsn
-
-
-@pytest.fixture
-async def db_pool(pg_dsn: str) -> PostgresPool:
-    """Create a pool connected to the test PostgreSQL."""
-    pool = PostgresPool(pg_dsn)
-    await pool.start()
-    # The container is module-scoped; wipe data so tests stay independent.
-    await pool.pool.execute("TRUNCATE chunks, documents, chat_turns, sessions")
-    yield pool
-    await pool.stop()
+from tests.integration.conftest import EMBEDDING_DIM
 
 
 @pytest.mark.integration
@@ -367,6 +339,39 @@ async def test_chunk_replace_with_nothing_clears_the_previous_chunks(
     await chunks.replace_document_chunks(doc.id, [], [])
 
     assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
+
+
+@pytest.mark.integration
+async def test_document_fail_pending_marks_only_pending_documents_failed(
+    db_pool: PostgresPool,
+) -> None:
+    documents = PostgresDocumentRepository(db_pool)
+    pending = Document.create(filename="p.pdf", status="pending")
+    ready = Document.create(filename="r.pdf", status="ready")
+    for doc in (pending, ready):
+        await documents.create(doc)
+
+    count = await documents.fail_pending("interrupted")
+
+    statuses = {
+        doc.id: (stored.status, stored.error)
+        for doc in (pending, ready)
+        if (stored := await documents.get(doc.id)) is not None
+    }
+    assert (count, statuses) == (
+        1,
+        {pending.id: ("failed", "interrupted"), ready.id: ("ready", None)},
+    )
+
+
+@pytest.mark.integration
+async def test_document_fail_pending_without_pending_documents_returns_zero(
+    db_pool: PostgresPool,
+) -> None:
+    documents = PostgresDocumentRepository(db_pool)
+    await documents.create(Document.create(filename="r.pdf", status="ready"))
+
+    assert await documents.fail_pending("interrupted") == 0
 
 
 @pytest.mark.integration

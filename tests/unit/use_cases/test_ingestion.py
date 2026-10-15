@@ -390,3 +390,37 @@ async def test_submit_failed_document_lost_claim_is_not_queued() -> None:
         "pending",
         0,
     )
+
+
+async def test_recover_interrupted_marks_documents_left_pending_failed() -> (
+    None
+):
+    documents = InMemoryDocumentRepository()
+    before_restart, _ = _build_ingestion(documents=documents)
+    left = await _submit(
+        before_restart, "report.pdf", build_pdf_bytes("Revenue grew.")
+    )
+    # The restart: a fresh process has an empty queue, the same database.
+    after_restart, _ = _build_ingestion(documents=documents)
+
+    await after_restart.recover_interrupted()
+
+    stored = documents.items[left.id]
+    assert (stored.status, stored.error) == (
+        "failed",
+        "Ingestion was interrupted by a restart; upload again.",
+    )
+
+
+async def test_recover_interrupted_leaves_ready_and_failed_documents() -> None:
+    ingestion, documents = _build_ingestion(provider=_RecoveringProvider())
+    failed = await _failed_document(ingestion, build_pdf_bytes("Revenue."))
+    ready = await _submit(ingestion, "ok.pdf", build_pdf_bytes("Profit."))
+    await ingestion.drain()
+
+    await ingestion.recover_interrupted()
+
+    assert [documents.items[d.id].status for d in (failed, ready)] == [
+        "failed",
+        "ready",
+    ]
