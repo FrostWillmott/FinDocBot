@@ -1,7 +1,7 @@
 # Documentation upkeep
 
 Two files are the project's memory across sessions. Unless the project's own
-CLAUDE.md (or the user, for the current task) explicitly says otherwise, the
+AGENTS.md (or the user, for the current task) explicitly says otherwise, the
 agent keeps both current — this is ongoing maintenance, not a one-time setup
 step.
 
@@ -25,13 +25,13 @@ step.
   later. Each entry: date, the decision, the one-line reason. Don't rewrite
   history; if a decision is later reversed, add a new entry that supersedes
   the old one rather than editing it away.
-- If the project's CLAUDE.md already has an inline "Key design decisions"
-  section, treat `DECISIONS.md` as the durable log and the CLAUDE.md section
+- If the project's AGENTS.md already has an inline "Key design decisions"
+  section, treat `DECISIONS.md` as the durable log and the AGENTS.md section
   as at most a short pointer to it — don't maintain the same information in
   both places.
 
 ## Escape hatch
-- "Unless stated otherwise" means: a line in the project's CLAUDE.md opting
+- "Unless stated otherwise" means: a line in the project's AGENTS.md opting
   out (e.g. "no DECISIONS.md — decisions live in ADRs under `docs/adr/`"), or
   an explicit instruction for the current task. Absence of instructions is
   not an opt-out — it's the default this module exists to cover.

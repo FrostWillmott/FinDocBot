@@ -25,6 +25,6 @@ The agent follows these by default but may let project context override. Covers
 specific implementations: which ruff rule set, how layers are split, which DI
 pattern. If the agent diverges, a one-line note is courteous but not required.
 
-When a project's own CLAUDE.md conflicts with a [PREFER] rule, the project wins
+When a project's own AGENTS.md conflicts with a [PREFER] rule, the project wins
 silently. When it conflicts with a [MUST], the agent surfaces the conflict
 rather than quietly following either.
