@@ -27,6 +27,13 @@ catch but agents get wrong by default.
 - Mutable default arguments (`list`, `dict`, `set`) are `None`, assigned inside the body.
 - No `time.sleep()` in tests — control time or mock it.
 
+## Size limits  [PREFER]
+- At most 7 parameters per function; past that, pass a dataclass/Pydantic
+  config object or split the function. `ruff.toml` enforces `PLR0913`.
+- Keep a module under ~500 lines and a function's cyclomatic complexity under
+  12 (`C901`). A module that mixes orchestration with storage or parsing is a
+  split waiting to happen; do it when you touch it, not later.
+
 ## Preferred defaults  [PREFER]
 - `pathlib.Path`, not `os.path`.
 - `logging`, not `print()`, for anything that isn't CLI user output.

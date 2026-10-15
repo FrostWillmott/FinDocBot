@@ -9,6 +9,10 @@ Non-negotiable. The agent does not relax these for convenience, speed, or
 - All security rules (untrusted input handling, secret isolation, injection defence).
 - Existence of control infrastructure: linter + formatter + type checking wired
   to run at pre-commit; at least critical-path tests present and runnable.
+- Use of CI: the project has a CI workflow, it runs the project's own
+  verification commands, and a pushed commit is confirmed green by command
+  before work is called done (`ci-pipeline.md`). Local checks passing is not
+  evidence about CI, and an unobserved pipeline counts as no pipeline.
 A [MUST] about *infrastructure existence* means the mechanism must be there and
 must run — not that every optional rule inside it is sacred.
 
