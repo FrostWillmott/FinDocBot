@@ -97,8 +97,9 @@ decision there is superseded, refresh the corresponding line here.
   `pending` document and enqueues the bytes on a private in-process asyncio
   queue; the container starts the worker via `start()`/`stop()`. The worker
   parses, chunks, embeds and persists them, then flips the status to `ready`
-  or `failed` (with a client-safe `error`); tests run queued work with
-  `drain()`. Terms are in `CONTEXT.md`. A SHA-256 of the uploaded bytes
+  or `failed` (with a client-safe `error`); an error nobody anticipated
+  also ends as `failed`, with a fixed message and its traceback in the log.
+  Tests run queued work with `drain()`. Terms are in `CONTEXT.md`. A SHA-256 of the uploaded bytes
   (`documents.content_hash`, unique) makes a re-upload return the stored
   document instead of queueing a second copy.
 

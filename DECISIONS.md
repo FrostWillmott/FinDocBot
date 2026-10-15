@@ -284,3 +284,18 @@ later reversed, add a superseding entry instead of editing the old one.
   the founding entry "document row is persisted only after embeddings
   succeed, and rolled back if chunk insertion fails", which stopped being
   true when ingestion moved to the background queue (2026-10-07).
+
+- **An unexpected error during ingestion marks the document `failed` with a
+  fixed message, `Ingestion failed unexpectedly.`** — it used to leave the
+  document `pending` for ever, with the worker logging and moving on (#36).
+  `IngestionUseCase._process` now has a deliberately broad `except Exception`
+  after the `FinDocBotError` branch: it is the outermost boundary of a
+  background job with no caller to report to, and `python-core.md` asks for
+  specific exception types elsewhere. It logs the traceback; the stored text
+  is a constant, never the exception's own message, so driver and parser
+  internals stay out of `documents.error` as the 2026-10-04 "502 responses
+  carry a fixed message" entry does for the API. The text does not suggest
+  re-uploading, because a re-upload returns the same failed document (#38).
+  The worker's own catch-all stays as the last resort for a failure the
+  status update itself cannot record. `asyncio.CancelledError` is not caught,
+  so a shutdown mid-job still leaves the document `pending` (#37).
