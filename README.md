@@ -223,6 +223,7 @@ make test
 - [Manual testing checklist](docs/manual-testing.md) — full E2E pass, including failure modes (Ollama down → 502, Postgres down → 503).
 - [Optimizations](docs/optimizations.md) — embedding and vector-search performance notes.
 - [DECISIONS.md](DECISIONS.md) — append-only log of non-obvious technical decisions.
+- [Agent docs](docs/agents/) — issue tracker, triage labels, and domain-doc conventions the coding skills consume.
 
 **How this was built.** The spec, design decisions ([DECISIONS.md](DECISIONS.md)) and acceptance criteria are mine; implementation is done with Claude Code, and every change is reviewed by hand before commit. Coding conventions (typing, error handling, testing, pgvector and LLM-integration rules) live in [`.claude/rules/`](.claude/rules/) as small binding modules with explicit rule levels (see `_LEVELS.md`), copied from [developer-os](https://github.com/FrostWillmott/developer-os), which holds the full agent configuration. [`.claude/skills/verify`](.claude/skills/verify/SKILL.md) describes how to check a change against the running API with a throwaway Postgres and a stub Ollama.
 
