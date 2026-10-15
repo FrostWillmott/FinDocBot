@@ -49,6 +49,11 @@ relative_files = true
 
 [tool.coverage.report]
 omit = ["*/__init__.py"]
+# Measured over the unit and integration suites together (`make cover`), since
+# the PostgreSQL code is only exercised by the latter. Set about three points
+# under the current 95.9% so one ordinary change does not trip it; raise it as
+# coverage grows, never lower it to go green.
+fail_under = 93
 show_missing = true
 exclude_also = ["if TYPE_CHECKING:"]
 
