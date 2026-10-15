@@ -15,16 +15,16 @@
 | src/findocbot/infrastructure/db.py                         |       26 |       13 |        6 |        0 |     41% |21-22, 28-30, 35-37, 41-51 |
 | src/findocbot/infrastructure/ollama\_gateway.py            |       99 |        0 |       20 |        0 |    100% |           |
 | src/findocbot/infrastructure/pdf\_parser.py                |       70 |        0 |       14 |        0 |    100% |           |
-| src/findocbot/infrastructure/postgres\_repositories.py     |      109 |       70 |       10 |        4 |     36% |24, 28, 47-65, 69-80, 84-95, 99-112, 116-123, 132-144, 157-168, 177-\>exit, 190, 193, 197-225, 234-258, 282-289, 293-300, 304-323, 327-351 |
+| src/findocbot/infrastructure/postgres\_repositories.py     |      114 |       75 |        8 |        3 |     34% |24, 28, 47-65, 69-80, 84-95, 99-112, 116-123, 132-144, 148-160, 173-184, 193-\>exit, 207, 212-247, 256-280, 304-311, 315-322, 326-345, 349-373 |
 | src/findocbot/main.py                                      |       27 |        1 |        2 |        0 |     97% |        54 |
 | src/findocbot/use\_cases/answer\_question.py               |       81 |        0 |        8 |        0 |    100% |           |
 | src/findocbot/use\_cases/dto.py                            |       17 |        0 |        0 |        0 |    100% |           |
-| src/findocbot/use\_cases/ingestion.py                      |       90 |        1 |       14 |        3 |     96% |116, 123-\>exit, 128-\>exit |
+| src/findocbot/use\_cases/ingestion.py                      |       99 |        1 |       18 |        3 |     97% |119, 141-\>exit, 146-\>exit |
 | src/findocbot/use\_cases/manage\_documents.py              |       17 |        0 |        4 |        0 |    100% |           |
-| src/findocbot/use\_cases/ports.py                          |       33 |        0 |        0 |        0 |    100% |           |
+| src/findocbot/use\_cases/ports.py                          |       34 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/prompt\_safety.py                 |       12 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/use\_cases/search\_similar\_chunks.py        |       15 |        0 |        2 |        0 |    100% |           |
-| **TOTAL**                                                  | **1025** |   **88** |  **140** |   **12** | **91%** |           |
+| **TOTAL**                                                  | **1040** |   **93** |  **142** |   **11** | **91%** |           |
 
 
 ## Setup coverage badge
