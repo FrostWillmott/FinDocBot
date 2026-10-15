@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from findocbot.use_cases.ports import UploadJob
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
+from findocbot.use_cases.ingestion import IngestionUseCase
 
 
 class StubProvider:
@@ -31,31 +30,13 @@ class StubProvider:
         return self.structured
 
 
-class RecordingQueue:
-    """Records enqueued upload jobs instead of processing them."""
-
-    def __init__(self) -> None:
-        """Start with no recorded jobs."""
-        self.jobs: list[UploadJob] = []
-
-    async def enqueue(self, job: UploadJob) -> None:
-        """Record one job."""
-        self.jobs.append(job)
-
-
 async def index_document(
-    upload: UploadPDFUseCase, filename: str, content: bytes
+    ingestion: IngestionUseCase, filename: str, content: bytes
 ) -> None:
-    """Submit one upload and process it synchronously for test setup.
+    """Submit one upload and ingest it synchronously for test setup.
 
     Mirrors the production flow minus the background worker: submit returns
-    a pending document, then ``process`` runs the pipeline to completion.
+    a pending document, then ``drain`` runs the pipeline to completion.
     """
-    document = await upload.submit(filename, content)
-    await upload.process(
-        UploadJob(
-            document_id=document.id,
-            filename=filename,
-            content=content,
-        )
-    )
+    await ingestion.submit(filename, content)
+    await ingestion.drain()

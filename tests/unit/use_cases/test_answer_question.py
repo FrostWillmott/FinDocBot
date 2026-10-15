@@ -12,13 +12,13 @@ from findocbot.domain.exceptions import (
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.ports import ModelProviderGateway
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 from tests.factories import build_pdf_bytes
-from tests.fakes import RecordingQueue, StubProvider, index_document
+from tests.fakes import StubProvider, index_document
 from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
@@ -65,13 +65,12 @@ async def test_execute_matching_document_returns_grounded_answer() -> None:
     chunks = InMemoryChunkRepository()
     history = InMemoryHistoryRepository()
 
-    upload = UploadPDFUseCase(
+    ingestion = IngestionUseCase(
         parser=parser,
         chunker=chunker,
         provider=provider,
         documents=docs,
         chunks=chunks,
-        queue=RecordingQueue(),
     )
     search = SearchSimilarChunksUseCase(provider=provider, chunks=chunks)
     ask = AnswerQuestionUseCase(
@@ -81,7 +80,7 @@ async def test_execute_matching_document_returns_grounded_answer() -> None:
     )
 
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent in the quarter.")
-    await index_document(upload, "report.pdf", pdf_bytes)
+    await index_document(ingestion, "report.pdf", pdf_bytes)
 
     response = await ask.execute(
         session_id=None,
@@ -105,13 +104,12 @@ class _RecordingProvider(FakeProviderGateway):
 async def _prompt_for_document(text: str, question: str) -> str:
     provider = _RecordingProvider()
     chunks = InMemoryChunkRepository()
-    upload = UploadPDFUseCase(
+    ingestion = IngestionUseCase(
         parser=PyPDFParser(),
         chunker=ParagraphTokenChunker(chunk_tokens=120, overlap_ratio=0.1),
         provider=provider,
         documents=InMemoryDocumentRepository(),
         chunks=chunks,
-        queue=RecordingQueue(),
     )
     ask = AnswerQuestionUseCase(
         provider=provider,
@@ -120,7 +118,7 @@ async def _prompt_for_document(text: str, question: str) -> str:
         ),
         history=InMemoryHistoryRepository(),
     )
-    await index_document(upload, "report.pdf", build_pdf_bytes(text))
+    await index_document(ingestion, "report.pdf", build_pdf_bytes(text))
     await ask.execute(session_id=None, question=question, top_k=2)
     return provider.prompts[0]
 

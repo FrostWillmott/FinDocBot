@@ -2,25 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 
 import httpx
 from fpdf import FPDF
 
 from findocbot.config import Settings
+from findocbot.domain.entities import DocumentStatus
 from findocbot.domain.exceptions import ModelProviderError, StorageError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.container import AppContainer
 from findocbot.infrastructure.pdf_parser import PyPDFParser
-from findocbot.infrastructure.upload_queue import InProcessUploadQueue
 from findocbot.main import create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
 from findocbot.use_cases.ports import ChunkWithScore
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 from tests.factories import build_pdf_bytes
 from tests.in_memory import (
     InMemoryChunkRepository,
@@ -71,14 +72,48 @@ class _FailingSearchChunkRepository(InMemoryChunkRepository):
         raise StorageError("database unavailable")
 
 
+class _FirstEmbedBreaksProvider(_StubProvider):
+    """Raises a non-domain error on the first ingestion, then works."""
+
+    def __init__(self) -> None:
+        self._broken = True
+
+    async def embed_many(self, texts: list[str]) -> list[list[float]]:
+        if self._broken:
+            self._broken = False
+            raise RuntimeError("boom")
+        return await super().embed_many(texts)
+
+
+class _SignallingDocumentRepository(InMemoryDocumentRepository):
+    """Sets ``ready`` once any document is marked ready."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.ready = asyncio.Event()
+
+    async def set_status(
+        self,
+        document_id: str,
+        status: DocumentStatus,
+        error: str | None = None,
+    ) -> None:
+        await super().set_status(document_id, status, error)
+        if status == "ready":
+            self.ready.set()
+
+
 def _build_container(
     provider: _StubProvider | None = None,
     chunks: InMemoryChunkRepository | None = None,
     health_checks: dict[str, Callable[[], Awaitable[None]]] | None = None,
+    documents: InMemoryDocumentRepository | None = None,
 ) -> AppContainer:
     provider = provider if provider is not None else _StubProvider()
     chunks = chunks if chunks is not None else InMemoryChunkRepository()
-    documents = InMemoryDocumentRepository()
+    documents = (
+        documents if documents is not None else InMemoryDocumentRepository()
+    )
     history = InMemoryHistoryRepository()
 
     search_chunks = SearchSimilarChunksUseCase(
@@ -89,25 +124,21 @@ def _build_container(
         search_use_case=search_chunks,
         history=history,
     )
-    upload_queue = InProcessUploadQueue()
-    upload_pdf = UploadPDFUseCase(
+    ingestion = IngestionUseCase(
         parser=PyPDFParser(),
         chunker=ParagraphTokenChunker(chunk_tokens=120, overlap_ratio=0.1),
         provider=provider,
         documents=documents,
         chunks=chunks,
-        queue=upload_queue,
     )
-    upload_queue.set_processor(upload_pdf.process)
     return AppContainer(
         settings=Settings(),
         db=_FakeDB(),  # type: ignore[arg-type]
         provider=provider,
-        upload_pdf=upload_pdf,
+        ingestion=ingestion,
         search_chunks=search_chunks,
         answer_question=answer_question,
         manage_documents=ManageDocumentsUseCase(documents),
-        upload_queue=upload_queue,
         health_checks=health_checks or {},
     )
 
@@ -177,7 +208,7 @@ async def test_upload_blank_pdf_marks_document_failed_after_processing() -> (
         assert resp.status_code == 202
         document_id = resp.json()["document_id"]
 
-        await container.upload_queue.drain()
+        await container.ingestion.drain()
 
         stored = await client.get(f"/documents/{document_id}")
         assert stored.json()["status"] == "failed"
@@ -198,7 +229,7 @@ async def test_upload_non_pdf_bytes_marks_document_failed() -> None:
         assert resp.status_code == 202
         document_id = resp.json()["document_id"]
 
-        await container.upload_queue.drain()
+        await container.ingestion.drain()
 
         stored = await client.get(f"/documents/{document_id}")
         assert stored.json()["status"] == "failed"
@@ -334,3 +365,78 @@ async def test_get_document_after_upload_returns_its_filename() -> None:
         upload = await _upload_pdf(client)
         resp = await client.get(f"/documents/{upload.json()['document_id']}")
         assert resp.json()["filename"] == "r.pdf"
+
+
+# The next three tests pin today's behaviour of the ingestion path so the
+# ingestion refactor cannot change it by accident. Each one marks a known
+# defect: the fix flips its assertion on purpose.
+
+
+async def test_upload_duplicate_of_pending_document_responds_202_same_id() -> (
+    None
+):
+    # Defect #39: DECISIONS.md says a duplicate returns 200.
+    async with httpx.AsyncClient(
+        transport=_build_app(), base_url="http://test"
+    ) as client:
+        first = await _upload_pdf(client)
+        second = await _upload_pdf(client)
+
+        assert (second.status_code, second.json()["document_id"]) == (
+            202,
+            first.json()["document_id"],
+        )
+
+
+async def test_upload_duplicate_of_pending_document_is_ingested_once() -> None:
+    chunks = InMemoryChunkRepository()
+    container = _build_container(chunks=chunks)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(container=container)),
+        base_url="http://test",
+    ) as client:
+        await _upload_pdf(client)
+        await _upload_pdf(client)
+
+        await container.ingestion.drain()
+
+    # The one-paragraph PDF is a single chunk, so a second ingestion would
+    # show up as a second stored chunk.
+    assert len(chunks.items) == 1
+
+
+async def test_upload_unexpected_ingestion_error_leaves_document_pending() -> (
+    None
+):
+    # Defect #36: the fix marks it failed with a client-safe message.
+    documents = _SignallingDocumentRepository()
+    container = _build_container(
+        provider=_FirstEmbedBreaksProvider(), documents=documents
+    )
+    await container.startup()
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app(container=container)),
+            base_url="http://test",
+        ) as client:
+            broken = await _upload_pdf(client)
+            # The second upload becoming ready shows the worker survived.
+            await client.post(
+                "/documents/upload",
+                files={
+                    "file": (
+                        "p.pdf",
+                        build_pdf_bytes("Profit fell."),
+                        "application/pdf",
+                    )
+                },
+            )
+            await asyncio.wait_for(documents.ready.wait(), timeout=5)
+
+            stored = await client.get(
+                f"/documents/{broken.json()['document_id']}"
+            )
+    finally:
+        await container.shutdown()
+
+    assert stored.json()["status"] == "pending"

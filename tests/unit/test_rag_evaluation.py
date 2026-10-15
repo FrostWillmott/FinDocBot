@@ -23,12 +23,12 @@ from dataclasses import dataclass
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 from tests.factories import build_pdf_bytes
-from tests.fakes import RecordingQueue, index_document
+from tests.fakes import index_document
 from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
@@ -154,13 +154,12 @@ async def test_rag_pipeline_golden_dataset_meets_metric_thresholds() -> None:
     chunks_repo = InMemoryChunkRepository()
     history = InMemoryHistoryRepository()
 
-    upload = UploadPDFUseCase(
+    ingestion = IngestionUseCase(
         parser=parser,
         chunker=chunker,
         provider=provider,
         documents=docs,
         chunks=chunks_repo,
-        queue=RecordingQueue(),
     )
     search = SearchSimilarChunksUseCase(provider=provider, chunks=chunks_repo)
     ask = AnswerQuestionUseCase(
@@ -174,7 +173,9 @@ async def test_rag_pipeline_golden_dataset_meets_metric_thresholds() -> None:
         "Section 2\nOperational profit remained stable despite headwinds.\n\n"
         "Section 3\nAsset quality improved significantly in Q4."
     )
-    await index_document(upload, "annual_report.pdf", build_pdf_bytes(corpus))
+    await index_document(
+        ingestion, "annual_report.pdf", build_pdf_bytes(corpus)
+    )
 
     precision_scores: list[float] = []
     faithfulness_scores: list[float] = []

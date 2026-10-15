@@ -22,15 +22,6 @@ class ChunkWithScore:
     score: float
 
 
-@dataclass(frozen=True)
-class UploadJob:
-    """Queued upload awaiting background ingestion."""
-
-    document_id: str
-    filename: str
-    content: bytes
-
-
 class PDFParserPort(Protocol):
     """Extract plain text from PDF bytes."""
 
@@ -91,13 +82,6 @@ class DocumentRepositoryPort(Protocol):
         error: str | None = None,
     ) -> None:
         """Update a document's ingestion status and optional error message."""
-
-
-class UploadQueuePort(Protocol):
-    """Queue for background PDF ingestion."""
-
-    async def enqueue(self, job: UploadJob) -> None:
-        """Queue an upload for background processing."""
 
 
 class ChunkRepositoryPort(Protocol):

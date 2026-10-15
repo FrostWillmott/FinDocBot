@@ -1,4 +1,4 @@
-"""Tests for UploadPDFUseCase."""
+"""Tests for IngestionUseCase."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from findocbot.domain.entities import Document
 from findocbot.domain.exceptions import ModelProviderError, StorageError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
+from findocbot.use_cases.ingestion import IngestionUseCase
 from tests.factories import build_pdf_bytes
-from tests.fakes import RecordingQueue, StubProvider
+from tests.fakes import StubProvider
 from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
@@ -48,57 +48,60 @@ class _RacingDocumentRepository(InMemoryDocumentRepository):
         return await super().find_by_content_hash(content_hash)
 
 
-def _build_upload(
+def _build_ingestion(
     *,
     documents: InMemoryDocumentRepository | None = None,
     provider: StubProvider | None = None,
     chunks: InMemoryChunkRepository | None = None,
-    queue: RecordingQueue | None = None,
-) -> tuple[UploadPDFUseCase, RecordingQueue, InMemoryDocumentRepository]:
-    queue = queue if queue is not None else RecordingQueue()
+) -> tuple[IngestionUseCase, InMemoryDocumentRepository]:
     documents = (
         documents if documents is not None else InMemoryDocumentRepository()
     )
-    upload = UploadPDFUseCase(
+    ingestion = IngestionUseCase(
         parser=PyPDFParser(),
         chunker=ParagraphTokenChunker(chunk_tokens=120, overlap_ratio=0.1),
         provider=provider or StubProvider(),
         documents=documents,
         chunks=chunks or InMemoryChunkRepository(),
-        queue=queue,
     )
-    return upload, queue, documents
+    return ingestion, documents
 
 
-async def test_submit_creates_pending_document_and_enqueues_job() -> None:
-    upload, queue, documents = _build_upload()
+async def test_submit_new_upload_creates_pending_document() -> None:
+    ingestion, documents = _build_ingestion()
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
 
-    document = await upload.submit("report.pdf", pdf_bytes)
+    document = await ingestion.submit("report.pdf", pdf_bytes)
 
-    assert document.status == "pending"
-    assert documents.items[document.id].status == "pending"
-    assert len(queue.jobs) == 1
-    assert queue.jobs[0].document_id == document.id
-    assert queue.jobs[0].content == pdf_bytes
+    assert (document.status, documents.items[document.id].status) == (
+        "pending",
+        "pending",
+    )
 
 
-async def test_submit_same_bytes_twice_returns_first_and_enqueues_once() -> (
+async def test_submit_same_bytes_twice_returns_first_and_ingests_once() -> (
     None
 ):
-    upload, queue, documents = _build_upload()
+    chunks = InMemoryChunkRepository()
+    ingestion, documents = _build_ingestion(chunks=chunks)
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
 
-    first = await upload.submit("report.pdf", pdf_bytes)
-    second = await upload.submit("report-copy.pdf", pdf_bytes)
+    first = await ingestion.submit("report.pdf", pdf_bytes)
+    second = await ingestion.submit("report-copy.pdf", pdf_bytes)
+    await ingestion.drain()
 
-    assert second == first
-    assert len(queue.jobs) == 1
-    assert list(documents.items) == [first.id]
+    # The one-paragraph PDF is a single chunk, so a second ingestion would
+    # show up as a second stored chunk.
+    assert (second, list(documents.items), len(chunks.items)) == (
+        first,
+        [first.id],
+        1,
+    )
 
 
 async def test_submit_concurrent_duplicate_returns_stored_document() -> None:
     documents = _RacingDocumentRepository()
+    chunks = InMemoryChunkRepository()
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
     stored = Document.create(
         filename="report.pdf",
@@ -106,20 +109,21 @@ async def test_submit_concurrent_duplicate_returns_stored_document() -> None:
     )
     # Seeded directly: create() would spend the pre-check miss itself.
     documents.items[stored.id] = stored
-    upload, queue, _ = _build_upload(documents=documents)
+    ingestion, _ = _build_ingestion(documents=documents, chunks=chunks)
 
-    result = await upload.submit("report.pdf", pdf_bytes)
+    result = await ingestion.submit("report.pdf", pdf_bytes)
+    await ingestion.drain()
 
-    assert (result, len(queue.jobs)) == (stored, 0)
+    assert (result, len(chunks.items)) == (stored, 0)
 
 
-async def test_process_marks_document_ready_and_stores_chunks() -> None:
+async def test_drain_upload_marks_document_ready_and_stores_chunks() -> None:
     chunks = InMemoryChunkRepository()
-    upload, queue, documents = _build_upload(chunks=chunks)
+    ingestion, documents = _build_ingestion(chunks=chunks)
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
-    document = await upload.submit("report.pdf", pdf_bytes)
+    document = await ingestion.submit("report.pdf", pdf_bytes)
 
-    await upload.process(queue.jobs[0])
+    await ingestion.drain()
 
     stored = documents.items[document.id]
     assert stored.status == "ready"
@@ -127,38 +131,38 @@ async def test_process_marks_document_ready_and_stores_chunks() -> None:
     assert chunks.items
 
 
-async def test_process_empty_pdf_marks_document_failed() -> None:
-    upload, queue, documents = _build_upload()
+async def test_drain_empty_pdf_marks_document_failed() -> None:
+    ingestion, documents = _build_ingestion()
     pdf = FPDF()
     pdf.add_page()
     blank = bytes(pdf.output())
-    document = await upload.submit("blank.pdf", blank)
+    document = await ingestion.submit("blank.pdf", blank)
 
-    await upload.process(queue.jobs[0])
+    await ingestion.drain()
 
     stored = documents.items[document.id]
     assert stored.status == "failed"
     assert "does not contain text" in (stored.error or "")
 
 
-async def test_process_chunk_storage_failure_marks_document_failed() -> None:
-    upload, queue, documents = _build_upload(chunks=_FailingChunkRepository())
+async def test_drain_chunk_storage_failure_marks_document_failed() -> None:
+    ingestion, documents = _build_ingestion(chunks=_FailingChunkRepository())
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
-    document = await upload.submit("report.pdf", pdf_bytes)
+    document = await ingestion.submit("report.pdf", pdf_bytes)
 
-    await upload.process(queue.jobs[0])
+    await ingestion.drain()
 
     stored = documents.items[document.id]
     assert stored.status == "failed"
     assert stored.error == "insert failed"
 
 
-async def test_process_provider_failure_sanitizes_error_message() -> None:
-    upload, queue, documents = _build_upload(provider=_FailingProvider())
+async def test_drain_provider_failure_sanitizes_error_message() -> None:
+    ingestion, documents = _build_ingestion(provider=_FailingProvider())
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
-    document = await upload.submit("report.pdf", pdf_bytes)
+    document = await ingestion.submit("report.pdf", pdf_bytes)
 
-    await upload.process(queue.jobs[0])
+    await ingestion.drain()
 
     stored = documents.items[document.id]
     assert stored.status == "failed"

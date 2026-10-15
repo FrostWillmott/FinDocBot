@@ -1,10 +1,11 @@
-"""Upload PDF use case."""
+"""Ingestion use case: accept an upload and ingest it in the background."""
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import logging
+from dataclasses import dataclass
 
 from findocbot.domain.entities import Chunk, Document
 from findocbot.domain.exceptions import (
@@ -19,11 +20,19 @@ from findocbot.use_cases.ports import (
     DocumentRepositoryPort,
     ModelProviderGateway,
     PDFParserPort,
-    UploadJob,
-    UploadQueuePort,
 )
 
 logger = logging.getLogger(__name__)
+
+# Fixed, not a setting: nothing about it varies per deployment. A full queue
+# makes ``submit`` wait, which holds the upload request open.
+_QUEUE_MAXSIZE = 100
+
+
+@dataclass(frozen=True)
+class _Job:
+    document_id: str
+    content: bytes
 
 
 def _safe_error_message(error: FinDocBotError) -> str:
@@ -37,8 +46,14 @@ def _safe_error_message(error: FinDocBotError) -> str:
     return str(error)
 
 
-class UploadPDFUseCase:
-    """Extract, chunk, embed, and save an uploaded PDF in the background."""
+class IngestionUseCase:
+    """Accept uploaded PDFs and ingest them into searchable chunks.
+
+    ``submit`` stores a ``pending`` document and queues its bytes; one worker
+    parses, chunks, embeds and persists them, then marks the document
+    ``ready`` or ``failed``. Queued bytes live in memory, so jobs not yet
+    handled do not survive a restart; see DECISIONS.md.
+    """
 
     def __init__(
         self,
@@ -47,15 +62,17 @@ class UploadPDFUseCase:
         provider: ModelProviderGateway,
         documents: DocumentRepositoryPort,
         chunks: ChunkRepositoryPort,
-        queue: UploadQueuePort,
     ) -> None:
-        """Store dependencies for the upload workflow."""
+        """Store dependencies for the ingestion workflow."""
         self._parser = parser
         self._chunker = chunker
         self._provider = provider
         self._documents = documents
         self._chunks = chunks
-        self._queue = queue
+        self._queue: asyncio.Queue[_Job] = asyncio.Queue(
+            maxsize=_QUEUE_MAXSIZE
+        )
+        self._worker: asyncio.Task[None] | None = None
 
     async def submit(self, filename: str, content: bytes) -> Document:
         """Register an upload and queue it for background ingestion.
@@ -83,16 +100,45 @@ class UploadPDFUseCase:
             if stored is None:
                 raise
             return stored
-        await self._queue.enqueue(
-            UploadJob(
-                document_id=document.id,
-                filename=filename,
-                content=content,
-            )
-        )
+        await self._queue.put(_Job(document_id=document.id, content=content))
         return document
 
-    async def process(self, job: UploadJob) -> None:
+    async def start(self) -> None:
+        """Spawn the worker task if it is not already running."""
+        if self._worker is None:
+            self._worker = asyncio.create_task(self._run())
+
+    async def stop(self) -> None:
+        """Cancel the worker; unprocessed jobs are dropped (not durable)."""
+        if self._worker is not None:
+            self._worker.cancel()
+            await asyncio.gather(self._worker, return_exceptions=True)
+            self._worker = None
+
+    async def drain(self) -> None:
+        """Process every queued job to completion (used by tests)."""
+        while not self._queue.empty():
+            job = await self._queue.get()
+            await self._process(job)
+            self._queue.task_done()
+
+    async def _run(self) -> None:
+        """Consume jobs until cancelled."""
+        while True:
+            job = await self._queue.get()
+            try:
+                await self._process(job)
+            except Exception:
+                # An unexpected bug must not kill the worker; log it and
+                # keep processing. Expected failures are already turned
+                # into a 'failed' document status by ``_process``.
+                logger.exception(
+                    "Upload worker failed on job %s", job.document_id
+                )
+            finally:
+                self._queue.task_done()
+
+    async def _process(self, job: _Job) -> None:
         """Parse, chunk, embed, and persist one queued upload.
 
         CPU-bound PDF parsing and chunking are offloaded to a thread so they
@@ -117,7 +163,7 @@ class UploadPDFUseCase:
                     error,
                 )
 
-    async def _ingest(self, job: UploadJob) -> None:
+    async def _ingest(self, job: _Job) -> None:
         """Run the parse → chunk → embed → persist pipeline for one upload."""
         text = (
             await asyncio.to_thread(self._parser.extract_text, job.content)

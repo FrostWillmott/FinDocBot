@@ -285,3 +285,23 @@ later reversed, add a superseding entry instead of editing the old one.
   of its own. Pinning it keeps the code CI already ran, where `v3.41` would
   quietly step back. Move to a tagged release when it is worth reviewing the
   change. Bump SHA and trailing version comment together.
+
+- **Ingestion is one module with a private queue; the queue port is gone** —
+  `UploadPDFUseCase`, `InProcessUploadQueue` and `UploadQueuePort` became
+  `IngestionUseCase`. Dedup, the worker, every status transition and error
+  sanitising were spread over four modules joined by a circular
+  `set_processor` call that the container and two test builders each
+  repeated; the port had one production adapter and one test double, which
+  is a hypothetical seam. The queue stays in-process (2026-10-07 entry) but
+  is now stdlib `asyncio` inside the use case: a data point for the Clean
+  Architecture exercise, where this port turned out to be ceremony. The
+  refactor changes no behaviour; `drain()` remains the test hook and
+  `stop()` still drops unprocessed jobs. Five defects in this path are
+  filed as #36–#40, each to be fixed on its own, with tests that pin
+  today's behaviour (`tests/e2e/test_routes.py`) so each fix flips an
+  assertion on purpose.
+- **A document row is now written as `pending` before any parsing, and a
+  failed ingestion marks it `failed`; nothing is rolled back** — supersedes
+  the founding entry "document row is persisted only after embeddings
+  succeed, and rolled back if chunk insertion fails", which stopped being
+  true when ingestion moved to the background queue (2026-10-07).
