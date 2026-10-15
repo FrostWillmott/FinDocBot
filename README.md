@@ -210,7 +210,7 @@ make test
 
 ## Testing & Code Quality
 
-- **Run tests**: `make test` (add `--integration` for PostgreSQL tests via Docker; CI runs them in a separate job)
+- **Run tests**: `make test` (unit); `uv run pytest --integration -m integration` (PostgreSQL via Docker); `uv run pytest --e2e -m e2e` (real Postgres + Ollama via Docker)
 - **Coverage report**: `make cover` (pytest-cov, terminal report with missing lines; CI enforces ≥90% and refreshes the badge above on every push to `master`)
 - **Linting & Formatting**: `make lint` / `make fmt`
 - **Static type checking**: `uv run mypy src/findocbot` (strict mode, enforced in CI)
