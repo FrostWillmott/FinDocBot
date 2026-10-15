@@ -44,8 +44,9 @@ class Submission:
     """Outcome of ``IngestionUseCase.submit``."""
 
     document: Document
-    # True when this request queued ingestion; False when the bytes resolved
-    # to a document stored earlier, whatever its status.
+    # True when this request queued ingestion: a new upload, or the retry of a
+    # failed document. False when the bytes resolved to a document that is
+    # pending or ready, or whose retry another request claimed first.
     queued: bool
 
 
@@ -95,12 +96,14 @@ class IngestionUseCase:
         worker flips it to ``ready`` or ``failed`` after processing.
         Re-uploading the same bytes returns the stored document with
         ``queued=False`` and does not queue it again, so uploads stay
-        idempotent and cost no extra parsing or embedding.
+        idempotent and cost no extra parsing or embedding, except that a
+        ``failed`` document is retried: it goes back to ``pending`` and is
+        queued again (``queued=True``).
         """
         content_hash = hashlib.sha256(content).hexdigest()
         existing = await self._documents.find_by_content_hash(content_hash)
         if existing is not None:
-            return Submission(document=existing, queued=False)
+            return await self._resubmit(existing, content)
 
         document = Document.create(
             filename=filename,
@@ -117,6 +120,21 @@ class IngestionUseCase:
             return Submission(document=stored, queued=False)
         await self._queue.put(_Job(document_id=document.id, content=content))
         return Submission(document=document, queued=True)
+
+    async def _resubmit(
+        self, existing: Document, content: bytes
+    ) -> Submission:
+        """Retry a failed document; return any other stored one as it is."""
+        if existing.status != "failed":
+            return Submission(document=existing, queued=False)
+        claimed = await self._documents.reset_failed(existing.id)
+        if claimed is None:
+            # Another request claimed the retry first (or the document was
+            # deleted meanwhile): show the row as it is now.
+            current = await self._documents.get(existing.id)
+            return Submission(document=current or existing, queued=False)
+        await self._queue.put(_Job(document_id=claimed.id, content=content))
+        return Submission(document=claimed, queued=True)
 
     async def start(self) -> None:
         """Spawn the worker task if it is not already running."""
@@ -217,4 +235,6 @@ class IngestionUseCase:
         embeddings = await self._provider.embed_many([
             c.text for c in built_chunks
         ])
-        await self._chunks.add_chunks_with_embeddings(built_chunks, embeddings)
+        await self._chunks.replace_document_chunks(
+            job.document_id, built_chunks, embeddings
+        )

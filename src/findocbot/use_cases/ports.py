@@ -83,16 +83,29 @@ class DocumentRepositoryPort(Protocol):
     ) -> None:
         """Update a document's ingestion status and optional error message."""
 
+    async def reset_failed(self, document_id: str) -> Document | None:
+        """Mark a failed document pending again and clear its error.
+
+        Atomic: of several concurrent callers only one gets the updated
+        document; the others, and a call for a document that is not failed
+        or does not exist, get None.
+        """
+
 
 class ChunkRepositoryPort(Protocol):
     """Persistence operations for chunks with vectors."""
 
-    async def add_chunks_with_embeddings(
+    async def replace_document_chunks(
         self,
+        document_id: str,
         chunks: list[Chunk],
         embeddings: list[list[float]],
     ) -> None:
-        """Persist chunks with embeddings."""
+        """Make these chunks, with embeddings, the document's only chunks.
+
+        Atomic: any chunks the document already had are removed in the same
+        transaction, so a retried ingestion never leaves two copies.
+        """
 
     async def search_by_embedding(
         self,

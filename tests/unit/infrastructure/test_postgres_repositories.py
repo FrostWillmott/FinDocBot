@@ -28,7 +28,9 @@ async def test_chunk_insert_wrong_dim_raises_without_db_access(
     chunk = Chunk.create(document_id="d", chunk_index=0, text="x")
 
     with pytest.raises(EmbeddingDimensionError, match="has 2 dimensions"):
-        await unstarted_repo.add_chunks_with_embeddings([chunk], [[0.1, 0.2]])
+        await unstarted_repo.replace_document_chunks(
+            "d", [chunk], [[0.1, 0.2]]
+        )
 
 
 async def test_chunk_search_wrong_dim_raises_without_db_access(
