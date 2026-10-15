@@ -28,11 +28,11 @@ from findocbot.domain.exceptions import (
     NotFoundError,
 )
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 class ApiServices(Protocol):
     """What the routes need; the app's container provides it."""
 
-    upload_pdf: UploadPDFUseCase
+    ingestion: IngestionUseCase
     search_chunks: SearchSimilarChunksUseCase
     answer_question: AnswerQuestionUseCase
     manage_documents: ManageDocumentsUseCase
@@ -164,7 +164,7 @@ def build_router(container: ApiServices) -> APIRouter:
                     detail=f"File exceeds {_MAX_UPLOAD_MB} MB limit.",
                 )
         with _map_use_case_errors():
-            document = await container.upload_pdf.submit(
+            document = await container.ingestion.submit(
                 filename=file.filename or "uploaded.pdf",
                 content=bytes(content),
             )

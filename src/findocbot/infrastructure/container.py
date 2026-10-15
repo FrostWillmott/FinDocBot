@@ -18,14 +18,13 @@ from findocbot.infrastructure.postgres_repositories import (
     PostgresChunkRepository,
     PostgresDocumentRepository,
 )
-from findocbot.infrastructure.upload_queue import InProcessUploadQueue
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
 from findocbot.use_cases.ports import ModelProviderGateway
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -38,11 +37,10 @@ class AppContainer:
     settings: Settings
     db: PostgresPool
     provider: ModelProviderGateway
-    upload_pdf: UploadPDFUseCase
+    ingestion: IngestionUseCase
     search_chunks: SearchSimilarChunksUseCase
     answer_question: AnswerQuestionUseCase
     manage_documents: ManageDocumentsUseCase
-    upload_queue: InProcessUploadQueue
     # Run after the database is up; a failure aborts application startup.
     startup_checks: list[Callable[[], Awaitable[None]]] = field(
         default_factory=list
@@ -58,11 +56,11 @@ class AppContainer:
         for check in self.startup_checks:
             await check()
         await self.provider.start()
-        await self.upload_queue.start()
+        await self.ingestion.start()
 
     async def shutdown(self) -> None:
         """Shutdown external resources."""
-        await self.upload_queue.stop()
+        await self.ingestion.stop()
         await self.provider.stop()
         await self.db.stop()
 
@@ -106,26 +104,22 @@ def create_container(settings: Settings) -> AppContainer:
         history=history,
         max_history_pairs=settings.max_history_pairs,
     )
-    upload_queue = InProcessUploadQueue()
-    upload_pdf = UploadPDFUseCase(
+    ingestion = IngestionUseCase(
         parser=parser,
         chunker=chunker,
         provider=provider,
         documents=documents,
         chunks=chunks,
-        queue=upload_queue,
     )
-    upload_queue.set_processor(upload_pdf.process)
 
     return AppContainer(
         settings=settings,
         db=db,
         provider=provider,
-        upload_pdf=upload_pdf,
+        ingestion=ingestion,
         search_chunks=search_chunks,
         answer_question=answer_question,
         manage_documents=ManageDocumentsUseCase(documents),
-        upload_queue=upload_queue,
         startup_checks=[chunks.verify_schema],
         health_checks={
             "database": db.ping,

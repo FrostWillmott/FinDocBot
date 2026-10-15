@@ -5,12 +5,12 @@ import pytest
 from findocbot.domain.exceptions import InvalidQueryError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
+from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 from tests.factories import build_pdf_bytes
-from tests.fakes import RecordingQueue, StubProvider, index_document
+from tests.fakes import StubProvider, index_document
 from tests.in_memory import (
     InMemoryChunkRepository,
     InMemoryDocumentRepository,
@@ -47,13 +47,12 @@ async def test_execute_after_upload_returns_matching_chunk_first() -> None:
     docs = InMemoryDocumentRepository()
     chunks = InMemoryChunkRepository()
 
-    upload = UploadPDFUseCase(
+    ingestion = IngestionUseCase(
         parser=parser,
         chunker=chunker,
         provider=provider,
         documents=docs,
         chunks=chunks,
-        queue=RecordingQueue(),
     )
     search = SearchSimilarChunksUseCase(provider=provider, chunks=chunks)
 
@@ -62,7 +61,7 @@ async def test_execute_after_upload_returns_matching_chunk_first() -> None:
         "Section 2\nOperational profit remained stable.\n\n"
         "Section 3\nAsset quality improved."
     )
-    await index_document(upload, "report.pdf", pdf_bytes)
+    await index_document(ingestion, "report.pdf", pdf_bytes)
 
     results = await search.execute(query="What about revenue?", top_k=1)
 

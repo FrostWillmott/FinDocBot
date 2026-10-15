@@ -14,15 +14,14 @@ from findocbot.domain.exceptions import ModelProviderError, StorageError
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.container import AppContainer
 from findocbot.infrastructure.pdf_parser import PyPDFParser
-from findocbot.infrastructure.upload_queue import InProcessUploadQueue
 from findocbot.main import create_app
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.manage_documents import ManageDocumentsUseCase
 from findocbot.use_cases.ports import ChunkWithScore
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
-from findocbot.use_cases.upload_pdf import UploadPDFUseCase
 from tests.factories import build_pdf_bytes
 from tests.in_memory import (
     InMemoryChunkRepository,
@@ -125,25 +124,21 @@ def _build_container(
         search_use_case=search_chunks,
         history=history,
     )
-    upload_queue = InProcessUploadQueue()
-    upload_pdf = UploadPDFUseCase(
+    ingestion = IngestionUseCase(
         parser=PyPDFParser(),
         chunker=ParagraphTokenChunker(chunk_tokens=120, overlap_ratio=0.1),
         provider=provider,
         documents=documents,
         chunks=chunks,
-        queue=upload_queue,
     )
-    upload_queue.set_processor(upload_pdf.process)
     return AppContainer(
         settings=Settings(),
         db=_FakeDB(),  # type: ignore[arg-type]
         provider=provider,
-        upload_pdf=upload_pdf,
+        ingestion=ingestion,
         search_chunks=search_chunks,
         answer_question=answer_question,
         manage_documents=ManageDocumentsUseCase(documents),
-        upload_queue=upload_queue,
         health_checks=health_checks or {},
     )
 
@@ -213,7 +208,7 @@ async def test_upload_blank_pdf_marks_document_failed_after_processing() -> (
         assert resp.status_code == 202
         document_id = resp.json()["document_id"]
 
-        await container.upload_queue.drain()
+        await container.ingestion.drain()
 
         stored = await client.get(f"/documents/{document_id}")
         assert stored.json()["status"] == "failed"
@@ -234,7 +229,7 @@ async def test_upload_non_pdf_bytes_marks_document_failed() -> None:
         assert resp.status_code == 202
         document_id = resp.json()["document_id"]
 
-        await container.upload_queue.drain()
+        await container.ingestion.drain()
 
         stored = await client.get(f"/documents/{document_id}")
         assert stored.json()["status"] == "failed"
@@ -403,7 +398,7 @@ async def test_upload_duplicate_of_pending_document_is_ingested_once() -> None:
         await _upload_pdf(client)
         await _upload_pdf(client)
 
-        await container.upload_queue.drain()
+        await container.ingestion.drain()
 
     # The one-paragraph PDF is a single chunk, so a second ingestion would
     # show up as a second stored chunk.
