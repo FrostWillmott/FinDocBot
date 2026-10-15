@@ -148,3 +148,17 @@ Conventions are codified in `.claude/rules/` (see `_LEVELS.md` for rule levels),
 vendored from developer-os `rules-library/`; change a module there first, then
 copy it here.
 Non-obvious technical decisions are logged in `DECISIONS.md`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for `FrostWillmott/FinDocBot`; skills read and write them via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` at the repo root plus `docs/adr/`. See `docs/agents/domain.md`.
