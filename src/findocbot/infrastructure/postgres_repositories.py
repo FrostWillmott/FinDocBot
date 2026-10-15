@@ -232,17 +232,22 @@ class PostgresChunkRepository:
         """Search by cosine distance and map rows to DTO."""
         self._check_dim(embedding)
         try:
+            # Only chunks of ready documents are searchable (see CONTEXT.md).
+            # The join keeps the HNSW index scan; pgvector filters after it,
+            # which loses nothing while non-ready documents hold few chunks.
             rows = await self._db.pool.fetch(
                 """
                 SELECT
-                    id,
-                    document_id,
-                    chunk_index,
-                    section,
-                    content,
-                    1 - (embedding <=> $1::vector) AS score
-                FROM chunks
-                ORDER BY embedding <=> $1::vector
+                    c.id,
+                    c.document_id,
+                    c.chunk_index,
+                    c.section,
+                    c.content,
+                    1 - (c.embedding <=> $1::vector) AS score
+                FROM chunks AS c
+                JOIN documents AS d ON d.id = c.document_id
+                WHERE d.status = 'ready'
+                ORDER BY c.embedding <=> $1::vector
                 LIMIT $2
                 """,
                 _vector_literal(embedding),
