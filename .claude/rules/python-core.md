@@ -17,15 +17,22 @@ catch but agents get wrong by default.
   a reason comment.
 
 ## Error handling  [MUST]
-- Never `except:` or `except Exception:` bare — catch the specific exception.
+- Catch the specific exception type — a bare `except:` or `except Exception:` catches too much.
 - Raise specific, named exceptions; define domain exceptions where a layer has
   its own failure modes. Don't leak implementation details (e.g. raw DB errors)
   across a layer boundary.
 - Don't swallow exceptions silently. If you catch and continue, log why.
 
 ## Must-avoid defaults  [MUST]
-- No mutable default arguments (`def f(x=[])`); use `None` + assign inside.
+- Mutable default arguments (`list`, `dict`, `set`) are `None`, assigned inside the body.
 - No `time.sleep()` in tests — control time or mock it.
+
+## Size limits  [PREFER]
+- At most 7 parameters per function; past that, pass a dataclass/Pydantic
+  config object or split the function. `ruff.toml` enforces `PLR0913`.
+- Keep a module under ~500 lines and a function's cyclomatic complexity under
+  12 (`C901`). A module that mixes orchestration with storage or parsing is a
+  split waiting to happen; do it when you touch it, not later.
 
 ## Preferred defaults  [PREFER]
 - `pathlib.Path`, not `os.path`.
