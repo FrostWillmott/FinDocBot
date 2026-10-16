@@ -16,6 +16,12 @@ _INJECTION_MARKER = re.compile(
 )
 _TRUNCATION_MARK = " [truncated]"
 
+# Longest untrusted spans a prompt carries before `neutralize` cuts them. The
+# chunker keeps every chunk within MAX_SOURCE_CHARS, and the reranker prompt
+# applies the same limits, so a stored chunk is never cut when quoted.
+MAX_SOURCE_CHARS = 4000
+MAX_QUESTION_CHARS = 2000
+
 
 def neutralize(text: str, max_chars: int) -> str:
     """Truncate *text* and defuse markers that mimic prompt structure.

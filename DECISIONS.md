@@ -708,3 +708,161 @@ later reversed, add a superseding entry instead of editing the old one.
   one question is 7 points, and the seconds were taken on a loaded 16 GB machine
   with the embedder at its maximum window, so they are pessimistic while their
   order is not.
+
+- **The reranker's P(yes) is one function in `infrastructure/ollama_reranker.py`,
+  and a reply the scorer cannot read no longer ends as a 500** — the shipped
+  `OllamaReranker` divided `yes / (yes + no)` and raised `ZeroDivisionError` when
+  the first token's `top_logprobs` held neither word, and read `entry["token"]`
+  outside the `try`, so a malformed entry was a `KeyError`; search catches only
+  `ModelProviderError` and `TimeoutError`, so `/search` and `/ask` answered 500
+  with the reranker on instead of keeping the vector order. The evaluation had
+  its own copy of the scorer with the reference code's fallback (a missing
+  yes/no token counts as log-probability -10), so what `evals/` measured was not
+  what shipped. Now `evals/retrieval_eval.py` imports `yes_probability` from the
+  adapter, a reply with neither word scores 0.5 (the evaluation's behaviour; one
+  passage in the middle is harmless and a trained yes/no prompt almost never
+  gives it), and a malformed entry raises `ModelProviderError` like a reply
+  without logprobs. **Not done**: the evaluation still copies the prompt and
+  its request options, and the Ollama error mapping still exists in the
+  reranker, `OllamaGateway._post` and `ping`; sharing the prompt is the next
+  step, the mapping stays as it is (the retry logic in `_post` is interleaved
+  with it, and the fix is not worth touching the most tested adapter).
+
+- **The retrieval evaluation builds its reranker prompt with the shipped
+  function** — `evals/retrieval_eval.py` kept its own copy of the Qwen3-Reranker
+  system prefix and suffix, its own `neutralize` call with limits imported from
+  private constants in `answer_question`, and the model card's default
+  instruction as a second literal, so a change to the shipped prompt would have
+  left the evaluation measuring the old one. `reranker_prompt(query, passage,
+  instruction)` in `infrastructure/ollama_reranker.py` is now the only builder
+  (the instruction defaults to `DEFAULT_INSTRUCTION`; the evaluation's two
+  `INSTRUCTIONS` pass theirs), and the evaluation's `default` instruction is
+  that constant. Checked against the old copy: the prompts for both instructions,
+  a hostile passage and an over-long query and passage are byte-identical, so
+  the recorded results in `evals/results/` still describe the same prompts.
+  **Not changed**: the evaluation keeps its own transport, per-pair timing and
+  `num_ctx` of 4096 (production sets 8192), because moving it onto
+  `OllamaReranker` would re-baseline the recorded latencies and needs a local
+  Ollama to check. Supersedes the "not done" prompt note of the previous entry;
+  the Ollama error mapping stays as it is.
+
+- **A chunk never exceeds the source cap of the answer prompt, whatever
+  `CHUNK_TOKENS` is; the limits that relate them are shared constants** — the
+  previous cap (ten characters per chunk token) alone stops being enough above
+  `CHUNK_TOKENS=400`: 4,010 characters or more, while `neutralize` cuts a source
+  at 4,000 in the answer prompt and the reranker prompt had its own copy of the
+  same number. The cut part of a chunk is stored and searchable, but the model
+  never sees it. Now `ParagraphTokenChunker` takes `min(chunk_tokens x 10,
+  MAX_SOURCE_CHARS)` as its default ceiling and logs one WARNING with the
+  resolved values when the second term wins (config-hygiene: a silent fallback
+  says so); `MAX_SOURCE_CHARS` and `MAX_QUESTION_CHARS` are public in
+  `use_cases/prompt_safety.py`, read by the answer prompt, the reranker prompt
+  and the chunker, so the relation lives in one place. **Rejected**: failing at
+  startup for `CHUNK_TOKENS > 400` (it refuses configs that are fine for
+  English, where the ceiling is rarely reached), and turning the limits into
+  settings (the earlier entry on constants stands). **Narrows** the "a chunk
+  now always fits the 4,000-character cap" bonus of the ten-per-token entry:
+  that held only at the default, and now holds for every setting. An explicit
+  `max_chunk_chars` still overrides both (tests).
+
+- **The generation prompt's budget is in chunker tokens in the notes above, and
+  nothing guards it** — the "~12k tokens worst case" of the `num_ctx=16384`
+  entry counts 20 chunks x 300 *chunker* tokens (words and marks). Measured on
+  2026-10-16 with `qwen3.5:4b` on a 2,300-character chunk: 654 chat tokens in
+  English (3.5 characters per token), 760 in Russian (3.0), 1,753 in Armenian
+  (1.3). So 20 English chunks are about 13k tokens before history, 20 Armenian
+  chunks about 35k, against a window of 16,384; the default `top_k=5` fits in
+  all three (8.8k for Armenian). Whether an over-long prompt loses its start
+  depends on the model, on Ollama 0.40.4 with a secret code on the first line
+  and `num_ctx=1024`: `qwen3.5:4b` (the default) still answered it
+  (`prompt_eval_count` 4601, the full length), `qwen2.5:7b` lost it
+  (`prompt_eval_count` 514) and `qwen3.5:9b` answered nothing (1026). So
+  `prompt_eval_count` is no reliable signal of a cut, and a static check has to
+  assume 1.3 characters per token. **Not changed**: the budget stays a
+  product decision (lower the `top_k` ceiling of 20, trim sources to fit, or
+  accept it), tracked in issue #67. **Indicative
+  only**: one chunk text per script (not the real reports), one Ollama version.
+
+- **The in-memory repositories and Postgres run one contract suite, and the
+  wired fake pair filters on `ready` and cascades a delete** — the fakes had
+  drifted from Postgres in three places nobody could see, because the only
+  tests of the repositories ran against Postgres: `set_status` on an id that is
+  not stored raised `KeyError` (the `UPDATE` does nothing, which is what a worker
+  finishing a job for a document deleted meanwhile meets), `delete` left the
+  document's chunks (the foreign key removes them), and search returned the
+  chunks of `pending` and `failed` documents (the join keeps `ready` ones).
+  `tests/repository_contract.py` now holds the cases as base classes; the unit
+  suite runs them on `in_memory_repositories()` and the integration suite on
+  Postgres, 23 cases each, and the adapter-independent tests of
+  `test_postgres_repositories.py` moved into it (replaced, not duplicated).
+  Written first, the contract failed on the fakes in exactly those four cases
+  (`delete`, `set_status`, and search for `pending` and `failed`). **Supersedes**
+  the acceptance in the "search only considers chunks of `ready` documents"
+  entry that the rule "is covered by integration tests only": that entry
+  rejected a production operation spanning both repositories, which this is not
+  (two optional attributes on test fakes; built separately the fakes stay
+  independent, so existing tests are untouched). A use-case test now covers
+  the #40 scenario without Docker: chunks stored, the `ready` update fails, the
+  chunks are not searchable. **Not changed**: the query-level filter and the
+  transaction question; the transition rules (`set_status`, `reset_failed`,
+  `fail_pending`) stay three operations with their own guards, since nothing
+  failed there and #44-#46 built them recently; other tests keep building the
+  fakes unwired.
+
+- **`Document.create` takes no default status** — it defaulted to `ready`, while
+  `CONTEXT.md` says an upload is `pending` and the only production caller (`submit`)
+  always passed it, so the default served tests alone and made a forgotten
+  argument produce a searchable document. `status` is now a required keyword;
+  mypy and the test suites found every caller (three tests relied on the
+  default and now say what they need).
+
+- **The parser and the chunker stay two ports; the text convention between them
+  is pinned by a test through ingestion instead** — each port has one production
+  adapter and no test double, the criterion that removed `UploadQueuePort`
+  (2026-10-15). That port was internal to a use case; these two keep
+  `use_cases` from importing `pypdf` and the infrastructure chunker, which is the
+  dependency rule the project chose, so merging them into one "PDF to chunks"
+  port would hide the same convention behind the same single adapter. The gap
+  was that nothing proved the convention end to end (a blank line is a
+  paragraph, a paragraph whose first line starts with `Section` or `Chapter` is
+  a heading): `test_ingestion.py` now builds a three-section PDF and asserts
+  the stored chunks' `section` values, and one without headings asserts none.
+  Either side breaking fails it (checked by making the heading pattern match
+  nothing, and by making the parser never emit a paragraph break). **Rejected**:
+  a parser that returns paragraphs instead of a string (it would rewrite the
+  27 text-based chunker tests for a different home of the same convention).
+  **Not changed**: headings are English-only and short sections share the last
+  label, tracked in issue #70.
+
+- **Section headings widen to the real reports' languages, and a chunk spanning
+  several sections carries no label** — `_extract_section` matched only
+  `Section`/`Chapter`, so the Russian report's `Раздел` and the Armenian
+  report's `Բաժին` produced `section: None`. Checked in the downloaded PDFs
+  (18 and 7 occurrences; neither report uses `Глава`/`Գլուխ`), the pattern now
+  matches `section|chapter|раздел|բաժին` on a paragraph's first line only — the
+  guard that keeps a wider pattern from misfiring on wrapped body text
+  (2026-10-01) — and `\b` keeps a body word like `разделение` from matching. A
+  chunk that accumulated several short headings (sections under
+  `min_chunk_tokens` that merge) now gets `section: None` instead of the last
+  heading: one label cannot describe text drawn from several sections.
+  `_section_of` re-derives the distinct headings from the chunk's own
+  paragraphs, so the flush, close and tail-merge paths all agree. Supersedes
+  the "Not changed" note of the parser/chunker entry, resolving issue #70.
+  **Rejected**: a numbered-heading pattern (`Item 7`, `Note 3`, `1.`) — false
+  positives on lists and body text; and font-size detection — a parser→chunker
+  contract change, fragile across report styles.
+
+- **The generation prompt is bounded to the context window; the lowest-ranked
+  sources are dropped, not the ceiling** — issue #67: 20 sources at the
+  4,000-character cap reach ~35k tokens in Armenian (1.3 characters per token)
+  against `num_ctx=16384`, and Ollama silently drops the *start* of an over-long
+  prompt — the sources — while the instructions at the end survive.
+  `AnswerQuestionUseCase` now takes `context_window_tokens` and
+  `max_answer_tokens` (from `ollama_num_ctx`/`ollama_num_predict`) and, before
+  building the prompt, keeps sources best-first until the actual prompt —
+  measured against the real history and question, not their caps — fits
+  `(num_ctx - num_predict) x 1.3` characters; the dropped count is logged at
+  WARNING and the response's `sources` reflect what was used. **Rejected**:
+  lowering the `top_k` ceiling of 20 (breaking, and a few full Armenian chunks
+  still overflow with history) and accept-and-document (leaves the silent
+  degradation the issue exists for).

@@ -12,6 +12,7 @@ from findocbot.domain.exceptions import (
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.answer_question import AnswerQuestionUseCase
+from findocbot.use_cases.dto import SearchResultDTO
 from findocbot.use_cases.ingestion import IngestionUseCase
 from findocbot.use_cases.ports import ModelProviderGateway
 from findocbot.use_cases.search_similar_chunks import (
@@ -77,6 +78,8 @@ async def test_execute_matching_document_returns_grounded_answer() -> None:
         provider=provider,
         search_use_case=search,
         history=history,
+        context_window_tokens=16384,
+        max_answer_tokens=1024,
     )
 
     pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent in the quarter.")
@@ -117,6 +120,8 @@ async def _prompt_for_document(text: str, question: str) -> str:
             provider=provider, chunks=chunks
         ),
         history=InMemoryHistoryRepository(),
+        context_window_tokens=16384,
+        max_answer_tokens=1024,
     )
     await index_document(ingestion, "report.pdf", build_pdf_bytes(text))
     await ask.execute(session_id=None, question=question, top_k=2)
@@ -145,6 +150,9 @@ async def test_execute_prompt_escapes_forged_closing_tag() -> None:
 def _build_answer_use_case(
     provider: ModelProviderGateway,
     history: InMemoryHistoryRepository | None = None,
+    *,
+    context_window_tokens: int = 16384,
+    max_answer_tokens: int = 1024,
 ) -> AnswerQuestionUseCase:
     search = SearchSimilarChunksUseCase(
         provider=provider, chunks=InMemoryChunkRepository()
@@ -153,6 +161,8 @@ def _build_answer_use_case(
         provider=provider,
         search_use_case=search,
         history=history or InMemoryHistoryRepository(),
+        context_window_tokens=context_window_tokens,
+        max_answer_tokens=max_answer_tokens,
     )
 
 
@@ -325,6 +335,51 @@ async def test_execute_follow_up_searches_by_rewritten_query() -> None:
     await _ask_follow_up(provider)
 
     assert provider.embedded[-1] == "What was net profit in 2025?"
+
+
+class _StubSearch:
+    """Return a fixed list of sources, ignoring the query and top_k."""
+
+    def __init__(self, sources: list[SearchResultDTO]) -> None:
+        self._sources = sources
+
+    async def execute(self, query: str, top_k: int) -> list[SearchResultDTO]:
+        return self._sources[:top_k]
+
+
+def _source(text: str, index: int) -> SearchResultDTO:
+    return SearchResultDTO(
+        chunk_id=f"c{index}",
+        document_id="d1",
+        chunk_index=index,
+        text=text,
+        score=1.0 - index * 0.1,
+    )
+
+
+async def test_execute_trims_sources_that_exceed_the_prompt_window(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    sources = [_source("revenue " * 500, index) for index in range(5)]
+    ask = AnswerQuestionUseCase(
+        provider=_RecordingProvider(),
+        search_use_case=_StubSearch(sources),  # type: ignore[arg-type]
+        history=InMemoryHistoryRepository(),
+        context_window_tokens=4000,
+        max_answer_tokens=512,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        response = await ask.execute(
+            session_id=None, question="How did revenue change?", top_k=5
+        )
+
+    assert len(response.sources) < 5
+    # The kept sources are the highest-ranked, so their indexes are a prefix.
+    assert [s.chunk_index for s in response.sources] == list(
+        range(len(response.sources))
+    )
+    assert "Dropped" in caplog.text
 
 
 async def test_execute_follow_up_answer_prompt_keeps_original_question() -> (

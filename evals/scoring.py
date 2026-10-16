@@ -4,38 +4,13 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Iterable, Sequence
-
-# What the reference Qwen3-Reranker code uses for a yes/no token that is
-# missing from the returned top log-probabilities.
-_MISSING_LOGPROB = -10.0
+from collections.abc import Sequence
 
 # A figure as written in a report: "1,284", "1 284", "649.4", "0,1513".
 _FIGURE = re.compile(r"\d+(?:[ ,.]\d{3})*(?:[.,]\d+)?")
 # One-digit numbers ("8", a footnote, a month) prove nothing either way.
 _MIN_FIGURE_DIGITS = 2
 _MIN_WORD_LETTERS = 4
-
-
-def yes_probability(top_logprobs: Iterable[tuple[str, float]]) -> float:
-    """Return P(yes) among the yes/no answers at the first generated position.
-
-    Every case and spacing variant of a token counts ("Yes", "yes", " yes"),
-    because the tokenizer emits several of them and each carries probability
-    mass; keeping only the last one seen drops most of it. A token missing
-    from the list gets log-probability -10, as in the reference code.
-    """
-    yes: list[float] = []
-    no: list[float] = []
-    for token, logprob in top_logprobs:
-        word = token.strip().lower()
-        if word == "yes":
-            yes.append(math.exp(logprob))
-        elif word == "no":
-            no.append(math.exp(logprob))
-    yes_mass = sum(yes) if yes else math.exp(_MISSING_LOGPROB)
-    no_mass = sum(no) if no else math.exp(_MISSING_LOGPROB)
-    return yes_mass / (yes_mass + no_mass)
 
 
 def hit_at(hits: Sequence[bool], k: int) -> bool:
