@@ -42,6 +42,14 @@ class ModelProviderError(InfrastructureError):
     """Raised when the model provider (Ollama) is unreachable or fails."""
 
 
+class EmbeddingInputTooLongError(ModelProviderError):
+    """Raised when a text is longer than the embedding window.
+
+    The provider is told not to cut it: a silently shortened input gives a
+    vector that ignores its own tail.
+    """
+
+
 class StorageError(InfrastructureError):
     """Raised when a persistence operation fails."""
 

@@ -6,6 +6,7 @@ import asyncio
 import logging
 
 from findocbot.domain.exceptions import (
+    EmbeddingInputTooLongError,
     InvalidQueryError,
     ModelProviderError,
 )
@@ -44,7 +45,12 @@ class SearchSimilarChunksUseCase:
         if not clean_query:
             raise InvalidQueryError("Query cannot be empty.")
 
-        query_embedding = await self._provider.embed_one(clean_query)
+        try:
+            query_embedding = await self._provider.embed_one(clean_query)
+        except EmbeddingInputTooLongError as error:
+            # The client's text is the cause, unlike any other embedding
+            # failure, so say so instead of reporting a provider outage.
+            raise InvalidQueryError("Query is too long.") from error
         pool = top_k
         if self._reranker is not None:
             pool = max(top_k, self._rerank_candidates)

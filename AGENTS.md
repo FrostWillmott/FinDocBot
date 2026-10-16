@@ -147,7 +147,9 @@ applied exactly once. The integration tests run the same revisions via
 `OLLAMA_NUM_CTX` and the per-source prompt cap (`_MAX_SOURCE_CHARS`), so raise
 them together — `.env.example` says so next to the setting. Embedding requests
 carry their own window, `OLLAMA_EMBED_NUM_CTX`, which must stay above the
-longest chunk because Ollama cuts longer inputs.
+longest chunk: the gateway sends `truncate: false`, so a longer input is
+refused (`EmbeddingInputTooLongError`: the document fails with a stated
+cause, a search query gets a 400) instead of being cut by Ollama.
 
 ### Testing
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Iterator
+from contextlib import asynccontextmanager
 
 import asyncpg
 import httpx
@@ -52,15 +53,15 @@ def e2e_settings() -> Iterator[Settings]:
         yield settings
 
 
-@pytest.fixture
-async def client(
-    e2e_settings: Settings,
+@asynccontextmanager
+async def _serve(
+    settings: Settings,
 ) -> AsyncGenerator[httpx.AsyncClient, None]:
     """A real container behind an HTTP client; the lifespan runs the worker."""
     # The database lives for the whole session; wipe it so every test starts
     # without documents (a re-upload of the same PDF would otherwise be
     # deduplicated to the earlier test's row).
-    connection = await asyncpg.connect(str(e2e_settings.postgres_dsn))
+    connection = await asyncpg.connect(str(settings.postgres_dsn))
     try:
         await connection.execute(
             "TRUNCATE chunks, documents, chat_turns, sessions"
@@ -68,10 +69,29 @@ async def client(
     finally:
         await connection.close()
 
-    app = create_app(container=create_container(e2e_settings))
+    app = create_app(container=create_container(settings))
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(
             transport=transport, base_url="http://test"
         ) as client:
             yield client
+
+
+@pytest.fixture
+async def client(
+    e2e_settings: Settings,
+) -> AsyncGenerator[httpx.AsyncClient, None]:
+    """The app with the settings of the session."""
+    async with _serve(e2e_settings) as client:
+        yield client
+
+
+@pytest.fixture
+async def narrow_window_client(
+    e2e_settings: Settings,
+) -> AsyncGenerator[httpx.AsyncClient, None]:
+    """The app with an embedding window no chunk of the sample fits in."""
+    narrow = e2e_settings.model_copy(update={"ollama_embed_num_ctx": 16})
+    async with _serve(narrow) as client:
+        yield client

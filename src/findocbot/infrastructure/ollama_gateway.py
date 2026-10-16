@@ -11,7 +11,10 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from findocbot.domain.exceptions import ModelProviderError
+from findocbot.domain.exceptions import (
+    EmbeddingInputTooLongError,
+    ModelProviderError,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -19,6 +22,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+
+
+def _is_input_too_long(error: ModelProviderError) -> bool:
+    """Whether Ollama refused an embedding input longer than its window.
+
+    Recognised by the 400 and the words of its message; if Ollama rewords it
+    the error stays a plain ``ModelProviderError``, still a refusal and never
+    a silent cut.
+    """
+    cause = error.__cause__
+    return (
+        isinstance(cause, httpx.HTTPStatusError)
+        and cause.response.status_code == 400
+        and "context length" in cause.response.text.lower()
+    )
 
 
 class _EmbedResponse(BaseModel):
@@ -158,17 +176,27 @@ class OllamaGateway:
 
         for i in range(0, len(texts), self._batch_size):
             batch = texts[i : i + self._batch_size]
-            response = await self._post(
-                "/api/embed",
-                {
-                    "model": self._embed_model,
-                    "input": batch,
-                    # Ollama loads an embedding model at its maximum window
-                    # (qwen3-embedding: 32768 tokens, 5.8 GB; 2.9 GB at 8192).
-                    # An input longer than this is cut, not rejected.
-                    "options": {"num_ctx": self._embed_num_ctx},
-                },
-            )
+            try:
+                response = await self._post(
+                    "/api/embed",
+                    {
+                        "model": self._embed_model,
+                        "input": batch,
+                        # Ollama loads an embedding model at its maximum window
+                        # (qwen3-embedding: 32768 tokens, 5.8 GB; 2.9 GB at
+                        # 8192), and by default cuts an input longer than the
+                        # window without a word. Refuse it instead.
+                        "options": {"num_ctx": self._embed_num_ctx},
+                        "truncate": False,
+                    },
+                )
+            except ModelProviderError as exc:
+                if _is_input_too_long(exc):
+                    raise EmbeddingInputTooLongError(
+                        f"An input is longer than {self._embed_num_ctx} "
+                        "tokens, the embedding window (OLLAMA_EMBED_NUM_CTX)"
+                    ) from exc
+                raise
             try:
                 payload = _EmbedResponse.model_validate_json(response.content)
             except ValidationError as exc:

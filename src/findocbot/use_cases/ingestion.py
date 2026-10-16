@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from findocbot.domain.entities import Chunk, Document
 from findocbot.domain.exceptions import (
     DuplicateDocumentError,
+    EmbeddingInputTooLongError,
     EmptyDocumentError,
     FinDocBotError,
     ModelProviderError,
@@ -31,6 +32,13 @@ _QUEUE_MAXSIZE = 100
 # Stored as the document's ``error`` when ingestion fails for a reason we did
 # not anticipate; the cause (driver or parser internals) goes to the log only.
 _UNEXPECTED_ERROR_MESSAGE = "Ingestion failed unexpectedly."
+
+# Stored when a chunk is longer than the embedding window; the setting that
+# names it stays in the log, not in the response.
+_INPUT_TOO_LONG_MESSAGE = (
+    "A passage of the document is too long for the embedding model; "
+    "the server's chunk size or embedding window needs adjusting."
+)
 
 # What a document says after the process holding its queued bytes went away.
 # Uploading again is a real remedy: a duplicate of a failed document is
@@ -60,7 +68,12 @@ def _safe_error_message(error: FinDocBotError) -> str:
 
     ``ModelProviderError`` can name Ollama's internal URL, which a client
     has no use for; every other failure carries user-facing text already.
+    An input over the embedding window is the one provider failure with a
+    cause worth stating: uploading again will not help until the server's
+    settings change.
     """
+    if isinstance(error, EmbeddingInputTooLongError):
+        return _INPUT_TOO_LONG_MESSAGE
     if isinstance(error, ModelProviderError):
         return "Model provider request failed."
     return str(error)
@@ -205,6 +218,11 @@ class IngestionUseCase:
             await self._ingest(job)
             await self._documents.set_status(job.document_id, "ready")
         except FinDocBotError as error:
+            # The client gets the safe message; the operator needs the cause
+            # (the provider's URL, the setting an over-long input points at).
+            logger.warning(
+                "Ingestion of document %s failed: %s", job.document_id, error
+            )
             await self._mark_failed(job, _safe_error_message(error), error)
         except Exception as error:
             # Deliberately broad: this is the outermost boundary of a
