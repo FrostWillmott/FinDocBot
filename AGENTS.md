@@ -86,7 +86,9 @@ decision there is superseded, refresh the corresponding line here.
 - **Embedding dimension**: `EMBEDDING_DIM` (`Settings.embedding_dim`) sizes
   `chunks.embedding` in the Alembic migrations. Startup verifies the column
   against the setting, and the chunk repository checks every vector's length
-  before insert/search.
+  before insert/search. Revision 0006 resizes the column to `EMBEDDING_DIM`
+  (a no-op when it already matches); otherwise it deletes the chunks and
+  marks the documents `failed`, so uploading a file again re-embeds it.
 - **Prompt safety**: untrusted text (chunks, history, question) goes through
   `use_cases/prompt_safety.neutralize` and sits inside tags, with the
   instructions last.
@@ -149,7 +151,7 @@ them together — `.env.example` says so next to the setting.
 - **Integration tests** (`@pytest.mark.integration`, `--integration`) need Docker
   for PostgreSQL; **e2e tests** (`@pytest.mark.e2e`, `--e2e`) need only Docker —
   the fixture starts Postgres and Ollama containers and pulls the models
-  (~670 MB), so no local Ollama is required. Each is skipped unless its flag is
+  (~1 GB), so no local Ollama is required. Each is skipped unless its flag is
   passed (see `tests/conftest.py`). CI runs the integration tests in the `test` job, under the coverage gate, and the e2e tests in their own job. The e2e
   database is wiped before every test.
 - **In-memory fakes** (`tests/in_memory.py`) cover the repositories; model

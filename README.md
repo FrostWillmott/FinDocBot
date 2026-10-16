@@ -27,7 +27,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 - **Language**: Python 3.12+
 - **API Framework**: FastAPI
-- **LLM/Embeddings**: Ollama (models `qwen2.5:7b` and `nomic-embed-text`)
+- **LLM/Embeddings**: Ollama (models `qwen2.5:7b` and `qwen3-embedding:0.6b`)
 - **Database**: PostgreSQL + pgvector
 - **PDF Parsing**: PyPDF
 - **Dependency Management**: [uv](https://github.com/astral-sh/uv)
@@ -167,8 +167,9 @@ PostgreSQL uses an **HNSW** index (`m=16, ef_construction=64`) over the
 Migrations are versioned with **Alembic**; `make up` runs `alembic upgrade
 head` in the `api` service before it starts, and `make migrate` applies them
 against an already-running database. The vector size comes from
-`EMBEDDING_DIM` (768 for `nomic-embed-text`); the API refuses to start if the
-column and the setting disagree.
+`EMBEDDING_DIM` (1024 for `qwen3-embedding:0.6b`); the API refuses to start if
+the column and the setting disagree. Moving an existing database to another
+embedding size is covered in the [runbook](docs/runbook.md).
 
 ---
 
@@ -212,7 +213,7 @@ make test
 
 ## Testing & Code Quality
 
-- **Run tests**: `make test` (unit); `uv run pytest --integration -m integration` (PostgreSQL via Docker); `make e2e` (real Postgres + Ollama via Docker; pulls ~670 MB of models)
+- **Run tests**: `make test` (unit); `uv run pytest --integration -m integration` (PostgreSQL via Docker); `make e2e` (real Postgres + Ollama via Docker; pulls ~1 GB of models)
 - **Coverage report**: `make cover` (unit and integration tests together, so it needs Docker; pytest-cov, terminal report with missing lines; CI enforces the `fail_under` threshold in `pyproject.toml` and refreshes the badge above on every push to `master`)
 - **Retrieval evaluation**: `make eval-retrieval` (manual; compares vector retrieval with and without a reranker on a synthetic corpus, needs a local Ollama; see [`evals/README.md`](evals/README.md))
 - **Linting & Formatting**: `make lint` / `make fmt`

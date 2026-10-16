@@ -19,9 +19,9 @@ from tests.ollama_pull import pull_model
 # docker-compose.yml leads for both image tags; bump them there first.
 _POSTGRES_IMAGE = "pgvector/pgvector:pg16"
 _OLLAMA_IMAGE = "ollama/ollama:0.35.1"
-# Pinned to a tag (Settings defaults to ":latest") so a re-pushed model
-# cannot shift retrieval underneath the figure the search test looks for.
-_EMBED_MODEL = "nomic-embed-text:v1.5"
+# The Settings default, already a size tag, so the container pulls exactly
+# what a deployment runs with and the two cannot drift apart.
+_EMBED_MODEL = Settings.model_fields["ollama_embed_model"].default
 # A real-but-tiny chat model: small enough to pull in CI, and Ollama's
 # ``format`` schema still constrains it to valid JSON.
 _CHAT_MODEL = "qwen2.5:0.5b"

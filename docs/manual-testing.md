@@ -12,7 +12,7 @@ All commands are run from the repository root.
 
 - Python 3.12+, `uv`, Docker + Docker Compose.
 - Free ports: `8000` (API), `5432` (Postgres), `11434` (Ollama).
-- ~5–6 GB of disk space for Ollama models (`qwen2.5:7b`, `nomic-embed-text`).
+- ~5–6 GB of disk space for Ollama models (`qwen2.5:7b`, `qwen3-embedding:0.6b`).
 
 Environment check:
 
@@ -91,7 +91,7 @@ Confirm the models were pulled:
 
 ```bash
 curl -s http://localhost:11434/api/tags | python3 -m json.tool
-# the list should include qwen2.5:7b and nomic-embed-text
+# the list should include qwen2.5:7b and qwen3-embedding:0.6b
 ```
 
 ---

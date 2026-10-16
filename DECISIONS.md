@@ -513,3 +513,32 @@ later reversed, add a superseding entry instead of editing the old one.
   per language, the Armenian ones are not reviewed by a native speaker, and no
   model got its recommended query prefix (`qwen3-embedding` has one), so each
   row is a drop-in swap rather than the model at its best.
+
+- **The default embedder is `qwen3-embedding:0.6b` (1024 dimensions), and
+  revision 0006 resizes an existing database by discarding its chunks** —
+  chosen from `evals/results/2026-10-16-embedders/`: the gold chunk reached the
+  top 20 for 14/14 questions on all three reports, with the same reranked
+  quality as the 4B model at a quarter of the size. `Settings` now defaults to
+  `qwen3-embedding:0.6b` and `EMBEDDING_DIM=1024`. pgvector cannot cast
+  `vector(768)` to `vector(1024)` and vectors from another model are
+  meaningless to the new one, so 0006 deletes every chunk, marks every
+  document that is not already `failed` as failed with "The embedding model
+  changed; upload the document again.", and retypes the column (Postgres
+  rebuilds the HNSW index with its parameters). Re-embedding in place was
+  rejected: it would need Ollama inside a migration or a separate job, while
+  the failed-document retry already re-ingests an upload; the cost is that the
+  chunk text is lost and every PDF is uploaded again (the runbook says to take
+  a `pg_dump` first). The target size is `EMBEDDING_DIM`, falling back to the
+  `Settings` default (one source, not a second literal), and nothing happens
+  when the column already has that size, so a fresh install and a deployment
+  that keeps `nomic-embed-text` with `EMBEDDING_DIM=768` are untouched.
+  Alembic applies a revision once, so **a later size change needs another
+  revision**; the runbook says so. Downgrade restores `vector(768)`, the size
+  0001 creates without `EMBEDDING_DIM`, and discards the chunks the same way.
+  The e2e test no longer pins its own embed-model tag (it supersedes that
+  part of the entry above): the default is already a size tag, and using it
+  keeps the test on what a deployment runs. `docker-compose.yml` no longer
+  restates `EMBEDDING_DIM` (`.env` reaches the container through `env_file`),
+  so the default lives in `Settings` alone. **Not measured**: no query prefix
+  is sent, though `qwen3-embedding` documents one, so retrieval may improve
+  further.

@@ -12,7 +12,7 @@ from findocbot.infrastructure.db import PostgresPool
 from tests.migrations import run_migrations
 
 # Mirrors Settings.embedding_dim, which leads (the e2e tests read it there).
-EMBEDDING_DIM = 768
+EMBEDDING_DIM = 1024
 
 
 @pytest.fixture(scope="module")

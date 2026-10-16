@@ -20,7 +20,7 @@ docker run -d --rm --name findocbot-verify-db \
 
 # Apply the Alembic migrations to the throwaway database
 POSTGRES_DSN=postgresql://postgres:postgres@127.0.0.1:55432/findocbot \
-EMBEDDING_DIM=768 uv run alembic upgrade head
+EMBEDDING_DIM=1024 uv run alembic upgrade head
 
 # Stub Ollama on :51434 (script below); /api/generate returns $S/mode.json verbatim
 python3 $S/stub_ollama.py 51434 $S/mode.json &
@@ -37,7 +37,7 @@ curl http://127.0.0.1:58000/documents/<document_id>
 # ...until "status" is "ready" (or "failed" with an "error").
 ```
 
-Stub Ollama (embeddings must be 768-dim to pass the repository's length check):
+Stub Ollama (embeddings must be 1024-dim to pass the repository's length check):
 
 ```python
 import json, sys
@@ -55,7 +55,7 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         if self.path == "/api/embed":
-            out = {"embeddings": [[0.1] * 768 for _ in body["input"]]}
+            out = {"embeddings": [[0.1] * 1024 for _ in body["input"]]}
         elif self.path == "/api/generate":
             out = {"response": open(sys.argv[2]).read()}
         else:
