@@ -30,10 +30,15 @@ class Document:
     @staticmethod
     def create(
         filename: str,
+        *,
+        status: DocumentStatus,
         content_hash: str | None = None,
-        status: DocumentStatus = "ready",
     ) -> Document:
-        """Create a document with generated identifier."""
+        """Create a document with generated identifier.
+
+        The status is required: a new upload is ``pending`` (CONTEXT.md), so
+        a default of ``ready`` would make a forgotten argument searchable.
+        """
         return Document(
             id=str(uuid4()),
             filename=filename,

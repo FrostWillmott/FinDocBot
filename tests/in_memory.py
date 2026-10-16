@@ -26,11 +26,16 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 class InMemoryDocumentRepository:
-    """Simple document repository for tests."""
+    """Simple document repository for tests.
+
+    ``chunks`` is set by ``in_memory_repositories``: deleting a document then
+    removes its chunks, as the foreign key does in Postgres.
+    """
 
     def __init__(self) -> None:
         """Initialize in-memory document storage."""
         self.items: dict[str, Document] = {}
+        self.chunks: InMemoryChunkRepository | None = None
 
     async def create(self, document: Document) -> None:
         """Store document entity."""
@@ -65,7 +70,10 @@ class InMemoryDocumentRepository:
 
     async def delete(self, document_id: str) -> bool:
         """Remove document entity by id; return whether it existed."""
-        return self.items.pop(document_id, None) is not None
+        existed = self.items.pop(document_id, None) is not None
+        if existed and self.chunks is not None:
+            self.chunks.remove_document(document_id)
+        return existed
 
     async def set_status(
         self,
@@ -73,10 +81,16 @@ class InMemoryDocumentRepository:
         status: DocumentStatus,
         error: str | None = None,
     ) -> None:
-        """Update a stored document's status and error message."""
-        self.items[document_id] = replace(
-            self.items[document_id], status=status, error=error
-        )
+        """Update a stored document's status and error message.
+
+        An id that is not stored (deleted meanwhile) changes nothing, as the
+        ``UPDATE`` in Postgres.
+        """
+        document = self.items.get(document_id)
+        if document is not None:
+            self.items[document_id] = replace(
+                document, status=status, error=error
+            )
 
     async def reset_failed(self, document_id: str) -> Document | None:
         """Mark a failed document pending again; None if it was not failed."""
@@ -124,11 +138,31 @@ class _StoredChunk:
 
 
 class InMemoryChunkRepository:
-    """Simple chunk repository for tests."""
+    """Simple chunk repository for tests.
+
+    ``documents`` is set by ``in_memory_repositories``: search then returns
+    only chunks of ``ready`` documents, as the join does in Postgres. Left
+    unset, every stored chunk is searchable.
+    """
 
     def __init__(self) -> None:
         """Initialize in-memory chunk storage."""
         self.items: list[_StoredChunk] = []
+        self.documents: InMemoryDocumentRepository | None = None
+
+    def remove_document(self, document_id: str) -> None:
+        """Drop the chunks of a document (what its deletion cascades to)."""
+        self.items = [
+            item
+            for item in self.items
+            if item.chunk.document_id != document_id
+        ]
+
+    def _searchable(self, item: _StoredChunk) -> bool:
+        if self.documents is None:
+            return True
+        document = self.documents.items.get(item.chunk.document_id)
+        return document is not None and document.status == "ready"
 
     async def replace_document_chunks(
         self,
@@ -152,7 +186,7 @@ class InMemoryChunkRepository:
     ) -> list[ChunkWithScore]:
         """Return top-k chunks sorted by cosine similarity."""
         ranked = sorted(
-            self.items,
+            (item for item in self.items if self._searchable(item)),
             key=lambda item: _cosine_similarity(item.embedding, embedding),
             reverse=True,
         )[:top_k]
@@ -191,3 +225,20 @@ class InMemoryHistoryRepository:
             item for item in self.items if item.session_id == session_id
         ]
         return filtered[-limit:]
+
+
+def in_memory_repositories() -> tuple[
+    InMemoryDocumentRepository, InMemoryChunkRepository
+]:
+    """A document and a chunk repository that behave like the Postgres pair.
+
+    Deleting a document removes its chunks, and only chunks of ``ready``
+    documents are searchable (the rule is in ``search_by_embedding``'s query
+    there). Constructing the two repositories separately keeps them
+    independent, which unit tests of a single use case rely on.
+    """
+    documents = InMemoryDocumentRepository()
+    chunks = InMemoryChunkRepository()
+    documents.chunks = chunks
+    chunks.documents = documents
+    return documents, chunks

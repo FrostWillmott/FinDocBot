@@ -60,7 +60,7 @@ _QUERY = [1.0] + [0.0] * (_DIM - 1)
 
 async def _seed_three_chunks(db_pool: PostgresPool) -> None:
     """Chunks a, b, c in vector order for the query axis."""
-    document = Document.create(filename="r.pdf")
+    document = Document.create(filename="r.pdf", status="ready")
     await PostgresDocumentRepository(db_pool).create(document)
     texts = ["a", "b", "c"]
     embeddings = [

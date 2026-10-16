@@ -782,3 +782,36 @@ later reversed, add a superseding entry instead of editing the old one.
   product decision (lower the `top_k` ceiling of 20, trim sources to fit, or
   accept it), tracked in issue #67. **Indicative
   only**: one chunk text per script (not the real reports), one Ollama version.
+
+- **The in-memory repositories and Postgres run one contract suite, and the
+  wired fake pair filters on `ready` and cascades a delete** — the fakes had
+  drifted from Postgres in three places nobody could see, because the only
+  tests of the repositories ran against Postgres: `set_status` on an id that is
+  not stored raised `KeyError` (the `UPDATE` does nothing, which is what a worker
+  finishing a job for a document deleted meanwhile meets), `delete` left the
+  document's chunks (the foreign key removes them), and search returned the
+  chunks of `pending` and `failed` documents (the join keeps `ready` ones).
+  `tests/repository_contract.py` now holds the cases as base classes; the unit
+  suite runs them on `in_memory_repositories()` and the integration suite on
+  Postgres, 23 cases each, and the adapter-independent tests of
+  `test_postgres_repositories.py` moved into it (replaced, not duplicated).
+  Written first, the contract failed on the fakes in exactly those four cases
+  (`delete`, `set_status`, and search for `pending` and `failed`). **Supersedes**
+  the acceptance in the "search only considers chunks of `ready` documents"
+  entry that the rule "is covered by integration tests only": that entry
+  rejected a production operation spanning both repositories, which this is not
+  (two optional attributes on test fakes; built separately the fakes stay
+  independent, so existing tests are untouched). A use-case test now covers
+  the #40 scenario without Docker: chunks stored, the `ready` update fails, the
+  chunks are not searchable. **Not changed**: the query-level filter and the
+  transaction question; the transition rules (`set_status`, `reset_failed`,
+  `fail_pending`) stay three operations with their own guards, since nothing
+  failed there and #44-#46 built them recently; other tests keep building the
+  fakes unwired.
+
+- **`Document.create` takes no default status** — it defaulted to `ready`, while
+  `CONTEXT.md` says an upload is `pending` and the only production caller (`submit`)
+  always passed it, so the default served tests alone and made a forgotten
+  argument produce a searchable document. `status` is now a required keyword;
+  mypy and the test suites found every caller (three tests relied on the
+  default and now say what they need).
