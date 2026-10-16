@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+
+import pytest
+
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 
 
@@ -223,6 +227,37 @@ class TestCharacterCeiling:
         result = chunker.split(text)
 
         assert max(len(chunk) for chunk, _ in result) <= 1000
+
+    def test_split_large_chunk_tokens_still_fit_a_source_in_the_prompt(
+        self,
+    ) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=500)  # 5,000 characters
+        text = "\n\n".join(["x" * 4500] * 8)  # 8 tokens to the chunker
+
+        result = chunker.split(text)
+
+        assert max(len(chunk) for chunk, _ in result) <= 4000
+
+    def test_init_capped_ceiling_logs_a_warning_with_the_resolved_value(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            ParagraphTokenChunker(chunk_tokens=500)
+
+        assert [r.getMessage() for r in caplog.records] == [
+            (
+                "chunk_tokens=500 allows 5000 characters per chunk; capped at "
+                "4000, the longest source the answer prompt carries"
+            )
+        ]
+
+    def test_init_default_chunk_tokens_logs_no_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            ParagraphTokenChunker()
+
+        assert caplog.records == []
 
     def test_split_capping_keeps_all_the_text(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=100)
