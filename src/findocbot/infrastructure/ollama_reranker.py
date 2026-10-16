@@ -19,7 +19,7 @@ _MAX_PASSAGE_CHARS = 4000
 _NUM_CTX = 8192
 # The reranker's own instruction (the model card's default): it is what the
 # model was trained with, and the evaluation harness measured it.
-_INSTRUCTION = (
+DEFAULT_INSTRUCTION = (
     "Given a web search query, retrieve relevant passages that answer the "
     "query"
 )
@@ -56,12 +56,14 @@ def yes_probability(top_logprobs: Iterable[tuple[str, float]]) -> float:
     return yes_mass / (yes_mass + no_mass)
 
 
-def _prompt(query: str, passage: str) -> str:
+def reranker_prompt(
+    query: str, passage: str, instruction: str = DEFAULT_INSTRUCTION
+) -> str:
     """The Qwen3-Reranker prompt; the untrusted text is neutralised."""
     safe_query = neutralize(query, _MAX_QUERY_CHARS)
     safe_passage = neutralize(passage, _MAX_PASSAGE_CHARS)
     return (
-        f"{_PREFIX}<Instruct>: {_INSTRUCTION}\n<Query>: {safe_query}\n"
+        f"{_PREFIX}<Instruct>: {instruction}\n<Query>: {safe_query}\n"
         f"<Document>: {safe_passage}{_SUFFIX}"
     )
 
@@ -93,7 +95,7 @@ class OllamaReranker:
                 f"{self._base_url}/api/generate",
                 json={
                     "model": self._model,
-                    "prompt": _prompt(query, passage),
+                    "prompt": reranker_prompt(query, passage),
                     "raw": True,
                     "stream": False,
                     "options": {

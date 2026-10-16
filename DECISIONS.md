@@ -727,3 +727,21 @@ later reversed, add a superseding entry instead of editing the old one.
   reranker, `OllamaGateway._post` and `ping`; sharing the prompt is the next
   step, the mapping stays as it is (the retry logic in `_post` is interleaved
   with it, and the fix is not worth touching the most tested adapter).
+
+- **The retrieval evaluation builds its reranker prompt with the shipped
+  function** — `evals/retrieval_eval.py` kept its own copy of the Qwen3-Reranker
+  system prefix and suffix, its own `neutralize` call with limits imported from
+  private constants in `answer_question`, and the model card's default
+  instruction as a second literal, so a change to the shipped prompt would have
+  left the evaluation measuring the old one. `reranker_prompt(query, passage,
+  instruction)` in `infrastructure/ollama_reranker.py` is now the only builder
+  (the instruction defaults to `DEFAULT_INSTRUCTION`; the evaluation's two
+  `INSTRUCTIONS` pass theirs), and the evaluation's `default` instruction is
+  that constant. Checked against the old copy: the prompts for both instructions,
+  a hostile passage and an over-long query and passage are byte-identical, so
+  the recorded results in `evals/results/` still describe the same prompts.
+  **Not changed**: the evaluation keeps its own transport, per-pair timing and
+  `num_ctx` of 4096 (production sets 8192), because moving it onto
+  `OllamaReranker` would re-baseline the recorded latencies and needs a local
+  Ollama to check. Supersedes the "not done" prompt note of the previous entry;
+  the Ollama error mapping stays as it is.
