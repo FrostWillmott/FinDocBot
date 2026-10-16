@@ -7,6 +7,18 @@ import re
 TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 SECTION_PATTERN = re.compile(r"^(section|chapter)\b", re.IGNORECASE)
 
+# Characters per chunk token. The chunker counts words and marks, which says
+# little about length: text without spaces (Thai, Chinese) or with its spaces
+# lost in extraction is a handful of "tokens" however long it is. Measured
+# with the embedder's tokenizer, a 300-token chunk is at most 2,343 characters
+# in English, Russian and Armenian reports, so this keeps their chunks as they
+# were and bounds every other script.
+_MAX_CHARS_PER_TOKEN = 10
+# A cut may move back by up to half the ceiling to land on a boundary.
+_CUT_SEARCH_FLOOR = 0.5
+# Where to cut, best first: paragraph, line, sentence mark, space.
+_CUT_AFTER = ("\n\n", "\n", "。", ". ", " ")
+
 
 class ParagraphTokenChunker:
     """Split text into chunks while preserving paragraph/section boundaries."""
@@ -16,14 +28,53 @@ class ParagraphTokenChunker:
         chunk_tokens: int = 300,
         overlap_ratio: float = 0.15,
         min_chunk_tokens: int = 80,
+        max_chunk_chars: int | None = None,
     ) -> None:
-        """Initialize token limits and overlap for chunk building."""
+        """Initialize token limits and overlap for chunk building.
+
+        ``max_chunk_chars`` is the ceiling on a chunk's length; by default
+        ten characters per chunk token.
+        """
         self._chunk_tokens = chunk_tokens
+        self._max_chars = (
+            max_chunk_chars
+            if max_chunk_chars is not None
+            else chunk_tokens * _MAX_CHARS_PER_TOKEN
+        )
         self._overlap_tokens = max(1, int(chunk_tokens * overlap_ratio))
         self._min_chunk_tokens = min_chunk_tokens
 
     def split(self, text: str) -> list[tuple[str, str | None]]:
-        """Return chunks as (text, section) pairs."""
+        """Return chunks as (text, section) pairs, none over the ceiling."""
+        return [
+            (piece, section)
+            for chunk, section in self._split_by_tokens(text)
+            for piece in self._cap(chunk)
+        ]
+
+    def _cap(self, chunk: str) -> list[str]:
+        """Cut *chunk* into pieces of at most ``max_chunk_chars``."""
+        pieces: list[str] = []
+        rest = chunk
+        while len(rest) > self._max_chars:
+            cut = self._cut_point(rest)
+            pieces.append(rest[:cut].strip())
+            rest = rest[cut:].strip()
+        if rest:
+            pieces.append(rest)
+        return [piece for piece in pieces if piece] or [chunk]
+
+    def _cut_point(self, text: str) -> int:
+        """Where to cut *text*: after a boundary, else at the ceiling."""
+        window = text[: self._max_chars]
+        floor = int(self._max_chars * _CUT_SEARCH_FLOOR)
+        for boundary in _CUT_AFTER:
+            index = window.rfind(boundary, floor)
+            if index != -1:
+                return index + len(boundary)
+        return self._max_chars
+
+    def _split_by_tokens(self, text: str) -> list[tuple[str, str | None]]:
         paragraphs = [
             p.strip() for p in re.split(r"\n{2,}", text) if p.strip()
         ]

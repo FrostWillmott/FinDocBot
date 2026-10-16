@@ -103,6 +103,10 @@ decision there is superseded, refresh the corresponding line here.
 - **PDF → chunks**: the parser rebuilds paragraph breaks (blank lines) from line
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.
+  The chunker counts words and marks, not characters or the embedder's
+  tokens, so `split` ends by cutting any chunk over ten characters per
+  `CHUNK_TOKENS` (at a paragraph, line, sentence mark or space, else hard);
+  the `truncate: false` check in the gateway stays as the backstop.
 - **Reranking (opt-in)**: with `OLLAMA_RERANK_MODEL` set, `SearchSimilarChunksUseCase`
   fetches `max(top_k, RERANK_CANDIDATES)` candidates, asks a `RerankerPort`
   (`OllamaReranker`: Qwen3-Reranker prompt through `/api/generate`, P(yes) from

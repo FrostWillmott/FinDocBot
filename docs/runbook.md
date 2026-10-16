@@ -46,7 +46,10 @@
    - `DB_POOL_MAX_SIZE` — PostgreSQL connection pool size (5).
    - `CHUNK_TOKENS` / `CHUNK_OVERLAP_RATIO` — chunk size and overlap for new
      uploads (300 / 0.15); documents already indexed keep their chunks.
-     Raise `OLLAMA_NUM_CTX` along with `CHUNK_TOKENS`.
+     Raise `OLLAMA_NUM_CTX` along with `CHUNK_TOKENS`. The chunker counts
+     words, so a chunk is also cut at ten characters per token (3,000 at
+     300); that bounds text without spaces, and leaves the English, Russian
+     and Armenian reports as they were.
    - `LOG_LEVEL` — level for the app's own loggers (`INFO` by default);
      libraries stay at `WARNING`.
 

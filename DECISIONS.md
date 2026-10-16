@@ -651,3 +651,35 @@ later reversed, add a superseding entry instead of editing the old one.
   the ratio differs by script; a script that needs more than about 3.5 tokens
   per character would still fail loudly. Checked against Ollama 0.40.4 on the
   host and by an e2e test against the 0.35.1 image CI pulls.
+
+- **A chunk is capped at ten characters per chunk token, as the last step of
+  `split`** — the answer to what the embedding-window guard (previous entry)
+  should do with a chunk that is too long: remove the cause, not repair the
+  symptom. The chunker's "token" is a regex word or mark, so text without
+  spaces (Thai, Chinese) or with its spaces lost in extraction is a handful of
+  tokens however long it is. Measured with the production chunker and the
+  embedder's tokenizer on synthetic texts (random characters, so pessimistic):
+  Chinese without punctuation became **one chunk of 90,118 characters** (over
+  32,768 tokens; before the guard Ollama would have embedded the first 8,192 of
+  them and said nothing); English with its spaces lost gave chunks of 17,502
+  characters; Chinese with punctuation 3,058 characters, 4,500 tokens. After
+  the cap: 60 chunks of at most 1,500 characters (2,255 tokens), 48 of at most
+  2,792 (702 tokens), 49 of at most 2,888 (4,263 tokens). **The cap is a pass
+  after the existing split, not a change inside it**, so text that is within it
+  comes out exactly as before: the three real reports give the same chunks
+  (same digests of the chunk lists, 547, 130 and 59 chunks; longest 2,103,
+  2,259 and 2,343 characters, which is 7.0 to 7.8 characters per chunk token,
+  so ten leaves about 28% headroom over Armenian). Cuts prefer a paragraph
+  break, then a line, a sentence mark (`。`, `. `) and a space, looked for in
+  the second half of the window, else fall at the ceiling; pieces carry the
+  section of the chunk and no overlap between them. Ten per token is derived
+  from `CHUNK_TOKENS`, not a new setting, because nobody has a reason to turn
+  it separately; `max_chunk_chars` exists on the constructor for tests. A bonus:
+  a chunk now always fits the 4,000-character cap on a source in the answer
+  prompt. **The guard stays as the backstop**: 3,000 characters would have to
+  cost more than 2.7 tokens each to pass 8,192, and then the document fails
+  loudly as before. **Rejected**: splitting at embedding time (Ollama does not
+  say which input was too long, so it needs extra requests, and it cuts text
+  after the chunker has decided), and truncating with a warning (the tail of
+  the chunk is invisible to search again). Not measured: real Thai or Chinese
+  documents.
