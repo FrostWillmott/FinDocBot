@@ -43,7 +43,7 @@ services:
     environment:
       # Not OLLAMA_MODELS: Ollama reads that as the models directory path,
       # which would store the downloads outside the volume.
-      FINDOCBOT_MODELS: "qwen2.5:7b qwen3-embedding:0.6b"
+      FINDOCBOT_MODELS: "qwen3.5:9b qwen3-embedding:0.6b"
 
   api:
     build:

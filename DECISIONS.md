@@ -556,3 +556,22 @@ later reversed, add a superseding entry instead of editing the old one.
   matching on file name was rejected because a name is not an identity (two
   different reports can share one). The runbook, `AGENTS.md` and the
   migration comment now say so.
+
+- **The default chat model is `qwen3.5:9b`, and every generate request sends
+  `think: false`** — the maintainer runs `qwen3.5:9b` locally, so `Settings`,
+  `.env.example`, `docker-compose.yml` and the docs now name it instead of
+  `qwen2.5:7b`. It is a thinking model: against the real Ollama, `/ask` took
+  57 s and 64 s on the first two questions and the second failed with 502
+  "malformed structured output", and direct calls show why: 715 and 1008
+  tokens spent against the `num_predict` cap of 1024, mostly hidden reasoning,
+  so the reply can be cut off. With `think: false` the same direct calls took
+  1.6–1.8 s with identical answers, and three `/ask` requests through the API
+  returned 200 in 11–16 s, the injected-source question included. The flag is
+  hardcoded rather than a setting: the answers are schema-constrained JSON
+  over retrieved text and nothing needs the reasoning; if a model ever does,
+  make it a field then. Models without a thinking mode accept the flag
+  (`qwen2.5-coder:3b` locally, and the e2e job's `qwen2.5:0.5b` in CI). The e2e
+  test keeps its tiny chat model. **Not measured**: answer quality against
+  `qwen2.5:7b` (three questions, one injected source, no comparison), and the
+  CPU-only Ollama container in `docker-compose.yml` will be slow with a 9B
+  model, as it was with a 7B one.

@@ -69,3 +69,38 @@ Not exercised here: a developer `.env` that still says `OLLAMA_EMBED_MODEL=nomic
 `EMBEDDING_DIM=768` keeps working (revision 0006 changes nothing); it only moves to the
 new model when both lines are updated, see "Changing the embedding model" in
 `docs/runbook.md`.
+
+## Chat model `qwen3.5:9b` and `think: false`
+
+**Change.** `Settings` defaults to `qwen3.5:9b`; the generate request sends
+`think: false`.
+
+**Method.** Real uvicorn against the development database (documents re-uploaded
+after revision 0006, `qwen3-embedding:0.6b`) and the local Ollama with `qwen3.5:9b`.
+First without the flag, then direct calls with and without it, then with the change.
+
+| Flow | Verdict | Observed |
+|------|---------|----------|
+| `/ask` before the change, question 1 | PASS | 200 in 57 s, correct answer |
+| `/ask` before the change, question 2 (source with an injected instruction) | FAIL | 502 "Ollama returned malformed structured output" after 64 s |
+| Direct `/api/generate`, thinking on | FAIL | 38 s and 54 s; 715 and 1008 tokens against a cap of 1024; correct answers |
+| Direct `/api/generate`, `think: false` | PASS | 1.8 s and 1.6 s; 28 tokens; same answers |
+| `think: false` against a model without a thinking mode (`qwen2.5-coder:3b`) | PASS | accepted, valid JSON |
+| `/ask` after the change, three questions | PASS | 200 in 16 s, 11 s and 14 s; revenue "USD 1,284 million", dividend "USD 0.20 per share", the 2026 outlook; 3 sources each |
+
+The injected source did not change the answer ("The Board approved a quarterly
+dividend of USD 0.20 per share."). One question, so this shows the plumbing and not a
+prompt-safety result.
+
+### Stubbed check of the request (the `verify` skill)
+
+Real uvicorn and worker from a scratch directory (no `.env`, default `Settings`),
+throwaway Postgres, stub Ollama that logs the model and the `think` field of every
+`/api/generate` body.
+
+| Flow | Verdict | Observed |
+|------|---------|----------|
+| Upload the sample PDF, then poll | PASS | 202, then `ready` |
+| `POST /ask` | PASS | 200, stub answer "Total revenue was USD 1,284 million.", `high`, 2 sources; one generate call: model `qwen3.5:9b`, `think` false |
+| Follow-up `/ask` with the returned `session_id` (adds the standalone-query rewrite) | PASS | 200; two generate calls, both model `qwen3.5:9b`, `think` false |
+| Generate requests without `think: false` | PASS | 0 |

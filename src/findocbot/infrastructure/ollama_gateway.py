@@ -193,6 +193,11 @@ class OllamaGateway:
                 "prompt": prompt,
                 "stream": False,
                 "format": schema,
+                # A thinking model (qwen3.5) otherwise spends the num_predict
+                # budget on hidden reasoning: 40-60 s per answer, and a cut-off
+                # reply that fails as malformed output. Models without a
+                # thinking mode accept the flag.
+                "think": False,
                 "options": {
                     "num_ctx": self._num_ctx,
                     "num_predict": self._num_predict,

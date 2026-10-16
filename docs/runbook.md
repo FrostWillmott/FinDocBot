@@ -6,7 +6,7 @@
 - `uv`
 - Docker + Docker Compose
 - Ollama models available:
-  - `qwen2.5:7b`
+  - `qwen3.5:9b`
   - `qwen3-embedding:0.6b`
 
 ## Environment
@@ -15,7 +15,8 @@
    - `cp .env.example .env`
 2. Adjust variables if needed:
    - `OLLAMA_BASE_URL`
-   - `OLLAMA_CHAT_MODEL`
+   - `OLLAMA_CHAT_MODEL` — generation model (`qwen3.5:9b`). Requests switch
+     thinking off; a thinking model otherwise takes about a minute per answer.
    - `OLLAMA_EMBED_MODEL`
    - `OLLAMA_RERANK_MODEL` — optional reranker (empty = off). When set,
      `/search` and `/ask` fetch `RERANK_CANDIDATES` (20) candidates by vector
