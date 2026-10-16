@@ -27,7 +27,7 @@ The project leverages local LLMs via **Ollama** and **PostgreSQL (pgvector)** fo
 
 - **Language**: Python 3.12+
 - **API Framework**: FastAPI
-- **LLM/Embeddings**: Ollama (models `qwen2.5:7b` and `qwen3-embedding:0.6b`)
+- **LLM/Embeddings**: Ollama (models `qwen3.5:4b` and `qwen3-embedding:0.6b`)
 - **Database**: PostgreSQL + pgvector
 - **PDF Parsing**: PyPDF
 - **Dependency Management**: [uv](https://github.com/astral-sh/uv)

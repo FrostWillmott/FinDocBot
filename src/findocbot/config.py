@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_chat_model: str = "qwen2.5:7b"
+    ollama_chat_model: str = "qwen3.5:4b"
     ollama_embed_model: str = "qwen3-embedding:0.6b"
     # Reranking is off until a reranker model is named; see evals/README.md
     # for how it compares with plain vector search before turning it on.

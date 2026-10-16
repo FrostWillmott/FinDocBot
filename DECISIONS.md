@@ -556,3 +556,31 @@ later reversed, add a superseding entry instead of editing the old one.
   matching on file name was rejected because a name is not an identity (two
   different reports can share one). The runbook, `AGENTS.md` and the
   migration comment now say so.
+
+- **The default chat model is `qwen3.5:4b`, and every generate request sends
+  `think: false`** — the maintainer runs a `qwen3.5` locally, so `Settings`,
+  `.env.example`, `docker-compose.yml` and the docs now name it instead of
+  `qwen2.5:7b`. It is a thinking model: against the real Ollama, `qwen3.5:9b`
+  took 57 s and 64 s on the first two `/ask` questions and the second failed
+  with 502 "malformed structured output", and direct calls show why: 715 and
+  1008 tokens spent against the `num_predict` cap of 1024, mostly hidden
+  reasoning, so the reply can be cut off. With `think: false` the same direct
+  calls took 1.6–1.8 s with identical answers. The flag is hardcoded rather
+  than a setting: the answers are schema-constrained JSON over retrieved text
+  and nothing needs the reasoning; if a model ever does, make it a field then.
+  Models without a thinking mode accept it (`qwen2.5-coder:3b` locally, the
+  e2e job's `qwen2.5:0.5b` in CI). **Why 4b and not 9b or 7b**: the production
+  ask path (real parser, chunker, search and answer use cases, in-memory
+  repositories) ran 45 questions on the English, Russian and Armenian reports
+  with each model. Retrieval puts the figure into the top 5 for 35 of the 42
+  report questions, the same for all three; of those, checked by hand,
+  `qwen3.5:4b` and `qwen3.5:9b` answer 33 correctly and `qwen2.5:7b` 31, and
+  none followed the injected instruction (0 of 3). Median generation time is
+  11.5 s for 4b, 16.8 s for 9b and 19.5 s for 7b (Armenian: 20, 28 and 41 s),
+  and the model alone takes 4.1 GB against 6.1 and 5.5 GB. So the smaller model
+  costs nothing measurable here and is faster and lighter, which matters on a
+  16 GB machine and in the CPU-only Ollama container. **Indicative only**: the
+  questions are the project's own, 35 answerable questions, the hand check is
+  mine, timings were taken on a loaded machine (Docker and an IDE leave a few
+  gigabytes, and the 7.8 GB swap was in use), and CPU-only Docker was not
+  measured. The model is one `.env` line, so changing it back needs no code.
