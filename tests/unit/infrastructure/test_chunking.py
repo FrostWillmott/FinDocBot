@@ -207,3 +207,70 @@ class TestParagraphTokenChunker:
         # The 5-token window starts at "284" (mid "1,284"); it snaps to
         # "million".
         assert _chunk_texts(result)[1] == ("million this year.\n\n" + para2)
+
+
+class TestCharacterCeiling:
+    """No chunk is longer than ten characters per chunk token.
+
+    The chunker counts words and marks, which says little about length for
+    text without spaces or with its spaces lost.
+    """
+
+    def test_split_paragraphs_of_one_long_word_cap_every_chunk(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=100)
+        text = "\n\n".join(["x" * 600] * 8)  # 8 tokens to the chunker
+
+        result = chunker.split(text)
+
+        assert max(len(chunk) for chunk, _ in result) <= 1000
+
+    def test_split_capping_keeps_all_the_text(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=100)
+        text = "\n\n".join(["x" * 600] * 8)
+
+        result = chunker.split(text)
+
+        assert sum(chunk.count("x") for chunk, _ in result) == 8 * 600
+
+    def test_split_capping_prefers_paragraph_breaks(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=100)
+        text = "\n\n".join(["x" * 400] * 10)
+
+        result = chunker.split(text)
+
+        # Two whole paragraphs and the break between them, five times.
+        assert [len(chunk) for chunk, _ in result] == [802] * 5
+
+    def test_split_capping_keeps_the_section_of_every_piece(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=100)
+        text = "Section 1. Notes\n\n" + "\n\n".join(["x" * 600] * 8)
+
+        result = chunker.split(text)
+
+        assert {section for _, section in result} == {"Section 1. Notes"}
+
+    def test_split_one_unbreakable_run_is_cut_at_the_ceiling(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=100)
+
+        result = chunker.split("x" * 2500)
+
+        assert [len(chunk) for chunk, _ in result] == [1000, 1000, 500]
+
+    def test_split_capping_cuts_at_a_space_not_inside_a_word(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=1000, max_chunk_chars=500)
+
+        result = chunker.split("word " * 400)
+
+        assert {w for chunk, _ in result for w in chunk.split()} == {"word"}
+
+    def test_split_text_within_the_ceiling_is_unchanged(self) -> None:
+        text = "\n\n".join(
+            f"Section {n}. Revenue grew by {n} percent. " * 12
+            for n in range(1, 9)
+        )
+        default = ParagraphTokenChunker(chunk_tokens=60)
+        unbounded = ParagraphTokenChunker(
+            chunk_tokens=60, max_chunk_chars=10**9
+        )
+
+        assert default.split(text) == unbounded.split(text)

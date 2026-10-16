@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     db_pool_max_size: int = 5
 
     # Feeds the num_ctx budget (top_k x chunk_tokens); applies to new uploads.
+    # A chunk is also capped at ten characters per token, for text whose
+    # words the chunker cannot tell apart (no spaces, spaces lost).
     chunk_tokens: int = 300
     chunk_overlap_ratio: float = 0.15
 
