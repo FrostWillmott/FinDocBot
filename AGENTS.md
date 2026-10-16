@@ -128,8 +128,9 @@ decision there is superseded, refresh the corresponding line here.
   also ends as `failed`, with a fixed message and its traceback in the log.
   Tests run queued work with `drain()`. Search only considers chunks of
   `ready` documents (a join in `PostgresChunkRepository.search_by_embedding`);
-  the in-memory fake has no document status, so that rule is covered by
-  integration tests only. Terms are in `CONTEXT.md`. A SHA-256 of the uploaded bytes
+  the wired in-memory pair (`in_memory_repositories()`) filters the same way,
+  and a shared contract suite runs it and Postgres through that rule. Terms
+  are in `CONTEXT.md`. A SHA-256 of the uploaded bytes
   (`documents.content_hash`, unique) makes a re-upload return the stored
   document instead of queueing a second copy.
 
@@ -168,7 +169,16 @@ cause, a search query gets a 400) instead of being cut by Ollama.
   database is wiped before every test.
 - **In-memory fakes** (`tests/in_memory.py`) cover the repositories; model
   provider stubs sit in `tests/fakes.py` and in individual tests — no Docker
-  needed for unit tests.
+  needed for unit tests. `in_memory_repositories()` returns a document and a
+  chunk repository wired as in Postgres (deleting a document removes its
+  chunks, search sees only `ready` documents); built separately they stay
+  independent.
+- **Repository contract**: `tests/repository_contract.py` holds the cases both
+  adapters must pass; `tests/unit/test_in_memory_repositories.py` runs them on
+  the fakes and `tests/integration/test_postgres_repository_contract.py` on
+  Postgres. A change to a repository's behaviour goes into the contract, so
+  the fake cannot drift; only what is specific to Postgres (the dimension
+  guard, schema check, sessions, ping) stays in `test_postgres_repositories.py`.
 - Shared helpers live at the `tests/` root: `tests.factories` (PDF builder),
   `tests.in_memory`, `tests.fakes` and `tests.migrations` (Alembic helper).
 - Test names follow `test_{what}_{condition}_{expected}`.

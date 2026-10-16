@@ -1,7 +1,8 @@
-"""Integration tests for PostgreSQL repository implementations.
+"""Integration tests for what only the PostgreSQL repositories do.
 
-Requires Docker (testcontainers spins up pgvector/pgvector:pg16).
-Run with: pytest --integration
+The behaviour shared with the in-memory fakes is in
+``test_postgres_repository_contract.py``. Requires Docker (testcontainers
+spins up pgvector/pgvector:pg16). Run with: pytest --integration
 """
 
 from __future__ import annotations
@@ -13,10 +14,8 @@ from findocbot.domain.entities import (
     ChatTurn,
     Chunk,
     Document,
-    DocumentStatus,
 )
 from findocbot.domain.exceptions import (
-    DuplicateDocumentError,
     EmbeddingDimensionError,
     StorageError,
 )
@@ -27,59 +26,6 @@ from findocbot.infrastructure.postgres_repositories import (
     PostgresDocumentRepository,
 )
 from tests.integration.conftest import EMBEDDING_DIM
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_document_create_new_document_persists_row(
-    db_pool: PostgresPool,
-) -> None:
-    """Document row can be persisted via the repository."""
-    repo = PostgresDocumentRepository(db_pool)
-    doc = Document.create(filename="test.pdf")
-    await repo.create(doc)
-
-    row = await db_pool.pool.fetchrow(
-        "SELECT id, filename FROM documents WHERE id = $1", doc.id
-    )
-    assert row is not None
-    assert row["filename"] == "test.pdf"
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_chunk_search_after_insert_returns_closest_first(
-    db_pool: PostgresPool,
-) -> None:
-    """Chunks with embeddings can be persisted and searched by vector."""
-    repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
-    doc = Document.create(filename="report.pdf")
-    doc_repo = PostgresDocumentRepository(db_pool)
-    await doc_repo.create(doc)
-
-    chunks = [
-        Chunk.create(document_id=doc.id, chunk_index=i, text=text)
-        for i, text in enumerate([
-            "Revenue grew by 20%",
-            "Profit remained stable",
-        ])
-    ]
-    embeddings = [[0.0] * EMBEDDING_DIM, [0.0] * EMBEDDING_DIM]
-    # Zero vectors have no cosine direction and HNSW skips them, so both
-    # vectors are non-zero; the second points the same way as the query.
-    embeddings[0][1] = 0.9
-    embeddings[1][0] = 0.9
-
-    await repo.replace_document_chunks(doc.id, chunks, embeddings)
-
-    query_embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    results = await repo.search_by_embedding(query_embedding, top_k=2)
-
-    assert len(results) == 2
-    assert results[0].chunk.chunk_index == 1
-    # asyncpg returns UUID objects — verify they are converted to str.
-    assert isinstance(results[0].chunk.id, str)
-    assert isinstance(results[0].chunk.document_id, str)
 
 
 @pytest.mark.integration
@@ -101,17 +47,6 @@ async def test_history_list_recent_after_adds_returns_oldest_first(
     assert recent[0].question == "Q1"
     assert recent[1].question == "Q2"
     assert isinstance(recent[0].id, str)
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_chunk_search_empty_table_returns_empty_list(
-    db_pool: PostgresPool,
-) -> None:
-    """Search with no indexed chunks returns empty list."""
-    repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
-    results = await repo.search_by_embedding([1.0] * EMBEDDING_DIM, top_k=5)
-    assert results == []
 
 
 @pytest.mark.integration
@@ -146,246 +81,6 @@ async def test_chunk_insert_wrong_dim_raises_before_writing(
         await repo.replace_document_chunks(doc.id, [chunk], [[0.1, 0.2, 0.3]])
 
     assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
-
-
-@pytest.mark.integration
-async def test_document_find_by_content_hash_after_create_returns_it(
-    db_pool: PostgresPool,
-) -> None:
-    repo = PostgresDocumentRepository(db_pool)
-    doc = Document.create(filename="a.pdf", content_hash="abc")
-    await repo.create(doc)
-
-    assert await repo.find_by_content_hash("abc") == doc
-
-
-@pytest.mark.integration
-async def test_document_create_same_content_hash_raises_duplicate(
-    db_pool: PostgresPool,
-) -> None:
-    repo = PostgresDocumentRepository(db_pool)
-    await repo.create(Document.create(filename="a.pdf", content_hash="abc"))
-
-    duplicate = Document.create(filename="b.pdf", content_hash="abc")
-
-    with pytest.raises(DuplicateDocumentError):
-        await repo.create(duplicate)
-
-
-@pytest.mark.integration
-async def test_document_create_two_without_hash_keeps_both(
-    db_pool: PostgresPool,
-) -> None:
-    repo = PostgresDocumentRepository(db_pool)
-    await repo.create(Document.create(filename="a.pdf"))
-    await repo.create(Document.create(filename="b.pdf"))
-
-    assert await db_pool.pool.fetchval("SELECT count(*) FROM documents") == 2
-
-
-@pytest.mark.integration
-async def test_document_list_page_returns_newest_first(
-    db_pool: PostgresPool,
-) -> None:
-    repo = PostgresDocumentRepository(db_pool)
-    older = Document.create(filename="older.pdf")
-    newer = Document.create(filename="newer.pdf")
-    await repo.create(older)
-    await repo.create(newer)
-
-    page = await repo.list_page(limit=1, offset=0)
-
-    assert [doc.id for doc in page] == [newer.id]
-
-
-@pytest.mark.integration
-async def test_document_get_after_create_returns_it(
-    db_pool: PostgresPool,
-) -> None:
-    repo = PostgresDocumentRepository(db_pool)
-    doc = Document.create(filename="a.pdf", content_hash="abc")
-    await repo.create(doc)
-
-    assert await repo.get(doc.id) == doc
-
-
-@pytest.mark.integration
-async def test_document_delete_removes_its_chunks_from_search(
-    db_pool: PostgresPool,
-) -> None:
-    doc = Document.create(filename="a.pdf")
-    documents = PostgresDocumentRepository(db_pool)
-    await documents.create(doc)
-    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
-    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    await chunks.replace_document_chunks(
-        doc.id,
-        [Chunk.create(document_id=doc.id, chunk_index=0, text="x")],
-        [embedding],
-    )
-
-    await documents.delete(doc.id)
-
-    assert await chunks.search_by_embedding(embedding, top_k=5) == []
-
-
-@pytest.mark.integration
-@pytest.mark.parametrize("status", ["pending", "failed"])
-async def test_chunk_search_non_ready_document_returns_nothing(
-    db_pool: PostgresPool, status: DocumentStatus
-) -> None:
-    doc = Document.create(filename="a.pdf", status=status)
-    await PostgresDocumentRepository(db_pool).create(doc)
-    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
-    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    await chunks.replace_document_chunks(
-        doc.id,
-        [Chunk.create(document_id=doc.id, chunk_index=0, text="x")],
-        [embedding],
-    )
-
-    assert await chunks.search_by_embedding(embedding, top_k=5) == []
-
-
-@pytest.mark.integration
-async def test_chunk_search_after_document_marked_ready_returns_its_chunk(
-    db_pool: PostgresPool,
-) -> None:
-    doc = Document.create(filename="a.pdf", status="pending")
-    documents = PostgresDocumentRepository(db_pool)
-    await documents.create(doc)
-    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
-    chunk = Chunk.create(document_id=doc.id, chunk_index=0, text="x")
-    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    await chunks.replace_document_chunks(doc.id, [chunk], [embedding])
-
-    await documents.set_status(doc.id, "ready")
-
-    results = await chunks.search_by_embedding(embedding, top_k=5)
-    assert [result.chunk.id for result in results] == [chunk.id]
-
-
-@pytest.mark.integration
-async def test_document_reset_failed_claims_a_failed_document_once(
-    db_pool: PostgresPool,
-) -> None:
-    doc = Document.create(filename="a.pdf", status="pending")
-    documents = PostgresDocumentRepository(db_pool)
-    await documents.create(doc)
-    await documents.set_status(doc.id, "failed", "boom")
-
-    first = await documents.reset_failed(doc.id)
-    second = await documents.reset_failed(doc.id)
-
-    assert first is not None
-    assert (first.status, first.error, second) == ("pending", None, None)
-
-
-@pytest.mark.integration
-@pytest.mark.parametrize("status", ["pending", "ready"])
-async def test_document_reset_failed_non_failed_document_returns_none(
-    db_pool: PostgresPool, status: DocumentStatus
-) -> None:
-    doc = Document.create(filename="a.pdf", status=status)
-    documents = PostgresDocumentRepository(db_pool)
-    await documents.create(doc)
-
-    assert await documents.reset_failed(doc.id) is None
-
-
-@pytest.mark.integration
-async def test_chunk_replace_leaves_exactly_the_new_set(
-    db_pool: PostgresPool,
-) -> None:
-    doc = Document.create(filename="a.pdf")
-    await PostgresDocumentRepository(db_pool).create(doc)
-    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
-    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    await chunks.replace_document_chunks(
-        doc.id,
-        [
-            Chunk.create(document_id=doc.id, chunk_index=i, text=f"old {i}")
-            for i in range(2)
-        ],
-        [embedding, embedding],
-    )
-
-    await chunks.replace_document_chunks(
-        doc.id,
-        [Chunk.create(document_id=doc.id, chunk_index=0, text="new")],
-        [embedding],
-    )
-
-    rows = await db_pool.pool.fetch(
-        "SELECT content FROM chunks WHERE document_id = $1", doc.id
-    )
-    assert [row["content"] for row in rows] == ["new"]
-
-
-@pytest.mark.integration
-async def test_chunk_replace_with_nothing_clears_the_previous_chunks(
-    db_pool: PostgresPool,
-) -> None:
-    doc = Document.create(filename="a.pdf")
-    await PostgresDocumentRepository(db_pool).create(doc)
-    chunks = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
-    embedding = [0.5] + [0.0] * (EMBEDDING_DIM - 1)
-    await chunks.replace_document_chunks(
-        doc.id,
-        [Chunk.create(document_id=doc.id, chunk_index=0, text="old")],
-        [embedding],
-    )
-
-    await chunks.replace_document_chunks(doc.id, [], [])
-
-    assert await db_pool.pool.fetchval("SELECT count(*) FROM chunks") == 0
-
-
-@pytest.mark.integration
-async def test_document_fail_pending_marks_only_pending_documents_failed(
-    db_pool: PostgresPool,
-) -> None:
-    documents = PostgresDocumentRepository(db_pool)
-    pending = Document.create(filename="p.pdf", status="pending")
-    ready = Document.create(filename="r.pdf", status="ready")
-    for doc in (pending, ready):
-        await documents.create(doc)
-
-    count = await documents.fail_pending("interrupted")
-
-    statuses = {
-        doc.id: (stored.status, stored.error)
-        for doc in (pending, ready)
-        if (stored := await documents.get(doc.id)) is not None
-    }
-    assert (count, statuses) == (
-        1,
-        {pending.id: ("failed", "interrupted"), ready.id: ("ready", None)},
-    )
-
-
-@pytest.mark.integration
-async def test_document_fail_pending_without_pending_documents_returns_zero(
-    db_pool: PostgresPool,
-) -> None:
-    documents = PostgresDocumentRepository(db_pool)
-    await documents.create(Document.create(filename="r.pdf", status="ready"))
-
-    assert await documents.fail_pending("interrupted") == 0
-
-
-@pytest.mark.integration
-async def test_document_delete_twice_reports_whether_it_existed(
-    db_pool: PostgresPool,
-) -> None:
-    repo = PostgresDocumentRepository(db_pool)
-    doc = Document.create(filename="a.pdf")
-    await repo.create(doc)
-
-    assert (await repo.delete(doc.id), await repo.delete(doc.id)) == (
-        True,
-        False,
-    )
 
 
 @pytest.mark.integration
