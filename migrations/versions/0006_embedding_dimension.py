@@ -49,7 +49,9 @@ def _resize_embedding_column(dim: int) -> None:
     # are meaningless to the new one, so the chunks go; their text is not kept.
     op.execute("DELETE FROM chunks")
     # A failed document is retried when it is uploaded again (the duplicate
-    # check releases it), so the re-embed needs no new mechanism.
+    # check releases it), so the re-embed needs no new mechanism. Rows from
+    # before 0004 have no content_hash and are not found: the upload makes
+    # a new document and the old row has to be deleted.
     op.execute(
         "UPDATE documents SET status = 'failed', "
         "error = 'The embedding model changed; upload the document again.' "

@@ -542,3 +542,17 @@ later reversed, add a superseding entry instead of editing the old one.
   so the default lives in `Settings` alone. **Not measured**: no query prefix
   is sent, though `qwen3-embedding` documents one, so retrieval may improve
   further.
+
+- **Re-uploading after revision 0006 retries only documents that have a
+  content hash; older rows need a hand-deleted duplicate** — found when the
+  development database was moved to `qwen3-embedding:0.6b`: its two documents
+  were ingested before revision 0004, so `documents.content_hash` is NULL
+  (their bytes were never stored). Uploading the sample PDF again did not
+  reach the `failed` row; it created a second document, which became `ready`
+  beside the old `failed` one, and the old row was removed with
+  `DELETE /documents/{document_id}`. This corrects the 0006 entry and the
+  runbook, which said every failed document is retried by a re-upload. No
+  code change: a hash cannot be back-filled without the original bytes, and
+  matching on file name was rejected because a name is not an identity (two
+  different reports can share one). The runbook, `AGENTS.md` and the
+  migration comment now say so.

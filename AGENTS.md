@@ -88,7 +88,9 @@ decision there is superseded, refresh the corresponding line here.
   against the setting, and the chunk repository checks every vector's length
   before insert/search. Revision 0006 resizes the column to `EMBEDDING_DIM`
   (a no-op when it already matches); otherwise it deletes the chunks and
-  marks the documents `failed`, so uploading a file again re-embeds it.
+  marks the documents `failed`, so uploading a file again re-embeds it
+  (rows from before 0004 have no `content_hash`: the upload makes a new
+  document and the old row is deleted by hand).
 - **Prompt safety**: untrusted text (chunks, history, question) goes through
   `use_cases/prompt_safety.neutralize` and sits inside tags, with the
   instructions last.

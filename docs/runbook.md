@@ -96,9 +96,12 @@ between sizes, so the model and `chunks.embedding` change together.
   both lines to take the defaults), then run `make migrate` (or `make up`).
   Revision 0006 deletes every chunk, resizes the column and marks each
   document `failed` with "The embedding model changed; upload the document
-  again." Upload each PDF again: a failed document is retried, not
-  deduplicated. Take a `pg_dump` first if the chunk text matters, since it is
-  not kept.
+  again." Upload each PDF again (the database keeps no copy of the files).
+  A document uploaded after revision 0004 has a content hash and is retried
+  in place. An older one has none, so the upload creates a new document and
+  the old `failed` row stays until you delete it: find it with
+  `GET /documents` and remove it with `DELETE /documents/{document_id}`.
+  Take a `pg_dump` first if the chunk text matters, since it is not kept.
 - **Staying on 768**: keep `EMBEDDING_DIM=768` and the old model; revision 0006
   then changes nothing.
 - **Any later change of size** needs a new revision: Alembic applies 0006 once,
