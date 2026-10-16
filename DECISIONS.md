@@ -815,3 +815,21 @@ later reversed, add a superseding entry instead of editing the old one.
   argument produce a searchable document. `status` is now a required keyword;
   mypy and the test suites found every caller (three tests relied on the
   default and now say what they need).
+
+- **The parser and the chunker stay two ports; the text convention between them
+  is pinned by a test through ingestion instead** — each port has one production
+  adapter and no test double, the criterion that removed `UploadQueuePort`
+  (2026-10-15). That port was internal to a use case; these two keep
+  `use_cases` from importing `pypdf` and the infrastructure chunker, which is the
+  dependency rule the project chose, so merging them into one "PDF to chunks"
+  port would hide the same convention behind the same single adapter. The gap
+  was that nothing proved the convention end to end (a blank line is a
+  paragraph, a paragraph whose first line starts with `Section` or `Chapter` is
+  a heading): `test_ingestion.py` now builds a three-section PDF and asserts
+  the stored chunks' `section` values, and one without headings asserts none.
+  Either side breaking fails it (checked by making the heading pattern match
+  nothing, and by making the parser never emit a paragraph break). **Rejected**:
+  a parser that returns paragraphs instead of a string (it would rewrite the
+  27 text-based chunker tests for a different home of the same convention).
+  **Not changed**: headings are English-only and short sections share the last
+  label, tracked in issue #70.
