@@ -683,3 +683,28 @@ later reversed, add a superseding entry instead of editing the old one.
   after the chunker has decided), and truncating with a warning (the tail of
   the chunk is invisible to search again). Not measured: real Thai or Chinese
   documents.
+
+- **Reranking fewer candidates keeps most of the gain for a fraction of the
+  time, and 20 does not fit the default timeout outside English; the reranker
+  stays off by default** — `evals/results/2026-10-16-rerank-pool/` runs the
+  retrieval evaluation with the pool at 5 and 10 against the 20 of the embedder
+  comparison (`qwen3-embedding:0.6b`, 14 questions per report). Hit@1 over
+  vector order, then with a pool of 5, 10 and 20: English 7, 10, 11, 12 (reranker
+  4, 9 and 17 s per query); Russian 9, 10, 11, 12 (9, 18 and 39 s); Armenian 8,
+  10, 11, 12 (22, 49 and 88 s). So a pool of 10 keeps 80%, 67% and 75% of the
+  full gain at about half the time, and a pool of 5 keeps 60%, 33% and 50% at
+  about a quarter. The ceiling is the pool: the right chunk is among the
+  candidates for 12, 11 and 12 of 14 questions at a pool of 5, and 13, 13 and 14
+  at 10, so the rest of the gain needs the lower candidates. Against
+  `RERANK_TIMEOUT_SECONDS=30` (past it search keeps the vector order, with a
+  warning), 20 candidates fit English only, 10 fit English and Russian (p90
+  27 s) and 5 fit all three, so with the defaults a reranker switched on
+  would do nothing for Russian and Armenian. **Not changed**: the reranker is
+  still off, and `RERANK_CANDIDATES` is still 20; if it is switched on, set
+  10 for English and Russian and 5 for Armenian. The runbook and `.env.example`
+  say so, replacing the 0.4 s per candidate of the first estimate (about 1, 2
+  and 4-5 s per candidate by script; the cost follows the token count of the
+  text). **Indicative only**: the questions are the project's own, n is 14 and
+  one question is 7 points, and the seconds were taken on a loaded 16 GB machine
+  with the embedder at its maximum window, so they are pessimistic while their
+  order is not.

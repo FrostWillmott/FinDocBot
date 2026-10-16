@@ -31,9 +31,14 @@
      search, rerank them and keep the best `top_k`; the reported `score` is then
      the reranker's, not the cosine similarity. If the reranker fails or takes
      longer than `RERANK_TIMEOUT_SECONDS` (30), search keeps the vector order
-     and logs a warning. It costs about 0.4 s per candidate on an M1 Pro, so
-     run Ollama natively, not in the CPU-only container, and see
-     `evals/README.md` before turning it on.
+     and logs a warning. It costs about 1 s per candidate for English, 2 s
+     for Russian and 4-5 s for Armenian on an M1 Pro (the token count of the
+     text), so 20 candidates fit the 30 s limit for English only: use
+     `RERANK_CANDIDATES=10` for English and Russian, 5 for Armenian, which
+     keep about three quarters and half of the gain
+     (`evals/results/2026-10-16-rerank-pool/summary.md`). Run Ollama
+     natively, not in the CPU-only container, and see `evals/README.md`
+     before turning it on.
    - `OLLAMA_NUM_CTX` / `OLLAMA_NUM_PREDICT` — prompt window and answer
      token cap for generation; a prompt longer than the window is silently
      cut from the start, so raise it together with `top_k`.
