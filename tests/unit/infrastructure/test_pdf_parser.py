@@ -34,11 +34,12 @@ def test_extract_text_unreadable_bytes_raises_invalid_document(
 
 
 # Same-length edits keep the xref offsets valid, so pypdf gets past parsing
-# and fails inside its internals with a builtin, not a PyPdfError.
+# and fails inside its internals with a builtin, not a PyPdfError. pypdf 6.20
+# stopped raising on a bad /Subtype (the old KeyError reproduction);
+# /FlateDecode still leaks a raw NotImplementedError.
 @pytest.mark.parametrize(
     ("original", "broken"),
     [
-        (b"/Subtype /Type1", b"/Subtype /Type0"),  # KeyError
         (b"/FlateDecode", b"/FlateDecodX"),  # NotImplementedError
     ],
 )
