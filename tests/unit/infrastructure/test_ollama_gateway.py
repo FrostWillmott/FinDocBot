@@ -111,6 +111,18 @@ async def test_generate_structured_request_sends_context_and_output_limits(
 
 
 @respx.mock
+async def test_generate_structured_request_disables_thinking(
+    gateway: OllamaGateway,
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/generate").mock(
+        return_value=httpx.Response(200, json={"response": "{}"})
+    )
+    await gateway.generate_structured("question", {})
+    body = json.loads(route.calls.last.request.content)
+    assert body["think"] is False
+
+
+@respx.mock
 async def test_generate_structured_http_503_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:

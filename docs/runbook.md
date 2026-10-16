@@ -6,7 +6,7 @@
 - `uv`
 - Docker + Docker Compose
 - Ollama models available:
-  - `qwen2.5:7b`
+  - `qwen3.5:4b`
   - `qwen3-embedding:0.6b`
 
 ## Environment
@@ -15,7 +15,8 @@
    - `cp .env.example .env`
 2. Adjust variables if needed:
    - `OLLAMA_BASE_URL`
-   - `OLLAMA_CHAT_MODEL`
+   - `OLLAMA_CHAT_MODEL` — generation model (`qwen3.5:4b`). Requests switch
+     thinking off; a thinking model otherwise takes about a minute per answer.
    - `OLLAMA_EMBED_MODEL`
    - `OLLAMA_EMBED_NUM_CTX` — window for embedding requests (8192). Without
      it Ollama loads `qwen3-embedding` at 32768 tokens, 5.8 GB instead of

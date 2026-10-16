@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_chat_model: str = "qwen2.5:7b"
+    ollama_chat_model: str = "qwen3.5:4b"
     ollama_embed_model: str = "qwen3-embedding:0.6b"
     # Window for embedding requests. Without it Ollama loads the model at its
     # maximum (qwen3-embedding: 32768 tokens, 5.8 GB; 2.9 GB at 8192); an
