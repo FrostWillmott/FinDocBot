@@ -86,6 +86,7 @@ def create_container(settings: Settings) -> AppContainer:
         batch_size=settings.embedding_batch_size,
         num_ctx=settings.ollama_num_ctx,
         num_predict=settings.ollama_num_predict,
+        embed_num_ctx=settings.ollama_embed_num_ctx,
     )
     provider = CachedEmbeddingGateway(
         gateway=ollama_gateway,

@@ -41,6 +41,7 @@ class OllamaGateway:
         batch_size: int = 50,
         num_ctx: int = 16384,
         num_predict: int = 1024,
+        embed_num_ctx: int = 8192,
         max_attempts: int = 3,
         backoff_seconds: float = 0.5,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -55,6 +56,7 @@ class OllamaGateway:
         self._batch_size = batch_size
         self._num_ctx = num_ctx
         self._num_predict = num_predict
+        self._embed_num_ctx = embed_num_ctx
         self._max_attempts = max_attempts
         self._backoff_seconds = backoff_seconds
         self._sleep = sleep
@@ -158,7 +160,14 @@ class OllamaGateway:
             batch = texts[i : i + self._batch_size]
             response = await self._post(
                 "/api/embed",
-                {"model": self._embed_model, "input": batch},
+                {
+                    "model": self._embed_model,
+                    "input": batch,
+                    # Ollama loads an embedding model at its maximum window
+                    # (qwen3-embedding: 32768 tokens, 5.8 GB; 2.9 GB at 8192).
+                    # An input longer than this is cut, not rejected.
+                    "options": {"num_ctx": self._embed_num_ctx},
+                },
             )
             try:
                 payload = _EmbedResponse.model_validate_json(response.content)

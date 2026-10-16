@@ -6,6 +6,7 @@ only builds an HTTP client.
 
 from __future__ import annotations
 
+import json
 import math
 
 import httpx
@@ -134,3 +135,58 @@ async def test_search_without_rerank_model_never_calls_the_reranker(
         await container.shutdown()
 
     assert ([r.text for r in results], generate.called) == (["a", "b"], False)
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_embedding_request_carries_the_configured_context_window(
+    pg_dsn: str,
+) -> None:
+    embed = respx.post(f"{_OLLAMA}/api/embed").mock(
+        return_value=httpx.Response(200, json={"embeddings": [_QUERY]})
+    )
+    container = create_container(
+        Settings(
+            _env_file=None,
+            postgres_dsn=pg_dsn,
+            embedding_dim=_DIM,
+            ollama_base_url=_OLLAMA,
+            ollama_embed_num_ctx=4096,
+        )
+    )
+
+    await container.startup()
+    try:
+        await container.provider.embed_one("q")
+    finally:
+        await container.shutdown()
+
+    body = json.loads(embed.calls.last.request.content)
+    assert body["options"] == {"num_ctx": 4096}
+
+
+@pytest.mark.integration
+@respx.mock
+async def test_embedding_request_without_configuration_uses_an_8192_window(
+    pg_dsn: str,
+) -> None:
+    embed = respx.post(f"{_OLLAMA}/api/embed").mock(
+        return_value=httpx.Response(200, json={"embeddings": [_QUERY]})
+    )
+    container = create_container(
+        Settings(
+            _env_file=None,
+            postgres_dsn=pg_dsn,
+            embedding_dim=_DIM,
+            ollama_base_url=_OLLAMA,
+        )
+    )
+
+    await container.startup()
+    try:
+        await container.provider.embed_one("q")
+    finally:
+        await container.shutdown()
+
+    body = json.loads(embed.calls.last.request.content)
+    assert body["options"] == {"num_ctx": 8192}

@@ -556,3 +556,22 @@ later reversed, add a superseding entry instead of editing the old one.
   matching on file name was rejected because a name is not an identity (two
   different reports can share one). The runbook, `AGENTS.md` and the
   migration comment now say so.
+
+- **Embedding requests carry an explicit window, `OLLAMA_EMBED_NUM_CTX`
+  (8192)** — found while comparing chat models: Ollama loads an embedding
+  model at its own maximum window, and for `qwen3-embedding:0.6b` that is
+  32768 tokens, 5.8 GB for a 639 MB model (2.9 GB at 8192, 2.2 GB at 2048).
+  The switch from `nomic-embed-text` in the embedder entry above should have
+  set it, as the reranker's `num_ctx` was set after the same discovery. On a
+  16 GB machine with Docker and an IDE running, the embedder plus a chat model
+  no longer fit, and generation and search slowed with swap (a full-pipeline
+  run showed `ollama ps` at 5.8 GB for the embedder next to 12 GB for the chat
+  runner, and a load average above 100). With the window set, search took 0.2 s
+  instead of about 1.5 s; that comparison was not isolated (the earlier figure
+  was taken under swap), so it shows the direction, not the size. A new
+  `Settings` field rather than a constant, because the right size depends on
+  the model and on how large `CHUNK_TOKENS` is. **8192, not 2048**: 2048 would
+  save 0.7 GB, but Ollama silently cuts an input longer than the window, and the
+  token count of an Armenian or Russian chunk against the Qwen tokenizer was not
+  measured, so the margin buys safety for a small price. There is no guard that
+  rejects a chunk longer than the window; that is a known gap.

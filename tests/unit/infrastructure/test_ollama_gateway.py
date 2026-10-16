@@ -136,6 +136,26 @@ async def test_embed_one_single_text_returns_its_embedding(
 
 
 @respx.mock
+async def test_embed_many_request_sends_the_embedding_context_window() -> None:
+    gw = OllamaGateway(
+        base_url=BASE_URL,
+        chat_model="test",
+        embed_model="test",
+        embed_num_ctx=4096,
+    )
+    await gw.start()
+    try:
+        route = respx.post(f"{BASE_URL}/api/embed").mock(
+            return_value=httpx.Response(200, json={"embeddings": [[0.1]]})
+        )
+        await gw.embed_many(["text"])
+    finally:
+        await gw.stop()
+    body = json.loads(route.calls.last.request.content)
+    assert body["options"] == {"num_ctx": 4096}
+
+
+@respx.mock
 async def test_embed_one_persistent_connect_error_raises_provider_error(
     gateway: OllamaGateway,
 ) -> None:
