@@ -10,7 +10,10 @@ import pytest
 import respx
 
 from findocbot.domain.exceptions import ModelProviderError
-from findocbot.infrastructure.ollama_reranker import OllamaReranker
+from findocbot.infrastructure.ollama_reranker import (
+    OllamaReranker,
+    reranker_prompt,
+)
 from tests.fakes import rerank_reply
 
 BASE_URL = "http://ollama.test:11434"
@@ -76,6 +79,12 @@ async def test_rerank_reply_missing_no_counts_it_as_logprob_minus_ten() -> (
 
     yes, no = math.exp(-0.5), math.exp(-10.0)
     assert scores == pytest.approx([yes / (yes + no)])
+
+
+def test_reranker_prompt_carries_the_given_instruction() -> None:
+    prompt = reranker_prompt("q", "p", instruction="Find the revenue figure")
+
+    assert "<Instruct>: Find the revenue figure\n<Query>: q\n" in prompt
 
 
 def _sent_body(route: respx.Route) -> dict[str, object]:
