@@ -101,6 +101,8 @@ def _build_test_container() -> AppContainer:
         provider=cached_provider,
         search_use_case=search_chunks,
         history=history,
+        context_window_tokens=settings.ollama_num_ctx,
+        max_answer_tokens=settings.ollama_num_predict,
     )
     ingestion = IngestionUseCase(
         parser=parser,

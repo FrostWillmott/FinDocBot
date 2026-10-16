@@ -119,6 +119,8 @@ def create_container(settings: Settings) -> AppContainer:
         search_use_case=search_chunks,
         history=history,
         max_history_pairs=settings.max_history_pairs,
+        context_window_tokens=settings.ollama_num_ctx,
+        max_answer_tokens=settings.ollama_num_predict,
     )
     ingestion = IngestionUseCase(
         parser=parser,

@@ -83,6 +83,10 @@ inline-quotes = "double"
 "tests/*" = ["D"]
 "conftest.py" = ["D"]
 "test_*.py" = ["D"]
+# Multilingual heading words (ru/hy) and the tests that pin them are legitimately
+# non-ASCII; RUF001/002/003 flag Cyrillic and Armenian as confusable.
+"src/findocbot/infrastructure/chunking.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/unit/infrastructure/test_chunking.py" = ["RUF001", "RUF002", "RUF003"]
 
 [format]
 preview = true

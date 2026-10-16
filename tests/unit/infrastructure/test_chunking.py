@@ -47,6 +47,25 @@ class TestParagraphTokenChunker:
         result = chunker.split(text)
         assert result[0][1] == "Chapter 1: Overview"
 
+    def test_split_russian_section_heading_labels_chunk(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=200)
+        text = "Раздел 1. Выручка\nСодержание раздела."
+        result = chunker.split(text)
+        assert result[0][1] == "Раздел 1. Выручка"
+
+    def test_split_armenian_section_heading_labels_chunk(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=200)
+        text = "ԲԱԺԻՆ 1. Եկամուտ\nԲաժնի բովանդակությունը."
+        result = chunker.split(text)
+        assert result[0][1] == "ԲԱԺԻՆ 1. Եկամուտ"
+
+    def test_split_heading_word_prefix_is_not_a_heading(self) -> None:
+        """A body word that merely starts with a heading word stays body."""
+        chunker = ParagraphTokenChunker(chunk_tokens=200)
+        text = "Разделение прибыли между регионами."
+        result = chunker.split(text)
+        assert result[0][1] is None
+
     def test_split_new_section_keeps_previous_chunk_label(self) -> None:
         """Regression test: section change must NOT relabel a flushed chunk.
 
@@ -199,6 +218,22 @@ class TestParagraphTokenChunker:
         result = chunker.split(text)
 
         assert result == [(text, "Section 1. Letter")]
+
+    def test_split_merged_short_sections_carry_no_label(self) -> None:
+        """Several sections too short to close merge into one chunk whose
+        text comes from more than one section, so no single label applies."""
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=100, min_chunk_tokens=50, overlap_ratio=0.0
+        )
+        text = (
+            "Section 1. Revenue\nOne sentence.\n\n"
+            "Section 2. Costs\nOne sentence.\n\n"
+            "Section 3. Outlook\nOne sentence."
+        )
+        result = chunker.split(text)
+
+        assert len(result) == 1
+        assert result[0][1] is None
 
     def test_split_overlap_mid_number_starts_at_word_boundary(self) -> None:
         chunker = ParagraphTokenChunker(

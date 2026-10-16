@@ -107,6 +107,8 @@ def _build_container(
         provider=provider,
         search_use_case=search_chunks,
         history=history,
+        context_window_tokens=16384,
+        max_answer_tokens=1024,
     )
     ingestion = IngestionUseCase(
         parser=PyPDFParser(),

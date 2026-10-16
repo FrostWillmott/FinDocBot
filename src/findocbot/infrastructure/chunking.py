@@ -10,7 +10,12 @@ from findocbot.use_cases.prompt_safety import MAX_SOURCE_CHARS
 logger = logging.getLogger(__name__)
 
 TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
-SECTION_PATTERN = re.compile(r"^(section|chapter)\b", re.IGNORECASE)
+# Heading words of the reports in evals/documents.md (en/ru/hy). The
+# first-line-only guard in _extract_section keeps these from matching body
+# text, and \b keeps prefixes like "разделение" from matching "раздел".
+SECTION_PATTERN = re.compile(
+    r"^(section|chapter|раздел|բաժին)\b", re.IGNORECASE
+)
 
 # Characters per chunk token. The chunker counts words and marks, which says
 # little about length: text without spaces (Thai, Chinese) or with its spaces
@@ -100,7 +105,10 @@ class ParagraphTokenChunker:
             maybe_section = self._extract_section(paragraph)
             closed = self._close_before_section(maybe_section, current_parts)
             if closed is not None:
-                chunks.append((closed, current_section))
+                chunks.append((
+                    closed,
+                    self._section_of(current_parts, current_section),
+                ))
                 current_parts = []
             candidate = "\n\n".join([*current_parts, paragraph]).strip()
             if self._count_tokens(candidate) <= self._chunk_tokens:
@@ -113,7 +121,10 @@ class ParagraphTokenChunker:
                 chunk_text = "\n\n".join(current_parts).strip()
                 # Use the section that was active *before* this paragraph
                 # (current_section has not been updated yet).
-                chunks.append((chunk_text, current_section))
+                chunks.append((
+                    chunk_text,
+                    self._section_of(current_parts, current_section),
+                ))
                 current_parts = self._build_overlap(chunk_text)
 
                 # If the incoming paragraph does not fit within the
@@ -154,10 +165,18 @@ class ParagraphTokenChunker:
                 self._count_tokens(last_chunk) >= self._min_chunk_tokens
                 or not chunks
             ):
-                chunks.append((last_chunk, current_section))
+                chunks.append((
+                    last_chunk,
+                    self._section_of(current_parts, current_section),
+                ))
             else:
                 merged_text = "\n\n".join([chunks[-1][0], last_chunk]).strip()
-                chunks[-1] = (merged_text, chunks[-1][1])
+                prev_section = chunks[-1][1]
+                last_section = self._section_of(current_parts, current_section)
+                chunks[-1] = (
+                    merged_text,
+                    last_section if prev_section == last_section else None,
+                )
         return chunks
 
     def _close_before_section(
@@ -282,3 +301,18 @@ class ParagraphTokenChunker:
         if SECTION_PATTERN.match(first_line):
             return first_line
         return None
+
+    def _section_of(
+        self, paragraphs: list[str], fallback: str | None
+    ) -> str | None:
+        """The single section these paragraphs belong to, else None.
+
+        A chunk that accumulated several headings (short sections merged
+        under ``min_chunk_tokens``) has no one label; ``fallback`` is the
+        active section for paragraphs that carry no heading of their own.
+        """
+        sections = {self._extract_section(p) for p in paragraphs}
+        sections.discard(None)
+        if len(sections) > 1:
+            return None
+        return fallback
