@@ -250,6 +250,42 @@ async def test_drain_failed_ready_update_leaves_chunks_unsearchable() -> None:
     assert found == []
 
 
+def _section_pdf(headings: list[str | None]) -> bytes:
+    """A PDF with one paragraph of about 100 words under each heading."""
+    body = " ".join(["Revenue grew steadily across every region."] * 14)
+    paragraphs = [f"{h}\n{body}" if h else body for h in headings]
+    return build_pdf_bytes("\n\n".join(paragraphs))
+
+
+async def _stored_sections(pdf_bytes: bytes) -> list[str | None]:
+    chunks = InMemoryChunkRepository()
+    ingestion, _ = _build_ingestion(chunks=chunks)
+    await _submit(ingestion, "report.pdf", pdf_bytes)
+    await ingestion.drain()
+    stored = sorted(chunks.items, key=lambda item: item.chunk.chunk_index)
+    return [item.chunk.section for item in stored]
+
+
+async def test_drain_pdf_with_section_headings_labels_each_chunk() -> None:
+    pdf_bytes = _section_pdf([
+        "Section 1. Revenue",
+        "Section 2. Costs",
+        "Section 3. Outlook",
+    ])
+
+    assert await _stored_sections(pdf_bytes) == [
+        "Section 1. Revenue",
+        "Section 2. Costs",
+        "Section 3. Outlook",
+    ]
+
+
+async def test_drain_pdf_without_section_headings_leaves_chunks_bare() -> None:
+    sections = await _stored_sections(_section_pdf([None, None, None]))
+
+    assert set(sections) == {None}
+
+
 async def test_drain_empty_pdf_marks_document_failed() -> None:
     ingestion, documents = _build_ingestion()
     pdf = FPDF()

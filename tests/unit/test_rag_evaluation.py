@@ -166,6 +166,8 @@ async def test_rag_pipeline_golden_dataset_meets_metric_thresholds() -> None:
         provider=provider,
         search_use_case=search,
         history=history,
+        context_window_tokens=16384,
+        max_answer_tokens=1024,
     )
 
     corpus = (

@@ -815,3 +815,54 @@ later reversed, add a superseding entry instead of editing the old one.
   argument produce a searchable document. `status` is now a required keyword;
   mypy and the test suites found every caller (three tests relied on the
   default and now say what they need).
+
+- **The parser and the chunker stay two ports; the text convention between them
+  is pinned by a test through ingestion instead** — each port has one production
+  adapter and no test double, the criterion that removed `UploadQueuePort`
+  (2026-10-15). That port was internal to a use case; these two keep
+  `use_cases` from importing `pypdf` and the infrastructure chunker, which is the
+  dependency rule the project chose, so merging them into one "PDF to chunks"
+  port would hide the same convention behind the same single adapter. The gap
+  was that nothing proved the convention end to end (a blank line is a
+  paragraph, a paragraph whose first line starts with `Section` or `Chapter` is
+  a heading): `test_ingestion.py` now builds a three-section PDF and asserts
+  the stored chunks' `section` values, and one without headings asserts none.
+  Either side breaking fails it (checked by making the heading pattern match
+  nothing, and by making the parser never emit a paragraph break). **Rejected**:
+  a parser that returns paragraphs instead of a string (it would rewrite the
+  27 text-based chunker tests for a different home of the same convention).
+  **Not changed**: headings are English-only and short sections share the last
+  label, tracked in issue #70.
+
+- **Section headings widen to the real reports' languages, and a chunk spanning
+  several sections carries no label** — `_extract_section` matched only
+  `Section`/`Chapter`, so the Russian report's `Раздел` and the Armenian
+  report's `Բաժին` produced `section: None`. Checked in the downloaded PDFs
+  (18 and 7 occurrences; neither report uses `Глава`/`Գլուխ`), the pattern now
+  matches `section|chapter|раздел|բաժին` on a paragraph's first line only — the
+  guard that keeps a wider pattern from misfiring on wrapped body text
+  (2026-10-01) — and `\b` keeps a body word like `разделение` from matching. A
+  chunk that accumulated several short headings (sections under
+  `min_chunk_tokens` that merge) now gets `section: None` instead of the last
+  heading: one label cannot describe text drawn from several sections.
+  `_section_of` re-derives the distinct headings from the chunk's own
+  paragraphs, so the flush, close and tail-merge paths all agree. Supersedes
+  the "Not changed" note of the parser/chunker entry, resolving issue #70.
+  **Rejected**: a numbered-heading pattern (`Item 7`, `Note 3`, `1.`) — false
+  positives on lists and body text; and font-size detection — a parser→chunker
+  contract change, fragile across report styles.
+
+- **The generation prompt is bounded to the context window; the lowest-ranked
+  sources are dropped, not the ceiling** — issue #67: 20 sources at the
+  4,000-character cap reach ~35k tokens in Armenian (1.3 characters per token)
+  against `num_ctx=16384`, and Ollama silently drops the *start* of an over-long
+  prompt — the sources — while the instructions at the end survive.
+  `AnswerQuestionUseCase` now takes `context_window_tokens` and
+  `max_answer_tokens` (from `ollama_num_ctx`/`ollama_num_predict`) and, before
+  building the prompt, keeps sources best-first until the actual prompt —
+  measured against the real history and question, not their caps — fits
+  `(num_ctx - num_predict) x 1.3` characters; the dropped count is logged at
+  WARNING and the response's `sources` reflect what was used. **Rejected**:
+  lowering the `top_k` ceiling of 20 (breaking, and a few full Armenian chunks
+  still overflow with history) and accept-and-document (leaves the silent
+  degradation the issue exists for).
