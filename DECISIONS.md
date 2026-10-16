@@ -484,3 +484,32 @@ later reversed, add a superseding entry instead of editing the old one.
   questions were written by the project, n is 14 per language, and the
   Armenian ones have not been reviewed by a native speaker. The `default` and
   `task` instruction variants give the same result within noise.
+
+- **A multilingual embedder fixes Russian and Armenian retrieval better than the
+  reranker does; `qwen3-embedding:0.6b` is the candidate, not yet adopted** —
+  `evals/results/2026-10-16-embedders/` runs the same 14-question sets with
+  four embedders swapped in (`bge-m3`, `qwen3-embedding` 0.6b and 4b,
+  `nomic-embed-text-v2-moe`) against the current `nomic-embed-text`, chosen
+  before the first run. The gold chunk lands in the top 20 for 14/14 questions
+  with `qwen3-embedding:0.6b` on all three reports (was 9/14 Russian, 10/14
+  Armenian, 12/14 English), and plain vector hit@1 goes from 3/14 to 9/14
+  (Russian), 1/14 to 8/14 (Armenian) and 5/14 to 7/14 (English), before any
+  reranker. With the reranker on top, hit@1 is 12/14 on every report (was 9,
+  9 and 10), so it still adds three to five hits, but at 40–90 s per query on
+  Russian and Armenian. `qwen3-embedding:4b` is no better than 0.6b (same pool
+  and reranked hit@1, 2.5 GB against 639 MB, 2560 dimensions against 1024);
+  `bge-m3` is close on Armenian but misses two Russian questions in the pool;
+  `nomic-embed-text-v2-moe` does not beat the current model on English. **This
+  supersedes a claim in the previous entry**: the 2–5 s per reranker pair on
+  Russian and Armenian is not contention. Four sequential runs with nothing else of
+  mine running give the same medians (about 2 s per pair for Russian, 4.3 s for
+  Armenian, 0.9 s for English), so it is the token count of the text, and the
+  reranker is impractical for Armenian on this hardware. Not adopted yet
+  because the swap is not a settings flip: `EMBEDDING_DIM` goes 768 → 1024, so
+  an existing database fails the startup column check until a new migration
+  drops the HNSW index, retypes `chunks.embedding` and the documents are
+  re-embedded; a fresh install only sets `EMBEDDING_DIM` before the first
+  migration. **Indicative only**: the questions are the project's own, n is 14
+  per language, the Armenian ones are not reviewed by a native speaker, and no
+  model got its recommended query prefix (`qwen3-embedding` has one), so each
+  row is a drop-in swap rather than the model at its best.
