@@ -42,7 +42,8 @@ class Settings(BaseSettings):
 
     # Feeds the num_ctx budget (top_k x chunk_tokens); applies to new uploads.
     # A chunk is also capped at ten characters per token, for text whose
-    # words the chunker cannot tell apart (no spaces, spaces lost).
+    # words the chunker cannot tell apart (no spaces, spaces lost), and at
+    # MAX_SOURCE_CHARS, so the answer prompt never cuts a stored chunk.
     chunk_tokens: int = 300
     chunk_overlap_ratio: float = 0.15
 

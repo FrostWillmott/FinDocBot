@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import re
+
+from findocbot.use_cases.prompt_safety import MAX_SOURCE_CHARS
+
+logger = logging.getLogger(__name__)
 
 TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 SECTION_PATTERN = re.compile(r"^(section|chapter)\b", re.IGNORECASE)
@@ -33,14 +38,23 @@ class ParagraphTokenChunker:
         """Initialize token limits and overlap for chunk building.
 
         ``max_chunk_chars`` is the ceiling on a chunk's length; by default
-        ten characters per chunk token.
+        ten characters per chunk token, but never more than a source can
+        carry in the answer prompt (a longer chunk would be cut there, and
+        the cut part could not be found by search).
         """
         self._chunk_tokens = chunk_tokens
-        self._max_chars = (
-            max_chunk_chars
-            if max_chunk_chars is not None
-            else chunk_tokens * _MAX_CHARS_PER_TOKEN
-        )
+        if max_chunk_chars is None:
+            max_chunk_chars = chunk_tokens * _MAX_CHARS_PER_TOKEN
+            if max_chunk_chars > MAX_SOURCE_CHARS:
+                logger.warning(
+                    "chunk_tokens=%d allows %d characters per chunk; capped "
+                    "at %d, the longest source the answer prompt carries",
+                    chunk_tokens,
+                    max_chunk_chars,
+                    MAX_SOURCE_CHARS,
+                )
+                max_chunk_chars = MAX_SOURCE_CHARS
+        self._max_chars = max_chunk_chars
         self._overlap_tokens = max(1, int(chunk_tokens * overlap_ratio))
         self._min_chunk_tokens = min_chunk_tokens
 

@@ -745,3 +745,40 @@ later reversed, add a superseding entry instead of editing the old one.
   `OllamaReranker` would re-baseline the recorded latencies and needs a local
   Ollama to check. Supersedes the "not done" prompt note of the previous entry;
   the Ollama error mapping stays as it is.
+
+- **A chunk never exceeds the source cap of the answer prompt, whatever
+  `CHUNK_TOKENS` is; the limits that relate them are shared constants** — the
+  previous cap (ten characters per chunk token) alone stops being enough above
+  `CHUNK_TOKENS=400`: 4,010 characters or more, while `neutralize` cuts a source
+  at 4,000 in the answer prompt and the reranker prompt had its own copy of the
+  same number. The cut part of a chunk is stored and searchable, but the model
+  never sees it. Now `ParagraphTokenChunker` takes `min(chunk_tokens x 10,
+  MAX_SOURCE_CHARS)` as its default ceiling and logs one WARNING with the
+  resolved values when the second term wins (config-hygiene: a silent fallback
+  says so); `MAX_SOURCE_CHARS` and `MAX_QUESTION_CHARS` are public in
+  `use_cases/prompt_safety.py`, read by the answer prompt, the reranker prompt
+  and the chunker, so the relation lives in one place. **Rejected**: failing at
+  startup for `CHUNK_TOKENS > 400` (it refuses configs that are fine for
+  English, where the ceiling is rarely reached), and turning the limits into
+  settings (the earlier entry on constants stands). **Narrows** the "a chunk
+  now always fits the 4,000-character cap" bonus of the ten-per-token entry:
+  that held only at the default, and now holds for every setting. An explicit
+  `max_chunk_chars` still overrides both (tests).
+
+- **The generation prompt's budget is in chunker tokens in the notes above, and
+  nothing guards it** — the "~12k tokens worst case" of the `num_ctx=16384`
+  entry counts 20 chunks x 300 *chunker* tokens (words and marks). Measured on
+  2026-10-16 with `qwen3.5:4b` on a 2,300-character chunk: 654 chat tokens in
+  English (3.5 characters per token), 760 in Russian (3.0), 1,753 in Armenian
+  (1.3). So 20 English chunks are about 13k tokens before history, 20 Armenian
+  chunks about 35k, against a window of 16,384; the default `top_k=5` fits in
+  all three (8.8k for Armenian). Whether an over-long prompt loses its start
+  depends on the model, on Ollama 0.40.4 with a secret code on the first line
+  and `num_ctx=1024`: `qwen3.5:4b` (the default) still answered it
+  (`prompt_eval_count` 4601, the full length), `qwen2.5:7b` lost it
+  (`prompt_eval_count` 514) and `qwen3.5:9b` answered nothing (1026). So
+  `prompt_eval_count` is no reliable signal of a cut, and a static check has to
+  assume 1.3 characters per token. **Not changed**: the budget stays a
+  product decision (lower the `top_k` ceiling of 20, trim sources to fit, or
+  accept it), tracked in issue #67. **Indicative
+  only**: one chunk text per script (not the real reports), one Ollama version.

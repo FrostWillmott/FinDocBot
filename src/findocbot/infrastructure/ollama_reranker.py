@@ -8,11 +8,12 @@ from collections.abc import Iterable
 import httpx
 
 from findocbot.domain.exceptions import ModelProviderError
-from findocbot.use_cases.prompt_safety import neutralize
+from findocbot.use_cases.prompt_safety import (
+    MAX_QUESTION_CHARS,
+    MAX_SOURCE_CHARS,
+    neutralize,
+)
 
-# Same limits as the answer prompt applies to the same untrusted text.
-_MAX_QUERY_CHARS = 2000
-_MAX_PASSAGE_CHARS = 4000
 # Explicit, because the community GGUF defaults to a 40200-token window and
 # Ollama then allocates an 8.7 GB runner for a 2.5 GB model (3.8 GB at 8192,
 # measured); it also covers the longest prompt the limits above allow.
@@ -60,8 +61,8 @@ def reranker_prompt(
     query: str, passage: str, instruction: str = DEFAULT_INSTRUCTION
 ) -> str:
     """The Qwen3-Reranker prompt; the untrusted text is neutralised."""
-    safe_query = neutralize(query, _MAX_QUERY_CHARS)
-    safe_passage = neutralize(passage, _MAX_PASSAGE_CHARS)
+    safe_query = neutralize(query, MAX_QUESTION_CHARS)
+    safe_passage = neutralize(passage, MAX_SOURCE_CHARS)
     return (
         f"{_PREFIX}<Instruct>: {instruction}\n<Query>: {safe_query}\n"
         f"<Document>: {safe_passage}{_SUFFIX}"

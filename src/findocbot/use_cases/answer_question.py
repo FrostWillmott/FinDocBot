@@ -18,17 +18,20 @@ from findocbot.use_cases.ports import (
     ChatHistoryRepositoryPort,
     ModelProviderGateway,
 )
-from findocbot.use_cases.prompt_safety import neutralize
+from findocbot.use_cases.prompt_safety import (
+    MAX_QUESTION_CHARS,
+    MAX_SOURCE_CHARS,
+    neutralize,
+)
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
 
 logger = logging.getLogger(__name__)
 
-# Per-span limits for untrusted text; chunks are ~300 tokens (~2,000 chars).
-_MAX_SOURCE_CHARS = 4000
+# Per-span limits for untrusted text that only this prompt carries; the source
+# and question limits are shared (see prompt_safety).
 _MAX_SECTION_CHARS = 200
-_MAX_QUESTION_CHARS = 2000
 _MAX_ANSWER_CHARS = 2000
 
 
@@ -198,7 +201,7 @@ class AnswerQuestionUseCase:
             return question
         logger.debug(f"Search query rewritten: {question!r} -> {rewritten!r}")
         # Bounded like the question: the result only goes to the embedder.
-        return rewritten[:_MAX_QUESTION_CHARS] or question
+        return rewritten[:MAX_QUESTION_CHARS] or question
 
     @staticmethod
     def _build_prompt(
@@ -217,7 +220,7 @@ class AnswerQuestionUseCase:
             for index, source in enumerate(sources, start=1)
         )
         history = "\n".join(_format_turn(turn) for turn in recent_turns)
-        question_text = neutralize(question, _MAX_QUESTION_CHARS)
+        question_text = neutralize(question, MAX_QUESTION_CHARS)
         return (
             "You are an assistant for financial documents.\n\n"
             f"<documents>\n{documents}\n</documents>\n\n"
@@ -238,7 +241,7 @@ class AnswerQuestionUseCase:
 
 def _build_rewrite_prompt(question: str, recent_turns: list[ChatTurn]) -> str:
     history = "\n".join(_format_turn(turn) for turn in recent_turns)
-    question_text = neutralize(question, _MAX_QUESTION_CHARS)
+    question_text = neutralize(question, MAX_QUESTION_CHARS)
     return (
         "You rewrite follow-up questions about financial documents into "
         "standalone search queries.\n\n"
@@ -258,7 +261,7 @@ def _build_rewrite_prompt(question: str, recent_turns: list[ChatTurn]) -> str:
 
 def _format_source(index: int, source: SearchResultDTO) -> str:
     section = neutralize(source.section or "", _MAX_SECTION_CHARS)
-    text = neutralize(source.text, _MAX_SOURCE_CHARS)
+    text = neutralize(source.text, MAX_SOURCE_CHARS)
     return (
         f'<document index="{index}" score="{source.score:.4f}" '
         f'section="{section}">\n{text}\n</document>'
@@ -266,7 +269,7 @@ def _format_source(index: int, source: SearchResultDTO) -> str:
 
 
 def _format_turn(turn: ChatTurn) -> str:
-    question = neutralize(turn.question, _MAX_QUESTION_CHARS)
+    question = neutralize(turn.question, MAX_QUESTION_CHARS)
     answer = neutralize(turn.answer, _MAX_ANSWER_CHARS)
     return (
         f"<turn>\n<question>{question}</question>\n"
