@@ -67,7 +67,7 @@
             <a id="nextFileLink" class="nav" href="z_0bcfff29bc54f7d0_entities_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-16 08:16 +0000
+            created at 2026-10-16 08:55 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -125,21 +125,23 @@
     <p class="run"><span class="n"><a id="t41" href="#t41">41</a></span><span class="t">    <span class="nam">db_pool_max_size</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">5</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t42" href="#t42">42</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t43" href="#t43">43</a></span><span class="t">    <span class="com"># Feeds the num_ctx budget (top_k x chunk_tokens); applies to new uploads.</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t44" href="#t44">44</a></span><span class="t">    <span class="nam">chunk_tokens</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">300</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t45" href="#t45">45</a></span><span class="t">    <span class="nam">chunk_overlap_ratio</span><span class="op">:</span> <span class="nam">float</span> <span class="op">=</span> <span class="num">0.15</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t46" href="#t46">46</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t47" href="#t47">47</a></span><span class="t">    <span class="nam">max_history_pairs</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">5</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t48" href="#t48">48</a></span><span class="t">    <span class="nam">embedding_cache_size</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">1000</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t49" href="#t49">49</a></span><span class="t">    <span class="nam">embedding_batch_size</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">50</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t50" href="#t50">50</a></span><span class="t">    <span class="nam">embedding_cache_ttl_seconds</span><span class="op">:</span> <span class="nam">int</span> <span class="op">|</span> <span class="key">None</span> <span class="op">=</span> <span class="num">3600</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t51" href="#t51">51</a></span><span class="t">    <span class="nam">log_level</span><span class="op">:</span> <span class="nam">Literal</span><span class="op">[</span><span class="str">&quot;DEBUG&quot;</span><span class="op">,</span> <span class="str">&quot;INFO&quot;</span><span class="op">,</span> <span class="str">&quot;WARNING&quot;</span><span class="op">,</span> <span class="str">&quot;ERROR&quot;</span><span class="op">]</span> <span class="op">=</span> <span class="str">&quot;INFO&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t52" href="#t52">52</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t53" href="#t53">53</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t54" href="#t54">54</a></span><span class="t"><span class="key">def</span> <span class="nam">load_settings</span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">Settings</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t55" href="#t55">55</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Load and validate runtime settings.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t56" href="#t56">56</a></span><span class="t">    <span class="com"># postgres_dsn has no default and is read from env/.env, not a code</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t57" href="#t57">57</a></span><span class="t">    <span class="com"># literal, so pydantic-settings populates it behind mypy&#x27;s back.</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t58" href="#t58">58</a></span><span class="t">    <span class="key">return</span> <span class="nam">Settings</span><span class="op">(</span><span class="op">)</span>  <span class="com"># type: ignore[call-arg]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t44" href="#t44">44</a></span><span class="t">    <span class="com"># A chunk is also capped at ten characters per token, for text whose</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t45" href="#t45">45</a></span><span class="t">    <span class="com"># words the chunker cannot tell apart (no spaces, spaces lost).</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t46" href="#t46">46</a></span><span class="t">    <span class="nam">chunk_tokens</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">300</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t47" href="#t47">47</a></span><span class="t">    <span class="nam">chunk_overlap_ratio</span><span class="op">:</span> <span class="nam">float</span> <span class="op">=</span> <span class="num">0.15</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t48" href="#t48">48</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t49" href="#t49">49</a></span><span class="t">    <span class="nam">max_history_pairs</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">5</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t50" href="#t50">50</a></span><span class="t">    <span class="nam">embedding_cache_size</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">1000</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t51" href="#t51">51</a></span><span class="t">    <span class="nam">embedding_batch_size</span><span class="op">:</span> <span class="nam">int</span> <span class="op">=</span> <span class="num">50</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t52" href="#t52">52</a></span><span class="t">    <span class="nam">embedding_cache_ttl_seconds</span><span class="op">:</span> <span class="nam">int</span> <span class="op">|</span> <span class="key">None</span> <span class="op">=</span> <span class="num">3600</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t53" href="#t53">53</a></span><span class="t">    <span class="nam">log_level</span><span class="op">:</span> <span class="nam">Literal</span><span class="op">[</span><span class="str">&quot;DEBUG&quot;</span><span class="op">,</span> <span class="str">&quot;INFO&quot;</span><span class="op">,</span> <span class="str">&quot;WARNING&quot;</span><span class="op">,</span> <span class="str">&quot;ERROR&quot;</span><span class="op">]</span> <span class="op">=</span> <span class="str">&quot;INFO&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t54" href="#t54">54</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t55" href="#t55">55</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t56" href="#t56">56</a></span><span class="t"><span class="key">def</span> <span class="nam">load_settings</span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">Settings</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t57" href="#t57">57</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Load and validate runtime settings.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t58" href="#t58">58</a></span><span class="t">    <span class="com"># postgres_dsn has no default and is read from env/.env, not a code</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t59" href="#t59">59</a></span><span class="t">    <span class="com"># literal, so pydantic-settings populates it behind mypy&#x27;s back.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t60" href="#t60">60</a></span><span class="t">    <span class="key">return</span> <span class="nam">Settings</span><span class="op">(</span><span class="op">)</span>  <span class="com"># type: ignore[call-arg]</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -149,7 +151,7 @@
             <a class="nav" href="z_0bcfff29bc54f7d0_entities_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
-            created at 2026-10-16 08:16 +0000
+            created at 2026-10-16 08:55 +0000
         </p>
     </div>
 </footer>

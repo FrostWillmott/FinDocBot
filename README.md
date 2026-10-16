@@ -10,7 +10,7 @@
 | src/findocbot/domain/entities.py                           |       45 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/domain/exceptions.py                         |       14 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/infrastructure/cached\_embedding\_gateway.py |       63 |        0 |       10 |        0 |    100% |           |
-| src/findocbot/infrastructure/chunking.py                   |      103 |        1 |       40 |        5 |     96% |128-\>130, 158-\>163, 176-\>188, 183-\>185, 195 |
+| src/findocbot/infrastructure/chunking.py                   |      127 |        1 |       48 |        6 |     96% |63-\>65, 179-\>181, 209-\>214, 227-\>239, 234-\>236, 246 |
 | src/findocbot/infrastructure/container.py                  |       51 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/infrastructure/db.py                         |       26 |        1 |        6 |        3 |     88% |21-\>exit, 28-\>exit, 36 |
 | src/findocbot/infrastructure/ollama\_gateway.py            |      108 |        0 |       22 |        0 |    100% |           |
@@ -25,7 +25,7 @@
 | src/findocbot/use\_cases/ports.py                          |       37 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/prompt\_safety.py                 |       12 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/use\_cases/search\_similar\_chunks.py        |       36 |        0 |        6 |        0 |    100% |           |
-| **TOTAL**                                                  | **1143** |   **37** |  **160** |   **12** | **96%** |           |
+| **TOTAL**                                                  | **1167** |   **37** |  **168** |   **13** | **96%** |           |
 
 
 ## Setup coverage badge
