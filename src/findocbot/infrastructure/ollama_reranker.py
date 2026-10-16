@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 
 import httpx
 
@@ -28,6 +29,31 @@ _PREFIX = (
     'only be "yes" or "no".<|im_end|>\n<|im_start|>user\n'
 )
 _SUFFIX = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+# What the reference Qwen3-Reranker code uses for a yes/no token that is
+# missing from the returned top log-probabilities.
+_MISSING_LOGPROB = -10.0
+
+
+def yes_probability(top_logprobs: Iterable[tuple[str, float]]) -> float:
+    """Return P(yes) among the yes/no answers at the first generated position.
+
+    Every case and spacing variant of a token counts ("Yes", "yes", " yes"),
+    because the tokenizer emits several of them and each carries probability
+    mass; keeping only the last one seen drops most of it. A token missing
+    from the list gets log-probability -10, as in the reference code, so a
+    reply with neither scores 0.5 instead of dividing by zero.
+    """
+    yes: list[float] = []
+    no: list[float] = []
+    for token, logprob in top_logprobs:
+        word = token.strip().lower()
+        if word == "yes":
+            yes.append(math.exp(logprob))
+        elif word == "no":
+            no.append(math.exp(logprob))
+    yes_mass = sum(yes) if yes else math.exp(_MISSING_LOGPROB)
+    no_mass = sum(no) if no else math.exp(_MISSING_LOGPROB)
+    return yes_mass / (yes_mass + no_mass)
 
 
 def _prompt(query: str, passage: str) -> str:
@@ -93,17 +119,13 @@ class OllamaReranker:
                 f"Ollama unreachable at {self._base_url}"
             ) from exc
         try:
-            top = response.json()["logprobs"][0]["top_logprobs"]
+            top = [
+                (entry["token"], entry["logprob"])
+                for entry in response.json()["logprobs"][0]["top_logprobs"]
+            ]
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             raise ModelProviderError(
-                "Ollama reply has no logprobs; the server may be too old "
-                "to report them"
+                "Ollama reply has no usable logprobs; the server may be too "
+                "old to report them"
             ) from exc
-        yes = no = 0.0
-        for entry in top:
-            word = entry["token"].strip().lower()
-            if word == "yes":
-                yes += math.exp(entry["logprob"])
-            elif word == "no":
-                no += math.exp(entry["logprob"])
-        return yes / (yes + no)
+        return yes_probability(top)

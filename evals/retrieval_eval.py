@@ -36,11 +36,11 @@ from evals.scoring import (
     hit_at,
     percentile,
     reciprocal_rank,
-    yes_probability,
 )
 from evals.synthetic import Question, read_questions
 from findocbot.config import Settings
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
+from findocbot.infrastructure.ollama_reranker import yes_probability
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.answer_question import (
     _MAX_QUESTION_CHARS,

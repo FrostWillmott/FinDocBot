@@ -708,3 +708,22 @@ later reversed, add a superseding entry instead of editing the old one.
   one question is 7 points, and the seconds were taken on a loaded 16 GB machine
   with the embedder at its maximum window, so they are pessimistic while their
   order is not.
+
+- **The reranker's P(yes) is one function in `infrastructure/ollama_reranker.py`,
+  and a reply the scorer cannot read no longer ends as a 500** — the shipped
+  `OllamaReranker` divided `yes / (yes + no)` and raised `ZeroDivisionError` when
+  the first token's `top_logprobs` held neither word, and read `entry["token"]`
+  outside the `try`, so a malformed entry was a `KeyError`; search catches only
+  `ModelProviderError` and `TimeoutError`, so `/search` and `/ask` answered 500
+  with the reranker on instead of keeping the vector order. The evaluation had
+  its own copy of the scorer with the reference code's fallback (a missing
+  yes/no token counts as log-probability -10), so what `evals/` measured was not
+  what shipped. Now `evals/retrieval_eval.py` imports `yes_probability` from the
+  adapter, a reply with neither word scores 0.5 (the evaluation's behaviour; one
+  passage in the middle is harmless and a trained yes/no prompt almost never
+  gives it), and a malformed entry raises `ModelProviderError` like a reply
+  without logprobs. **Not done**: the evaluation still copies the prompt and
+  its request options, and the Ollama error mapping still exists in the
+  reranker, `OllamaGateway._post` and `ping`; sharing the prompt is the next
+  step, the mapping stays as it is (the retry logic in `_post` is interleaved
+  with it, and the fix is not worth touching the most tested adapter).
