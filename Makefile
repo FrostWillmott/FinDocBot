@@ -2,7 +2,7 @@ UV := uv
 APP_MODULE := findocbot.main:create_app
 APP_FLAGS := --factory
 
-.PHONY: sync dev lint fmt test e2e eval-retrieval cover precommit-install up down logs migrate
+.PHONY: sync dev lint fmt test e2e eval-retrieval eval-generation cover precommit-install up down logs migrate
 
 sync:
 	$(UV) sync --all-groups
@@ -32,6 +32,13 @@ eval-retrieval:
 	$(UV) run python -m evals.retrieval_eval --pdf-dir evals/data/synthetic \
 		--questions evals/questions/synthetic.jsonl \
 		--variants plain,titled --instructions default,task
+
+# Chat model comparison on the real reports (see evals/README.md); needs the
+# PDFs of evals/documents.md and a local Ollama with the embed model and the
+# chat models, e.g. make eval-generation MODELS=qwen3.5:4b,qwen3.5:9b
+eval-generation:
+	$(if $(MODELS),,$(error set MODELS=model1,model2))
+	$(UV) run python -m evals.generation_eval --models $(MODELS)
 
 # Unit and integration tests together (the latter need Docker); the gate is
 # fail_under in pyproject.toml.
