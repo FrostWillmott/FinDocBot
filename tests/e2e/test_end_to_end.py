@@ -25,22 +25,30 @@ class Ingestion:
     document: dict[str, object]
 
 
-async def _wait_until_ready(
+async def _wait_until_settled(
     client: httpx.AsyncClient, document_id: str
 ) -> dict[str, object]:
+    """Poll until the worker has made the document ready or failed."""
     for _ in range(_INGESTION_TIMEOUT_SECONDS):
         response = await client.get(f"/documents/{document_id}")
         assert response.status_code == 200, response.text
         body: dict[str, object] = response.json()
-        if body["status"] == "ready":
+        if body["status"] != "pending":
             return body
-        # The worker stores a client-safe reason; show it, it is the only
-        # clue a CI failure leaves.
-        assert body["status"] != "failed", f"ingestion failed: {body['error']}"
         await asyncio.sleep(1)
     raise AssertionError(
-        f"document did not reach ready within {_INGESTION_TIMEOUT_SECONDS}s"
+        f"document did not settle within {_INGESTION_TIMEOUT_SECONDS}s"
     )
+
+
+async def _wait_until_ready(
+    client: httpx.AsyncClient, document_id: str
+) -> dict[str, object]:
+    body = await _wait_until_settled(client, document_id)
+    # The worker stores a client-safe reason; show it, it is the only clue a
+    # CI failure leaves.
+    assert body["status"] == "ready", f"ingestion failed: {body['error']}"
+    return body
 
 
 @pytest.fixture
@@ -111,4 +119,40 @@ async def test_ask_total_revenue_after_ingestion_cites_reported_figure(
     # 0.5B model samples at Ollama's default temperature is not.
     assert any(
         _REPORTED_REVENUE in source["text"] for source in ask.json()["sources"]
+    )
+
+
+@pytest.mark.e2e
+async def test_upload_chunk_over_the_embedding_window_fails_the_document(
+    narrow_window_client: httpx.AsyncClient, sample_pdf: bytes
+) -> None:
+    upload = await narrow_window_client.post(
+        "/documents/upload",
+        files={"file": ("aurora-ridge.pdf", sample_pdf, "application/pdf")},
+    )
+
+    document = await _wait_until_settled(
+        narrow_window_client, upload.json()["document_id"]
+    )
+
+    assert (document["status"], document["error"]) == (
+        "failed",
+        (
+            "A passage of the document is too long for the embedding model; "
+            "the server's chunk size or embedding window needs adjusting."
+        ),
+    )
+
+
+@pytest.mark.e2e
+async def test_search_query_over_the_embedding_window_responds_400(
+    client: httpx.AsyncClient,
+) -> None:
+    response = await client.post(
+        "/search", json={"query": "revenue " * 12000, "top_k": 3}
+    )
+
+    assert (response.status_code, response.json()["detail"]) == (
+        400,
+        "Query is too long.",
     )

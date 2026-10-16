@@ -8,7 +8,10 @@ import httpx
 import pytest
 import respx
 
-from findocbot.domain.exceptions import ModelProviderError
+from findocbot.domain.exceptions import (
+    EmbeddingInputTooLongError,
+    ModelProviderError,
+)
 from findocbot.infrastructure.ollama_gateway import OllamaGateway
 
 BASE_URL = "http://ollama.test:11434"
@@ -165,6 +168,45 @@ async def test_embed_many_request_sends_the_embedding_context_window() -> None:
         await gw.stop()
     body = json.loads(route.calls.last.request.content)
     assert body["options"] == {"num_ctx": 4096}
+
+
+@respx.mock
+async def test_embed_many_request_forbids_truncating_the_input(
+    gateway: OllamaGateway,
+) -> None:
+    route = respx.post(f"{BASE_URL}/api/embed").mock(
+        return_value=httpx.Response(200, json={"embeddings": [[0.1]]})
+    )
+    await gateway.embed_many(["text"])
+    body = json.loads(route.calls.last.request.content)
+    assert body["truncate"] is False
+
+
+@respx.mock
+async def test_embed_many_input_over_the_window_raises_input_too_long_error(
+    gateway: OllamaGateway,
+) -> None:
+    respx.post(f"{BASE_URL}/api/embed").mock(
+        return_value=httpx.Response(
+            400, json={"error": "the input length exceeds the context length"}
+        )
+    )
+    with pytest.raises(
+        EmbeddingInputTooLongError, match="longer than 8192 tokens"
+    ):
+        await gateway.embed_many(["text"])
+
+
+@respx.mock
+async def test_embed_many_other_http_400_raises_plain_provider_error(
+    gateway: OllamaGateway,
+) -> None:
+    respx.post(f"{BASE_URL}/api/embed").mock(
+        return_value=httpx.Response(400, json={"error": "invalid options"})
+    )
+    with pytest.raises(ModelProviderError) as caught:
+        await gateway.embed_many(["text"])
+    assert not isinstance(caught.value, EmbeddingInputTooLongError)
 
 
 @respx.mock

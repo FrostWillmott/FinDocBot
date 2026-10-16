@@ -621,3 +621,33 @@ later reversed, add a superseding entry instead of editing the old one.
   run time with the deterministic PDF factory, not shipped as a file. Results
   are not committed: the model tags float and sampling is not fixed, so a
   report is a dated measurement, not a fixture.
+
+- **An embedding input longer than the window is refused, not cut; the whole
+  document fails and a long query is a 400** — supersedes the "known gap" in
+  the `OLLAMA_EMBED_NUM_CTX` entry. Ollama's default is to cut an input to the
+  window and answer 200 (checked: a 20,000-character input at a 2048 window
+  came back as 2047 tokens, with a vector of the right size); the vector then
+  ignores the tail of the chunk and nothing says so. `/api/embed` takes
+  `truncate: false`, which turns that into a 400 "the input length exceeds the
+  context length", and the gateway always sends it. The gateway names the
+  failure `EmbeddingInputTooLongError` (a `ModelProviderError`, so every
+  existing handler still applies) when it sees that 400 with those words; if
+  Ollama rewords it, the error stays a plain `ModelProviderError`, still a
+  refusal and never a silent cut. Ingestion stores a fixed client-safe message
+  for it, the one provider failure whose cause is worth telling a client,
+  because uploading again will not help until the settings change, and it now
+  logs the cause of every failed document at WARNING (before, the cause of a
+  provider failure reached no log at all; the stubbed check found it); the
+  search use case turns it into `InvalidQueryError("Query is too long.")`, since the
+  client's text is the cause. **The whole document fails** and not just the
+  chunk: a batch of 50 chunks is one request and Ollama does not say which
+  input was too long, and a document with a hole in its index is worse than a
+  failed one that can be uploaded again. **Measured with the embedder's own
+  tokenizer** on the three real reports at `CHUNK_TOKENS=300`: the longest
+  chunk is 656 tokens in English, 926 in Russian and 2,322 in Armenian
+  (6 of 59 Armenian chunks are over 2048, none over 4096), so 8192 leaves 3.5
+  times the worst chunk and a 2048 window would have cut Armenian chunks
+  silently. The chunker counts its own tokens, not the Qwen ones, which is why
+  the ratio differs by script; a script that needs more than about 3.5 tokens
+  per character would still fail loudly. Checked against Ollama 0.40.4 on the
+  host and by an e2e test against the 0.35.1 image CI pulls.

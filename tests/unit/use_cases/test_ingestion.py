@@ -10,7 +10,11 @@ import pytest
 from fpdf import FPDF
 
 from findocbot.domain.entities import Document, DocumentStatus
-from findocbot.domain.exceptions import ModelProviderError, StorageError
+from findocbot.domain.exceptions import (
+    EmbeddingInputTooLongError,
+    ModelProviderError,
+    StorageError,
+)
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.ingestion import IngestionUseCase
@@ -36,6 +40,11 @@ class _FailingChunkRepository(InMemoryChunkRepository):
 class _FailingProvider(StubProvider):
     async def embed_many(self, texts: list[str]) -> list[list[float]]:
         raise ModelProviderError("Ollama unreachable at http://internal")
+
+
+class _TooLongInputProvider(StubProvider):
+    async def embed_many(self, texts: list[str]) -> list[list[float]]:
+        raise EmbeddingInputTooLongError("An input is longer than 8192 tokens")
 
 
 class _RecoveringProvider(StubProvider):
@@ -247,6 +256,39 @@ async def test_drain_provider_failure_sanitizes_error_message() -> None:
     stored = documents.items[document.id]
     assert stored.status == "failed"
     assert stored.error == "Model provider request failed."
+
+
+async def test_drain_input_over_the_embedding_window_names_the_cause() -> None:
+    ingestion, documents = _build_ingestion(provider=_TooLongInputProvider())
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
+
+    await ingestion.drain()
+
+    stored = documents.items[document.id]
+    assert (stored.status, stored.error) == (
+        "failed",
+        (
+            "A passage of the document is too long for the embedding model; "
+            "the server's chunk size or embedding window needs adjusting."
+        ),
+    )
+
+
+async def test_drain_failure_logs_the_cause_for_the_operator(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ingestion, _ = _build_ingestion(provider=_TooLongInputProvider())
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
+
+    with caplog.at_level(logging.WARNING):
+        await ingestion.drain()
+
+    assert (
+        f"Ingestion of document {document.id} failed: "
+        "An input is longer than 8192 tokens"
+    ) in caplog.messages
 
 
 async def test_drain_unexpected_error_marks_document_failed() -> None:

@@ -20,8 +20,12 @@
    - `OLLAMA_EMBED_MODEL`
    - `OLLAMA_EMBED_NUM_CTX` — window for embedding requests (8192). Without
      it Ollama loads `qwen3-embedding` at 32768 tokens, 5.8 GB instead of
-     2.9 GB. An input longer than the window is cut, so keep it above the
-     longest chunk.
+     2.9 GB. An input longer than the window is refused, not cut: the
+     document is marked `failed` ("A passage of the document is too long
+     for the embedding model...") and a search query gets a 400. Keep it
+     above the longest chunk; at `CHUNK_TOKENS=300` that is about 650
+     tokens for English, 930 for Russian and 2,300 for Armenian. Raising
+     `CHUNK_TOKENS` raises these in proportion.
    - `OLLAMA_RERANK_MODEL` — optional reranker (empty = off). When set,
      `/search` and `/ask` fetch `RERANK_CANDIDATES` (20) candidates by vector
      search, rerank them and keep the best `top_k`; the reported `score` is then

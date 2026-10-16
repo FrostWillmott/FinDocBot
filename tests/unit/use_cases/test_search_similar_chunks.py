@@ -5,7 +5,11 @@ import logging
 
 import pytest
 
-from findocbot.domain.exceptions import InvalidQueryError, ModelProviderError
+from findocbot.domain.exceptions import (
+    EmbeddingInputTooLongError,
+    InvalidQueryError,
+    ModelProviderError,
+)
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.ingestion import IngestionUseCase
@@ -208,3 +212,17 @@ async def test_execute_with_reranker_never_pools_fewer_than_top_k() -> None:
     results = await search.execute(query="q", top_k=3)
 
     assert len(results) == 3
+
+
+class _QueryTooLongProvider(StubProvider):
+    async def embed_one(self, text: str) -> list[float]:
+        raise EmbeddingInputTooLongError("An input is longer than 8192 tokens")
+
+
+async def test_execute_query_over_the_window_raises_invalid_query() -> None:
+    use_case = SearchSimilarChunksUseCase(
+        provider=_QueryTooLongProvider(), chunks=InMemoryChunkRepository()
+    )
+
+    with pytest.raises(InvalidQueryError, match="Query is too long"):
+        await use_case.execute("a very long question", top_k=3)
