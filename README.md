@@ -6,14 +6,14 @@
 |----------------------------------------------------------- | -------: | -------: | -------: | -------: | ------: | --------: |
 | src/findocbot/adapters/api/routes.py                       |       98 |        2 |        6 |        0 |     98% |     72-73 |
 | src/findocbot/adapters/api/schemas.py                      |       34 |        0 |        0 |        0 |    100% |           |
-| src/findocbot/config.py                                    |       27 |        0 |        0 |        0 |    100% |           |
+| src/findocbot/config.py                                    |       28 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/domain/entities.py                           |       45 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/domain/exceptions.py                         |       13 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/infrastructure/cached\_embedding\_gateway.py |       63 |        0 |       10 |        0 |    100% |           |
 | src/findocbot/infrastructure/chunking.py                   |      103 |        1 |       40 |        5 |     96% |128-\>130, 158-\>163, 176-\>188, 183-\>185, 195 |
 | src/findocbot/infrastructure/container.py                  |       51 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/infrastructure/db.py                         |       26 |        1 |        6 |        3 |     88% |21-\>exit, 28-\>exit, 36 |
-| src/findocbot/infrastructure/ollama\_gateway.py            |       99 |        0 |       20 |        0 |    100% |           |
+| src/findocbot/infrastructure/ollama\_gateway.py            |      100 |        0 |       20 |        0 |    100% |           |
 | src/findocbot/infrastructure/ollama\_reranker.py           |       48 |        0 |        8 |        0 |    100% |           |
 | src/findocbot/infrastructure/pdf\_parser.py                |       70 |        0 |       14 |        0 |    100% |           |
 | src/findocbot/infrastructure/postgres\_repositories.py     |      120 |       31 |        8 |        1 |     75% |64-65, 78-79, 94-95, 109-110, 126-127, 137-138, 159-160, 174-175, 197-198, 223, 262-263, 294-295, 326-327, 336-337, 360-361, 377-378 |
@@ -25,7 +25,7 @@
 | src/findocbot/use\_cases/ports.py                          |       37 |        0 |        0 |        0 |    100% |           |
 | src/findocbot/use\_cases/prompt\_safety.py                 |       12 |        0 |        2 |        0 |    100% |           |
 | src/findocbot/use\_cases/search\_similar\_chunks.py        |       33 |        0 |        6 |        0 |    100% |           |
-| **TOTAL**                                                  | **1125** |   **37** |  **156** |   **12** | **96%** |           |
+| **TOTAL**                                                  | **1127** |   **37** |  **156** |   **12** | **96%** |           |
 
 
 ## Setup coverage badge
