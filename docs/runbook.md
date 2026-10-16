@@ -18,6 +18,10 @@
    - `OLLAMA_CHAT_MODEL` — generation model (`qwen3.5:4b`). Requests switch
      thinking off; a thinking model otherwise takes about a minute per answer.
    - `OLLAMA_EMBED_MODEL`
+   - `OLLAMA_EMBED_NUM_CTX` — window for embedding requests (8192). Without
+     it Ollama loads `qwen3-embedding` at 32768 tokens, 5.8 GB instead of
+     2.9 GB. An input longer than the window is cut, so keep it above the
+     longest chunk.
    - `OLLAMA_RERANK_MODEL` — optional reranker (empty = off). When set,
      `/search` and `/ask` fetch `RERANK_CANDIDATES` (20) candidates by vector
      search, rerank them and keep the best `top_k`; the reported `score` is then

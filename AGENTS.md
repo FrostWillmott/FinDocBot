@@ -143,7 +143,9 @@ applied exactly once. The integration tests run the same revisions via
 `.env`; the class is the source of truth for field names and defaults.
 `postgres_dsn` is required (no default). `CHUNK_TOKENS` is coupled to
 `OLLAMA_NUM_CTX` and the per-source prompt cap (`_MAX_SOURCE_CHARS`), so raise
-them together — `.env.example` says so next to the setting.
+them together — `.env.example` says so next to the setting. Embedding requests
+carry their own window, `OLLAMA_EMBED_NUM_CTX`, which must stay above the
+longest chunk because Ollama cuts longer inputs.
 
 ### Testing
 
