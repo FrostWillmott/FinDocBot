@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+
+import pytest
+
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 
 
@@ -42,6 +46,25 @@ class TestParagraphTokenChunker:
         text = "Chapter 1: Overview\nSome content here."
         result = chunker.split(text)
         assert result[0][1] == "Chapter 1: Overview"
+
+    def test_split_russian_section_heading_labels_chunk(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=200)
+        text = "Раздел 1. Выручка\nСодержание раздела."
+        result = chunker.split(text)
+        assert result[0][1] == "Раздел 1. Выручка"
+
+    def test_split_armenian_section_heading_labels_chunk(self) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=200)
+        text = "ԲԱԺԻՆ 1. Եկամուտ\nԲաժնի բովանդակությունը."
+        result = chunker.split(text)
+        assert result[0][1] == "ԲԱԺԻՆ 1. Եկամուտ"
+
+    def test_split_heading_word_prefix_is_not_a_heading(self) -> None:
+        """A body word that merely starts with a heading word stays body."""
+        chunker = ParagraphTokenChunker(chunk_tokens=200)
+        text = "Разделение прибыли между регионами."
+        result = chunker.split(text)
+        assert result[0][1] is None
 
     def test_split_new_section_keeps_previous_chunk_label(self) -> None:
         """Regression test: section change must NOT relabel a flushed chunk.
@@ -196,6 +219,22 @@ class TestParagraphTokenChunker:
 
         assert result == [(text, "Section 1. Letter")]
 
+    def test_split_merged_short_sections_carry_no_label(self) -> None:
+        """Several sections too short to close merge into one chunk whose
+        text comes from more than one section, so no single label applies."""
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=100, min_chunk_tokens=50, overlap_ratio=0.0
+        )
+        text = (
+            "Section 1. Revenue\nOne sentence.\n\n"
+            "Section 2. Costs\nOne sentence.\n\n"
+            "Section 3. Outlook\nOne sentence."
+        )
+        result = chunker.split(text)
+
+        assert len(result) == 1
+        assert result[0][1] is None
+
     def test_split_overlap_mid_number_starts_at_word_boundary(self) -> None:
         chunker = ParagraphTokenChunker(
             chunk_tokens=12, overlap_ratio=0.45, min_chunk_tokens=1
@@ -223,6 +262,37 @@ class TestCharacterCeiling:
         result = chunker.split(text)
 
         assert max(len(chunk) for chunk, _ in result) <= 1000
+
+    def test_split_large_chunk_tokens_still_fit_a_source_in_the_prompt(
+        self,
+    ) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=500)  # 5,000 characters
+        text = "\n\n".join(["x" * 4500] * 8)  # 8 tokens to the chunker
+
+        result = chunker.split(text)
+
+        assert max(len(chunk) for chunk, _ in result) <= 4000
+
+    def test_init_capped_ceiling_logs_a_warning_with_the_resolved_value(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            ParagraphTokenChunker(chunk_tokens=500)
+
+        assert [r.getMessage() for r in caplog.records] == [
+            (
+                "chunk_tokens=500 allows 5000 characters per chunk; capped at "
+                "4000, the longest source the answer prompt carries"
+            )
+        ]
+
+    def test_init_default_chunk_tokens_logs_no_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            ParagraphTokenChunker()
+
+        assert caplog.records == []
 
     def test_split_capping_keeps_all_the_text(self) -> None:
         chunker = ParagraphTokenChunker(chunk_tokens=100)

@@ -88,6 +88,20 @@ class _UnrecordableFailureRepository(InMemoryDocumentRepository):
         await super().set_status(document_id, status, error)
 
 
+class _UnreadyableRepository(InMemoryDocumentRepository):
+    """Fails to store a 'ready' status, after the chunks were committed."""
+
+    async def set_status(
+        self,
+        document_id: str,
+        status: DocumentStatus,
+        error: str | None = None,
+    ) -> None:
+        if status == "ready":
+            raise StorageError("database unavailable")
+        await super().set_status(document_id, status, error)
+
+
 class _BrokenFailureRepository(SignallingDocumentRepository):
     """Raises a non-domain error when asked to store a 'failed' status."""
 
@@ -191,6 +205,7 @@ async def test_submit_concurrent_duplicate_returns_stored_document() -> None:
     stored = Document.create(
         filename="report.pdf",
         content_hash=hashlib.sha256(pdf_bytes).hexdigest(),
+        status="pending",
     )
     # Seeded directly: create() would spend the pre-check miss itself.
     documents.items[stored.id] = stored
@@ -218,6 +233,57 @@ async def test_drain_upload_marks_document_ready_and_stores_chunks() -> None:
     assert stored.status == "ready"
     assert stored.error is None
     assert chunks.items
+
+
+async def test_drain_failed_ready_update_leaves_chunks_unsearchable() -> None:
+    documents = _UnreadyableRepository()
+    chunks = InMemoryChunkRepository()
+    documents.chunks, chunks.documents = chunks, documents
+    ingestion, _ = _build_ingestion(documents=documents, chunks=chunks)
+    pdf_bytes = build_pdf_bytes("Revenue grew by 20 percent.")
+    await _submit(ingestion, "report.pdf", pdf_bytes)
+
+    await ingestion.drain()
+
+    stored_vector = chunks.items[0].embedding
+    found = await chunks.search_by_embedding(stored_vector, top_k=5)
+    assert found == []
+
+
+def _section_pdf(headings: list[str | None]) -> bytes:
+    """A PDF with one paragraph of about 100 words under each heading."""
+    body = " ".join(["Revenue grew steadily across every region."] * 14)
+    paragraphs = [f"{h}\n{body}" if h else body for h in headings]
+    return build_pdf_bytes("\n\n".join(paragraphs))
+
+
+async def _stored_sections(pdf_bytes: bytes) -> list[str | None]:
+    chunks = InMemoryChunkRepository()
+    ingestion, _ = _build_ingestion(chunks=chunks)
+    await _submit(ingestion, "report.pdf", pdf_bytes)
+    await ingestion.drain()
+    stored = sorted(chunks.items, key=lambda item: item.chunk.chunk_index)
+    return [item.chunk.section for item in stored]
+
+
+async def test_drain_pdf_with_section_headings_labels_each_chunk() -> None:
+    pdf_bytes = _section_pdf([
+        "Section 1. Revenue",
+        "Section 2. Costs",
+        "Section 3. Outlook",
+    ])
+
+    assert await _stored_sections(pdf_bytes) == [
+        "Section 1. Revenue",
+        "Section 2. Costs",
+        "Section 3. Outlook",
+    ]
+
+
+async def test_drain_pdf_without_section_headings_leaves_chunks_bare() -> None:
+    sections = await _stored_sections(_section_pdf([None, None, None]))
+
+    assert set(sections) == {None}
 
 
 async def test_drain_empty_pdf_marks_document_failed() -> None:

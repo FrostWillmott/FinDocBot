@@ -36,37 +36,26 @@ from evals.scoring import (
     hit_at,
     percentile,
     reciprocal_rank,
-    yes_probability,
 )
 from evals.synthetic import Question, read_questions
 from findocbot.config import Settings
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
-from findocbot.infrastructure.pdf_parser import PyPDFParser
-from findocbot.use_cases.answer_question import (
-    _MAX_QUESTION_CHARS,
-    _MAX_SOURCE_CHARS,
+from findocbot.infrastructure.ollama_reranker import (
+    DEFAULT_INSTRUCTION,
+    reranker_prompt,
+    yes_probability,
 )
-from findocbot.use_cases.prompt_safety import neutralize
+from findocbot.infrastructure.pdf_parser import PyPDFParser
 
 DEFAULT_RERANK_MODEL = "awenleven/Qwen3-Reranker-4B:Q4_K_M"
 # Fixed before the first run and not tuned against the question set.
 INSTRUCTIONS = {
-    "default": (
-        "Given a web search query, retrieve relevant passages that answer "
-        "the query"
-    ),
+    "default": DEFAULT_INSTRUCTION,
     "task": (
         "Given a question about a company's annual report, retrieve the "
         "passage that answers it for that company and fiscal year"
     ),
 }
-_SYSTEM = (
-    "Judge whether the Document meets the requirements based on the Query "
-    "and the Instruct provided. Note that the answer can only be "
-    '"yes" or "no".'
-)
-_PREFIX = f"<|im_start|>system\n{_SYSTEM}<|im_end|>\n<|im_start|>user\n"
-_SUFFIX = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
 _EMBED_BATCH = 50
 _KS = (1, 3, 5)
 
@@ -167,16 +156,6 @@ def cosine(a: Sequence[float], b: Sequence[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b, strict=True))
     norm = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b))
     return dot / norm if norm else 0.0
-
-
-def reranker_prompt(query: str, passage: str, instruction: str) -> str:
-    """The Qwen3-Reranker prompt; untrusted text is escaped as in prod."""
-    safe_query = neutralize(query, _MAX_QUESTION_CHARS)
-    safe_passage = neutralize(passage, _MAX_SOURCE_CHARS)
-    return (
-        f"{_PREFIX}<Instruct>: {instruction}\n<Query>: {safe_query}\n"
-        f"<Document>: {safe_passage}{_SUFFIX}"
-    )
 
 
 class Ollama:

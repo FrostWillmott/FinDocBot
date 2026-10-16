@@ -18,18 +18,27 @@ from findocbot.use_cases.ports import (
     ChatHistoryRepositoryPort,
     ModelProviderGateway,
 )
-from findocbot.use_cases.prompt_safety import neutralize
+from findocbot.use_cases.prompt_safety import (
+    MAX_QUESTION_CHARS,
+    MAX_SOURCE_CHARS,
+    neutralize,
+)
 from findocbot.use_cases.search_similar_chunks import (
     SearchSimilarChunksUseCase,
 )
 
 logger = logging.getLogger(__name__)
 
-# Per-span limits for untrusted text; chunks are ~300 tokens (~2,000 chars).
-_MAX_SOURCE_CHARS = 4000
+# Per-span limits for untrusted text that only this prompt carries; the source
+# and question limits are shared (see prompt_safety).
 _MAX_SECTION_CHARS = 200
-_MAX_QUESTION_CHARS = 2000
 _MAX_ANSWER_CHARS = 2000
+
+# Characters per generation token at the token-hungry end of the scripts in
+# evals/documents.md (Armenian measured ~1.3; English ~3.5). The prompt budget
+# multiplies the context window by this so no script overflows; a script with
+# more characters per token simply leaves part of the window unused.
+_WORST_CHARS_PER_TOKEN = 1.3
 
 
 class _AnswerValidation(BaseModel):
@@ -86,13 +95,29 @@ class AnswerQuestionUseCase:
         provider: ModelProviderGateway,
         search_use_case: SearchSimilarChunksUseCase,
         history: ChatHistoryRepositoryPort,
+        *,
         max_history_pairs: int = 5,
+        context_window_tokens: int,
+        max_answer_tokens: int,
     ) -> None:
-        """Store dependencies for RAG answer generation."""
+        """Store dependencies for RAG answer generation.
+
+        ``context_window_tokens`` and ``max_answer_tokens`` bound how many
+        sources fit the generation prompt; sources are trimmed to match.
+        """
+        if context_window_tokens <= max_answer_tokens:
+            raise ValueError(
+                "context_window_tokens must exceed max_answer_tokens"
+            )
         self._provider = provider
         self._search_use_case = search_use_case
         self._history = history
         self._max_history_pairs = max_history_pairs
+        self._context_window_tokens = context_window_tokens
+        self._max_prompt_chars = int(
+            (context_window_tokens - max_answer_tokens)
+            * _WORST_CHARS_PER_TOKEN
+        )
 
     async def execute(
         self,
@@ -130,6 +155,7 @@ class AnswerQuestionUseCase:
         sources = await self._search_use_case.execute(
             search_query, top_k=top_k
         )
+        sources = self._fit_sources(clean_question, recent_turns, sources)
         prompt = self._build_prompt(
             question=clean_question,
             sources=sources,
@@ -198,7 +224,40 @@ class AnswerQuestionUseCase:
             return question
         logger.debug(f"Search query rewritten: {question!r} -> {rewritten!r}")
         # Bounded like the question: the result only goes to the embedder.
-        return rewritten[:_MAX_QUESTION_CHARS] or question
+        return rewritten[:MAX_QUESTION_CHARS] or question
+
+    def _fit_sources(
+        self,
+        question: str,
+        recent_turns: list[ChatTurn],
+        sources: list[SearchResultDTO],
+    ) -> list[SearchResultDTO]:
+        """Drop the lowest-ranked sources until the prompt fits the window.
+
+        Sources arrive best-first, so trimming from the end keeps the most
+        relevant text intact. The budget is measured against the actual
+        history and question, not their caps.
+        """
+        overhead = len(self._build_prompt(question, [], recent_turns))
+        budget = self._max_prompt_chars - overhead
+        kept: list[SearchResultDTO] = []
+        used = 0
+        for source in sources:
+            block = _format_source(len(kept) + 1, source)
+            if used + len(block) > budget:
+                break
+            kept.append(source)
+            used += len(block)
+        if len(kept) < len(sources):
+            logger.warning(
+                "Dropped %d of %d sources so the generation prompt fits the "
+                "%d-token context window (max %d prompt chars)",
+                len(sources) - len(kept),
+                len(sources),
+                self._context_window_tokens,
+                self._max_prompt_chars,
+            )
+        return kept
 
     @staticmethod
     def _build_prompt(
@@ -217,7 +276,7 @@ class AnswerQuestionUseCase:
             for index, source in enumerate(sources, start=1)
         )
         history = "\n".join(_format_turn(turn) for turn in recent_turns)
-        question_text = neutralize(question, _MAX_QUESTION_CHARS)
+        question_text = neutralize(question, MAX_QUESTION_CHARS)
         return (
             "You are an assistant for financial documents.\n\n"
             f"<documents>\n{documents}\n</documents>\n\n"
@@ -238,7 +297,7 @@ class AnswerQuestionUseCase:
 
 def _build_rewrite_prompt(question: str, recent_turns: list[ChatTurn]) -> str:
     history = "\n".join(_format_turn(turn) for turn in recent_turns)
-    question_text = neutralize(question, _MAX_QUESTION_CHARS)
+    question_text = neutralize(question, MAX_QUESTION_CHARS)
     return (
         "You rewrite follow-up questions about financial documents into "
         "standalone search queries.\n\n"
@@ -258,7 +317,7 @@ def _build_rewrite_prompt(question: str, recent_turns: list[ChatTurn]) -> str:
 
 def _format_source(index: int, source: SearchResultDTO) -> str:
     section = neutralize(source.section or "", _MAX_SECTION_CHARS)
-    text = neutralize(source.text, _MAX_SOURCE_CHARS)
+    text = neutralize(source.text, MAX_SOURCE_CHARS)
     return (
         f'<document index="{index}" score="{source.score:.4f}" '
         f'section="{section}">\n{text}\n</document>'
@@ -266,7 +325,7 @@ def _format_source(index: int, source: SearchResultDTO) -> str:
 
 
 def _format_turn(turn: ChatTurn) -> str:
-    question = neutralize(turn.question, _MAX_QUESTION_CHARS)
+    question = neutralize(turn.question, MAX_QUESTION_CHARS)
     answer = neutralize(turn.answer, _MAX_ANSWER_CHARS)
     return (
         f"<turn>\n<question>{question}</question>\n"
