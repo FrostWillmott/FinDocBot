@@ -35,7 +35,7 @@ async def test_startup_marks_documents_left_pending_by_a_restart_failed(
         """
     )
     container = create_container(
-        Settings(_env_file=None, postgres_dsn=pg_dsn, embedding_dim=768)
+        Settings(_env_file=None, postgres_dsn=pg_dsn, embedding_dim=_DIM)
     )
 
     await container.startup()
@@ -53,7 +53,8 @@ async def test_startup_marks_documents_left_pending_by_a_restart_failed(
 
 
 _OLLAMA = "http://ollama.test:11434"
-_QUERY = [1.0] + [0.0] * 767
+_DIM = 1024
+_QUERY = [1.0] + [0.0] * (_DIM - 1)
 
 
 async def _seed_three_chunks(db_pool: PostgresPool) -> None:
@@ -62,9 +63,10 @@ async def _seed_three_chunks(db_pool: PostgresPool) -> None:
     await PostgresDocumentRepository(db_pool).create(document)
     texts = ["a", "b", "c"]
     embeddings = [
-        [math.cos(0.2 * i), math.sin(0.2 * i)] + [0.0] * 766 for i in range(3)
+        [math.cos(0.2 * i), math.sin(0.2 * i)] + [0.0] * (_DIM - 2)
+        for i in range(3)
     ]
-    await PostgresChunkRepository(db_pool, 768).replace_document_chunks(
+    await PostgresChunkRepository(db_pool, _DIM).replace_document_chunks(
         document.id,
         [Chunk.create(document.id, i, t) for i, t in enumerate(texts)],
         embeddings,
@@ -91,7 +93,7 @@ async def test_search_with_rerank_model_configured_returns_reranked_order(
         Settings(
             _env_file=None,
             postgres_dsn=pg_dsn,
-            embedding_dim=768,
+            embedding_dim=_DIM,
             ollama_base_url=_OLLAMA,
             ollama_rerank_model="reranker",
         )
@@ -120,7 +122,7 @@ async def test_search_without_rerank_model_never_calls_the_reranker(
         Settings(
             _env_file=None,
             postgres_dsn=pg_dsn,
-            embedding_dim=768,
+            embedding_dim=_DIM,
             ollama_base_url=_OLLAMA,
         )
     )

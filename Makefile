@@ -21,7 +21,7 @@ fmt:
 test:
 	$(UV) run pytest -q
 
-# Needs Docker; starts Postgres and Ollama and pulls ~670 MB of models.
+# Needs Docker; starts Postgres and Ollama and pulls ~1 GB of models.
 e2e:
 	$(UV) run pytest -q --e2e -m e2e
 

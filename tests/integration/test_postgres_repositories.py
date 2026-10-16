@@ -127,9 +127,9 @@ async def test_verify_schema_matching_dim_returns_none(
 async def test_verify_schema_mismatched_dim_raises_dimension_error(
     db_pool: PostgresPool,
 ) -> None:
-    repo = PostgresChunkRepository(db_pool, 1024)
+    repo = PostgresChunkRepository(db_pool, 768)
 
-    with pytest.raises(EmbeddingDimensionError, match="vector\\(768\\)"):
+    with pytest.raises(EmbeddingDimensionError, match="vector\\(1024\\)"):
         await repo.verify_schema()
 
 

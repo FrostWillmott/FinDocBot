@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_chat_model: str = "qwen2.5:7b"
-    ollama_embed_model: str = "nomic-embed-text:latest"
+    ollama_embed_model: str = "qwen3-embedding:0.6b"
     # Reranking is off until a reranker model is named; see evals/README.md
     # for how it compares with plain vector search before turning it on.
     ollama_rerank_model: str | None = None
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     ollama_num_predict: int = 1024
     ollama_timeout_seconds: float = 120.0
     # Output size of ollama_embed_model; also sizes chunks.embedding.
-    embedding_dim: int = 768
+    embedding_dim: int = 1024
     # No default: a DSN with a hardcoded password must not ship in source.
     postgres_dsn: PostgresDsn
 
