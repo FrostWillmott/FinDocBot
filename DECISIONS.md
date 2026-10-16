@@ -808,3 +808,10 @@ later reversed, add a superseding entry instead of editing the old one.
   `fail_pending`) stay three operations with their own guards, since nothing
   failed there and #44-#46 built them recently; other tests keep building the
   fakes unwired.
+
+- **`Document.create` takes no default status** — it defaulted to `ready`, while
+  `CONTEXT.md` says an upload is `pending` and the only production caller (`submit`)
+  always passed it, so the default served tests alone and made a forgotten
+  argument produce a searchable document. `status` is now a required keyword;
+  mypy and the test suites found every caller (three tests relied on the
+  default and now say what they need).

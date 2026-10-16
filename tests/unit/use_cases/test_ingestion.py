@@ -205,6 +205,7 @@ async def test_submit_concurrent_duplicate_returns_stored_document() -> None:
     stored = Document.create(
         filename="report.pdf",
         content_hash=hashlib.sha256(pdf_bytes).hexdigest(),
+        status="pending",
     )
     # Seeded directly: create() would spend the pre-check miss itself.
     documents.items[stored.id] = stored

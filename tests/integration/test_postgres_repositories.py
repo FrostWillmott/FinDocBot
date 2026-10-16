@@ -72,7 +72,7 @@ async def test_verify_schema_mismatched_dim_raises_dimension_error(
 async def test_chunk_insert_wrong_dim_raises_before_writing(
     db_pool: PostgresPool,
 ) -> None:
-    doc = Document.create(filename="dim.pdf")
+    doc = Document.create(filename="dim.pdf", status="ready")
     await PostgresDocumentRepository(db_pool).create(doc)
     repo = PostgresChunkRepository(db_pool, EMBEDDING_DIM)
     chunk = Chunk.create(document_id=doc.id, chunk_index=0, text="x")
