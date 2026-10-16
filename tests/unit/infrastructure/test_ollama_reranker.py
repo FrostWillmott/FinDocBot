@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 
 import httpx
 import pytest
@@ -48,6 +49,33 @@ async def test_rerank_sums_yes_and_no_variants_across_case_and_spacing() -> (
     scores = await reranker.rerank("q", ["p"])
 
     assert scores == pytest.approx([0.08 / (0.08 + 0.61)])
+
+
+@respx.mock
+async def test_rerank_reply_with_neither_yes_nor_no_scores_even() -> None:
+    respx.post(f"{BASE_URL}/api/generate").mock(
+        return_value=rerank_reply({"maybe": 0.9})
+    )
+    reranker = OllamaReranker(base_url=BASE_URL, model="reranker")
+
+    scores = await reranker.rerank("q", ["p"])
+
+    assert scores == pytest.approx([0.5])
+
+
+@respx.mock
+async def test_rerank_reply_missing_no_counts_it_as_logprob_minus_ten() -> (
+    None
+):
+    respx.post(f"{BASE_URL}/api/generate").mock(
+        return_value=rerank_reply({"yes": math.exp(-0.5)})
+    )
+    reranker = OllamaReranker(base_url=BASE_URL, model="reranker")
+
+    scores = await reranker.rerank("q", ["p"])
+
+    yes, no = math.exp(-0.5), math.exp(-10.0)
+    assert scores == pytest.approx([yes / (yes + no)])
 
 
 def _sent_body(route: respx.Route) -> dict[str, object]:
@@ -117,6 +145,20 @@ async def test_rerank_reply_without_logprobs_raises_model_provider_error() -> (
 ):
     respx.post(f"{BASE_URL}/api/generate").mock(
         return_value=httpx.Response(200, json={"response": "yes"})
+    )
+    reranker = OllamaReranker(base_url=BASE_URL, model="reranker")
+
+    with pytest.raises(ModelProviderError, match="logprobs"):
+        await reranker.rerank("q", ["p"])
+
+
+@respx.mock
+async def test_rerank_entry_without_token_raises_model_provider_error() -> (
+    None
+):
+    reply = {"logprobs": [{"top_logprobs": [{"logprob": -0.1}]}]}
+    respx.post(f"{BASE_URL}/api/generate").mock(
+        return_value=httpx.Response(200, json=reply)
     )
     reranker = OllamaReranker(base_url=BASE_URL, model="reranker")
 
