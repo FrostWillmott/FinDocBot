@@ -76,3 +76,40 @@ only show that nothing needs fixing.
 `evals/documents.md` lists three public reports (English, Russian, Armenian)
 with their sources and checksums, and `evals/questions/real-{en,ru,hy}.jsonl`
 holds 14 questions for each. Run them with `--gold any` (see that file).
+
+## Comparing chat models
+
+`evals/generation_eval.py` asks the real-report questions of the models you
+name, through the production ask path: the project's parser, chunker, embedder
+gateway, search and answer use cases (so the real prompt, the `think` flag and
+the output validation), with the in-memory repositories of the tests standing
+in for PostgreSQL. It needs the PDFs of `evals/documents.md`, a local Ollama
+with the embed model and the chat models, and runs from the repository root:
+
+```bash
+make eval-generation MODELS=qwen3.5:4b,qwen3.5:9b
+# or: uv run python -m evals.generation_eval --models qwen3.5:4b --reports hy
+```
+
+For each model it reports how many questions were answerable (the gold figure
+is in the retrieved chunks), how many of those answers carry the gold figure,
+errors, how often a source with an injected instruction was obeyed (three
+questions on a one-chunk document), and the median and p90 generation time.
+The report is written to `evals/results/<date>-generation.md`.
+
+- **The match is a lenient automatic check, not a verdict.** It looks for the
+  gold figures in the answer (`answer_matches` in `evals/scoring.py`), so an
+  equivalent wording ("43 million" for "43,000,000") counts as a miss. The
+  report ends with the answerable questions it did not accept, with each
+  model's answer; read them before comparing models. In the first comparison, with
+  a cruder version of this check, a hand check moved the counts from 26/28/26
+  to 33/33/31.
+- **A model name is a floating tag and sampling is not fixed**, so a re-run can
+  differ by a question or two; the report records the digests.
+- **Timings depend on the machine.** On a 16 GB Mac with Docker and an IDE
+  running, the models swap, so compare seconds between models in one run, not
+  between runs. The query embedding is cached after the first model, so the
+  `total` column is only comparable once the cache is warm for all models.
+- Answers are scored on questions whose gold figure was retrieved; the others
+  show how good retrieval is, not the model.
+

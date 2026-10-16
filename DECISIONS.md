@@ -603,3 +603,21 @@ later reversed, add a superseding entry instead of editing the old one.
   token count of an Armenian or Russian chunk against the Qwen tokenizer was not
   measured, so the margin buys safety for a small price. There is no guard that
   rejects a chunk longer than the window; that is a known gap.
+
+- **The chat model comparison is a tool in `evals/`, run by hand, and its
+  automatic check is deliberately lenient** — `evals/generation_eval.py` (and
+  `make eval-generation MODELS=...`) is the comparison behind the `qwen3.5:4b`
+  decision, kept so it can be repeated when a model changes. It runs the
+  production ask path, with the in-memory repositories of `tests/in_memory.py`
+  in place of PostgreSQL; importing them from `tests` ties the tool to the
+  repository root, accepted over a second copy of the fakes. The check
+  (`answer_matches`) asks for the gold figures as whole figures, however
+  separated, and for names by their words; it cannot recognise a rephrased
+  figure, so the first comparison, with a cruder version of the check, read
+  26, 28 and 26 correct answers automatically and 33, 33 and 31 after a hand
+  check of the 11 disagreements.
+  The report therefore lists every answerable question the check missed, with
+  each model's answer, and says to read them. The injection source is built at
+  run time with the deterministic PDF factory, not shipped as a file. Results
+  are not committed: the model tags float and sampling is not fixed, so a
+  report is a dated measurement, not a fixture.

@@ -5,14 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 All commands run through `make` — the Makefile is the source of truth for
-targets (`sync`, `dev`, `lint`, `fmt`, `test`, `e2e`, `eval-retrieval`, `cover`,
-`up`, `down`, `logs`, `migrate`, `precommit-install`). Two checks have no make
+targets (`sync`, `dev`, `lint`, `fmt`, `test`, `e2e`, `eval-retrieval`,
+`eval-generation`, `cover`, `up`, `down`, `logs`, `migrate`,
+`precommit-install`). Two checks have no make
 target:
 
 - Integration tests (Docker): `uv run pytest -q --integration -m integration`
 - Type check: `uv run mypy src/findocbot`
 
-`make eval-retrieval` is a manual retrieval evaluation (`evals/`, needs a local
+`make eval-retrieval` is a manual retrieval evaluation and `make
+eval-generation MODELS=...` a chat model comparison (`evals/`, need a local
 Ollama, not in CI; see `evals/README.md`).
 
 The CI `test` job runs `ruff check`, `ruff format --check`, `mypy --strict`, and `make cover` (unit and integration tests together, gated by `fail_under` in `pyproject.toml`); the `e2e` job runs `make e2e` (real Postgres and Ollama in containers). `ruff format` also formats Python code blocks in Markdown, so docs fail the check too; the pre-commit ruff hooks cover Markdown for that reason.
