@@ -19,6 +19,11 @@ def _chunk_sections(chunks: list[tuple[str, str | None]]) -> list[str | None]:
     return [c[1] for c in chunks]
 
 
+def _words(prefix: str, n: int) -> str:
+    """``n`` distinct one-token words: ``a0 a1 ... a{n-1}``."""
+    return " ".join(f"{prefix}{i}" for i in range(n))
+
+
 class TestParagraphTokenChunker:
     """Unit tests for the token-aware chunker."""
 
@@ -112,7 +117,7 @@ class TestParagraphTokenChunker:
         # First paragraph fills a chunk, second is tiny → merged into first.
         text = "big " * 60 + "\n\n" + "tiny"
         result = chunker.split(text)
-        assert len(result) == 1
+        assert result == [(("big " * 60).strip() + "\n\ntiny", None)]
 
     def test_split_empty_text_returns_empty_list(self) -> None:
         chunker = ParagraphTokenChunker()
@@ -247,6 +252,103 @@ class TestParagraphTokenChunker:
         # "million".
         assert _chunk_texts(result)[1] == ("million this year.\n\n" + para2)
 
+    def test_split_paragraph_equal_to_overlap_is_kept_once_in_next_chunk(
+        self,
+    ) -> None:
+        """A paragraph equal to the overlap is absorbed by it (FD-06).
+
+        The next chunk holds the text once, as overlap and paragraph alike,
+        and the first chunk still ends with it: two copies in the output for
+        two in the input, so nothing is lost. Overlap only adds copies, so
+        "no fewer occurrences than in the input" is the bound to keep.
+        """
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=10, overlap_ratio=0.5, min_chunk_tokens=1
+        )
+        text = "a b c d e f g h i j\n\nf g h i j\n\nk l m"
+
+        result = chunker.split(text)
+
+        assert _chunk_texts(result) == [
+            "a b c d e f g h i j",
+            "f g h i j\n\nk l m",
+        ]
+        assert sum(c.count("f g h i j") for c in _chunk_texts(result)) == 2
+
+
+class TestShortTailMerge:
+    """A tail under min_chunk_tokens joins the last chunk (FD-02).
+
+    After a flush the running chunk starts with the overlap, the tail of
+    the chunk just flushed. Merging must add only the paragraphs that
+    follow it, so the merged chunk is the previous one plus fewer than
+    ``min_chunk_tokens - overlap`` new tokens.
+    """
+
+    def test_split_short_tail_merged_into_previous_does_not_repeat_overlap(
+        self,
+    ) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=20, min_chunk_tokens=80)
+        first, tail = _words("a", 18), _words("b", 10)
+
+        result = chunker.split(first + "\n\n" + tail)
+
+        assert result == [(first + "\n\n" + tail, None)]
+
+    def test_split_short_tail_merged_chunk_stays_within_token_slack(
+        self,
+    ) -> None:
+        chunk_tokens, min_chunk_tokens, overlap = 20, 8, 3  # 0.15 → 3
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=chunk_tokens, min_chunk_tokens=min_chunk_tokens
+        )
+        # Leftover = 3 overlap + 4 new tokens < 8, so it is merged.
+        text = _words("a", 18) + "\n\n" + _words("b", 4)
+
+        result = chunker.split(text)
+
+        ((merged, _),) = result
+        assert len(merged.split()) <= (
+            chunk_tokens + min_chunk_tokens - overlap - 1
+        )
+
+    def test_split_repeated_source_paragraph_is_kept_after_merge(
+        self,
+    ) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=20, min_chunk_tokens=80)
+        first = _words("a", 18)
+
+        result = chunker.split(first + "\n\nNote.\n\nNote.")
+
+        assert result == [(first + "\n\nNote.\n\nNote.", None)]
+
+    def test_split_last_paragraph_equal_to_overlap_is_kept_after_merge(
+        self,
+    ) -> None:
+        """A leftover of only the overlap cannot occur: after a flush the
+        paragraph is appended or split. The one look-alike is a paragraph
+        equal to the overlap text, which the running chunk absorbs; it is
+        source text and must survive the merge."""
+        chunker = ParagraphTokenChunker(chunk_tokens=20, min_chunk_tokens=80)
+        first = _words("a", 15) + " Total due."  # overlap: "Total due."
+
+        result = chunker.split(first + "\n\nTotal due.")
+
+        assert result == [(first + "\n\nTotal due.", None)]
+
+    def test_split_tail_at_min_chunk_tokens_stays_separate_with_overlap(
+        self,
+    ) -> None:
+        chunker = ParagraphTokenChunker(chunk_tokens=20, min_chunk_tokens=5)
+        first, tail = _words("a", 18), _words("b", 10)
+
+        result = chunker.split(first + "\n\n" + tail)
+
+        assert result == [
+            (first, None),
+            ("a15 a16 a17\n\n" + tail, None),
+        ]
+
 
 class TestCharacterCeiling:
     """No chunk is longer than ten characters per chunk token.
@@ -344,3 +446,37 @@ class TestCharacterCeiling:
         )
 
         assert default.split(text) == unbounded.split(text)
+
+
+class TestLimits:
+    """The long-paragraph window advances only while overlap < chunk_tokens.
+
+    The limits that would stall it are rejected at construction, so these
+    tests never reach a loop that cannot end, with or without the fix.
+    """
+
+    @pytest.mark.parametrize(
+        ("chunk_tokens", "overlap_ratio"),
+        [(1, 0.0), (0, 0.15), (10, 1.0), (10, 1.5), (10, -0.1)],
+    )
+    def test_init_invalid_limits_raises_value_error(
+        self, chunk_tokens: int, overlap_ratio: float
+    ) -> None:
+        with pytest.raises(ValueError, match=r"chunk_tokens|overlap_ratio"):
+            ParagraphTokenChunker(
+                chunk_tokens=chunk_tokens, overlap_ratio=overlap_ratio
+            )
+
+    @pytest.mark.parametrize("overlap_ratio", [0.0, 0.15, 0.5, 0.99])
+    def test_split_long_paragraph_boundary_overlap_ratios_terminate(
+        self, overlap_ratio: float
+    ) -> None:
+        chunker = ParagraphTokenChunker(
+            chunk_tokens=10, overlap_ratio=overlap_ratio, min_chunk_tokens=1
+        )
+        words = [f"w{i}" for i in range(40)]
+
+        result = chunker.split(" ".join(words))
+
+        seen = [w for chunk, _ in result for w in chunk.split()]
+        assert (set(seen), len(result) <= 40) == (set(words), True)

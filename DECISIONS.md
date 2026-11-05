@@ -866,3 +866,137 @@ later reversed, add a superseding entry instead of editing the old one.
   lowering the `top_k` ceiling of 20 (breaking, and a few full Armenian chunks
   still overflow with history) and accept-and-document (leaves the silent
   degradation the issue exists for).
+
+## 2026-11-05
+
+- **pypdf is installed with its `crypto` extra, and a missing crypto provider
+  is a stated 400** — FD-01: an AES-encrypted PDF with an empty user password
+  (opens without one in any viewer) ended `failed` with "Ingestion failed
+  unexpectedly.". Plain `pypdf` ships no AES code: its fallback provider
+  raises `pypdf.errors.DependencyError` ("cryptography>=3.1 is required for
+  AES algorithm"), which subclasses `Exception`, not `PyPdfError`, so it
+  escaped the parser's mapping. `pypdf[crypto]` adds `cryptography` (with
+  `cffi`, `pycparser`) to the lock, so the image gets it via
+  `uv sync --frozen`. The parser now also maps `DependencyError` to
+  `InvalidDocumentError("Uploaded file uses an encryption this server cannot
+  decrypt.")`, logged at ERROR as a deployment fault, in case the extra is
+  ever dropped. Controls, unchanged: RC4 with an empty user password parsed
+  before the fix; a non-empty user password stays `FileNotDecryptedError` →
+  "not a readable PDF" → 400 (no password field is offered). The lock was
+  written with uv 0.12.11, the Dockerfile's pin, to keep its `revision = 3`.
+  **Rejected**: `pycryptodome` (the `cryptodome` extra): `cryptography` is
+  pypdf's first-choice provider and ships abi3 wheels for every Python we run.
+
+- **Chunk limits are validated twice, and the long-paragraph window always
+  advances** — FD-05: `_split_long_paragraph` moves its window by
+  `chunk_tokens - overlap`, so `CHUNK_OVERLAP_RATIO >= 1` or
+  `CHUNK_TOKENS <= 1` stalled it and grew the chunk list without bound
+  (hang, then memory exhaustion). `Settings` now bounds `chunk_tokens > 1`
+  and `0 <= chunk_overlap_ratio < 1`, so a bad `.env` fails at startup with a
+  field-named error; `ParagraphTokenChunker` checks the same ranges
+  (`ValueError`) because evals and tests build it without `Settings`. It also
+  clamps the overlap to `chunk_tokens - 1` and steps by at least one token.
+  For valid limits both are no-ops (`int(C * r) <= C - 1` when `r < 1`, so
+  `end - overlap >= start + 1`); they keep the loop's progress local to the
+  loop. **Rejected**: clamping bad settings silently (hides a
+  misconfiguration) and a loop iteration cap (bounds the symptom, not the
+  cause).
+- **A short last tail joins the previous chunk without its overlap** — FD-02:
+  after a flush the running chunk starts with the overlap (the tail of the
+  chunk just emitted); when the end-of-input leftover was under
+  `min_chunk_tokens` it was merged into that chunk whole, so the overlap
+  appeared twice (`chunk_tokens=20`: 31 tokens, "a15 a16 a17" twice).
+  `_split_by_tokens` now records how many leading parts are carried overlap
+  (`overlap_len`, 0 or 1) and `_close_tail` joins only the parts after it.
+  A paragraph equal to the overlap text, which `_append_to_current` absorbs,
+  counts as source text, so nothing from the input is lost. Contract: the
+  merge adds fewer than `min_chunk_tokens - overlap` tokens to the last
+  chunk; the other soft excess (the overlap prepended to a split
+  paragraph's first piece) is unchanged, and the character cap in `split`
+  stays the hard ceiling. **Rejected**: asserting "no repeated paragraphs"
+  in a chunk (financial reports repeat lines like "Note." legitimately, and
+  those copies must survive) and dropping the overlap from separate tail
+  chunks (it is the intended context between different chunks).
+- **The `not in` check in `_append_to_current` loses no text; kept as is**
+  — FD-06: it runs only after a flush whose paragraph fits next to the
+  overlap, when the running chunk is exactly the overlap, so it drops only a
+  paragraph equal to that text. The next chunk then holds it once, as overlap
+  and paragraph alike, while the flushed chunk still ends with it (pinned by
+  `test_split_paragraph_equal_to_overlap_is_kept_once_in_next_chunk`).
+  Metric: overlap only adds copies, so no input token may occur fewer times
+  in the output than in the input, and each chunk must be a contiguous
+  slice of the input's tokens, in order, the slices covering all of it.
+  A seeded property check (1,500 inputs with repeated paragraphs, notes,
+  overlap-equal tails and headings × 96 configs: `chunk_tokens` 8–30,
+  overlap 0–0.5, `min_chunk_tokens` 1–`chunk_tokens`) found no violation in
+  144,000 cases, with 3,016 absorptions. **Rejected**: removing the check
+  (the chunk would hold the same text twice and change 2,613 of those
+  outputs for no gain in coverage).
+- **Line spacing is measured in the page's median font size, not the lower
+  line's, and never in a unit below the smaller of the two lines' sizes** —
+  FD-03: with a 20 pt heading under 10 pt body (fpdf
+  `multi_cell(0, 10)` after `ln(4)`), the baselines were 789.3 → 753.7, a
+  35.6 pt gap that is 2.5x the body pitch of 14.2 pt but only 1.78 heading
+  sizes, under the 1.8 cap; the blank line before the heading vanished and
+  the chunker lost the `Section 2. Financial Highlights` label. 14/16 pt
+  headings failed the same way after `ln(2)`. `join_lines` computes the
+  median of the page's positive font sizes once, and `_spacing` divides each
+  gap by `max(median, min(above, below))`; a line of size 0 (and a page with
+  none positive) still never breaks. The median alone (the first version of
+  this fix) split body text on a footnote-heavy page: five 7 pt lines make
+  the median 7, so the 10 pt body pitch of 14.2 pt is 2.03 units, over the
+  cap, and three body lines came out as three paragraphs; the floor at the
+  smaller line's size measures body pairs in 10 pt again (1.42) while a
+  heading next to body still counts in the body size. The change also
+  removes a false break the old divisor made before a wrapped line whose
+  first piece is a 7 pt footnote marker (13.3 / 7 = 1.9 > 1.8).
+  **Rejected**: `min(above, below)` — fixes the headings but adds false breaks
+  before and after a 7 pt-first line and an extra one after a heading;
+  `above.font_size` — fixes the headings, one false break after a 7 pt-first
+  line; `max(above, below)` — does not fix the headings; the median alone —
+  the footnote-page split above. Tests: the FD-03 headings, the 7 pt-first
+  line (old divisor) and the footnote-heavy page (median alone) failed
+  before their fixes; the 20 pt-first line, the heading above body and a
+  half-title page (two 20 pt and two 10 pt lines) are guards that pass
+  under every version. **Limits**: a page
+  that is mostly large text measures body gaps in the large size, so breaks
+  between body paragraphs get less likely. On a footnote-heavy page a body
+  line starting with a 7 pt marker is measured in 7 pt on both sides (the
+  smaller size is the marker's), so it is split from the lines around it;
+  the old divisor split it on one side.
+- **Two prose columns drawn row by row stay interleaved; not fixed for now**
+  — FD-04: when a page's stream alternates left and right column lines on
+  the same baseline, pypdf (plain mode too) joins each pair into one line,
+  so every extracted line mixes both columns. The visitor sees both
+  fragments with their x, but a label/value table has the same geometry and
+  must keep its rows. A fix needs per-fragment x and a gated column-run
+  detector, which is new parser state and only a heuristic. It is unproven
+  on real reports (column-by-column streams already work), so it is
+  designed, not built:
+  `docs/column-reading-order.md`; the table's row order is pinned by
+  `test_extract_text_two_column_table_rows_keep_row_order`. **Rejected**:
+  sorting all fragments by x (breaks tables), a separator between fragments
+  (content still mixed), `extraction_mode="layout"` (no column segmentation,
+  changes every page).
+- **Two lines of one size are measured in that size; the median is for mixed
+  pairs only** — supersedes the divisor in the entry above. With a 10 pt body
+  as the median, a block of 7 pt footnotes was measured in 10 pt: their 9.8 pt
+  pitch became 0.98 and the 13.8 pt gap between two footnotes 1.38, under the
+  cap, so the breaks between footnotes were lost (the old divisor kept them:
+  13.8 / 7 = 1.97). `_spacing` now divides by the shared size when both lines
+  have it (within 1%) and by `max(median, min(above, below))` otherwise, so
+  headings and 7 pt-first lines behave as before. This also lifts the earlier
+  limit for a mostly large page: a run of body lines under a large median is
+  measured in its own size. **Limits**: a line whose first piece differs in
+  size from its neighbours is still a mixed pair. Test:
+  `test_join_lines_footnote_blocks_under_larger_body_keep_breaks` failed
+  before the change.
+- **Missing pypdf crypto provider is an `InfrastructureError`, not a 400** —
+  supersedes the first entry above. The original entry stated the missing
+  provider maps to `InvalidDocumentError` (400), but the file may be valid and
+  a 400-class error would blame the client for a deployment fault. The parser
+  now maps `DependencyError` to `InfrastructureError` ("The server cannot
+  decrypt this PDF: its PDF library lacks a crypto provider."), logged at
+  ERROR; the document ends `failed` with a message naming the server, not the
+  file. The first version's `InvalidDocumentError` text is rejected for the
+  reason stated.

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 import math
+import statistics
 from dataclasses import dataclass
 from io import BytesIO
 from itertools import pairwise
 
 from pypdf import PageObject, PdfReader
-from pypdf.errors import PyPdfError
+from pypdf.errors import DependencyError, PyPdfError
 
 from findocbot.domain.exceptions import InvalidDocumentError
 
@@ -27,14 +28,18 @@ _PYPDF_INTERNAL_ERRORS = (
     UnboundLocalError,
 )
 
-# Spacing is the baseline gap between two lines in units of font size;
-# single-spaced text sits at ~1.2-1.6. A paragraph break is spacing 1.3x
-# the page's tightest line spacing...
+# Spacing is the baseline gap between two lines in units of font size; two
+# lines of one size use that size. Lines of different sizes use the page's
+# median, so a large heading or a small marker starting a line does not
+# rescale its own gap, but never a unit below the smaller of the two, so
+# body text on a footnote-heavy page is not measured in footnote sizes;
+# single-spaced text sits at ~1.2-1.6. A
+# paragraph break is spacing 1.3x the page's tightest line spacing...
 _PARAGRAPH_GAP_FACTOR = 1.3
 # ...capped at 1.8: a page of one-line paragraphs and headings has no
 # single-spaced pair to measure against.
 _MAX_LINE_SPACING = 1.8
-# Closer than one font size is a super/subscript, not a separate line.
+# Closer than one font size (that unit) is a super/subscript, not a line.
 _MIN_LINE_SPACING = 1.0
 # Text jumping up the page starts the next column or a new text block.
 _JUMP_UP_SPACING = -0.5
@@ -59,6 +64,13 @@ class PyPDFParser:
         try:
             reader = PdfReader(BytesIO(content))
             pages = [_extract_page(page) for page in reader.pages]
+        except DependencyError as exc:
+            # Not a PyPdfError: pypdf lacks the crypto provider for AES, a
+            # deployment fault (`pypdf[crypto]` missing), not the client's.
+            logger.error(f"pypdf cannot decrypt upload: {exc}")
+            raise InvalidDocumentError(
+                "Uploaded file uses an encryption this server cannot decrypt."
+            ) from exc
         except PyPdfError as exc:
             raise InvalidDocumentError(
                 f"Uploaded file is not a readable PDF: {exc}"
@@ -117,7 +129,9 @@ def _flush_line(
 
 def join_lines(lines: list[TextLine]) -> str:
     """Join lines, inserting a blank line wherever a paragraph break is."""
-    spacings = [_spacing(above, below) for above, below in pairwise(lines)]
+    sizes = [line.font_size for line in lines if line.font_size > 0]
+    unit = statistics.median(sizes) if sizes else 0.0
+    spacings = [_spacing(a, b, unit) for a, b in pairwise(lines)]
     tight = [s for s in spacings if s >= _MIN_LINE_SPACING]
     threshold = _MAX_LINE_SPACING
     if tight:
@@ -131,7 +145,12 @@ def join_lines(lines: list[TextLine]) -> str:
     return "".join(out)
 
 
-def _spacing(above: TextLine, below: TextLine) -> float:
-    if below.font_size <= 0:
+def _spacing(above: TextLine, below: TextLine, unit: float) -> float:
+    if below.font_size <= 0 or unit <= 0:
         return 0.0
-    return (above.y - below.y) / below.font_size
+    own = min(above.font_size, below.font_size)
+    if math.isclose(above.font_size, below.font_size, rel_tol=0.01):
+        # Two lines of one size are measured against their own pitch, so a
+        # block of small text keeps its paragraph breaks next to larger body.
+        return (above.y - below.y) / own
+    return (above.y - below.y) / max(unit, own)

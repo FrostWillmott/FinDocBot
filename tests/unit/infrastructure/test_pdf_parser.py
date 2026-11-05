@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import NoReturn
 
 import pytest
 from fpdf import FPDF
+from pypdf.errors import DependencyError
 
 from findocbot.domain.exceptions import InvalidDocumentError
+from findocbot.infrastructure import pdf_parser
+from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import (
     PyPDFParser,
     TextLine,
     join_lines,
 )
-from tests.factories import build_pdf_bytes
+from tests.factories import build_encrypted_pdf_bytes, build_pdf_bytes
 
 
 def test_extract_text_single_line_pdf_returns_its_text() -> None:
@@ -50,6 +54,58 @@ def test_extract_text_pypdf_internal_error_raises_invalid_document(
 
     with pytest.raises(InvalidDocumentError, match="not a readable PDF"):
         PyPDFParser().extract_text(content)
+
+
+# An empty user password opens the file without one; pypdf tries it itself.
+def test_extract_text_aes128_encrypted_empty_user_password_returns_text() -> (
+    None
+):
+    content = build_encrypted_pdf_bytes("Revenue grew.", algorithm="AES-128")
+
+    assert PyPDFParser().extract_text(content) == "Revenue grew."
+
+
+def test_extract_text_aes256_encrypted_empty_user_password_returns_text() -> (
+    None
+):
+    content = build_encrypted_pdf_bytes("Revenue grew.", algorithm="AES-256")
+
+    assert PyPDFParser().extract_text(content) == "Revenue grew."
+
+
+def test_extract_text_rc4_encrypted_empty_user_password_returns_text() -> None:
+    content = build_encrypted_pdf_bytes("Revenue grew.", algorithm="RC4-128")
+
+    assert PyPDFParser().extract_text(content) == "Revenue grew."
+
+
+def test_extract_text_password_protected_pdf_raises_invalid_document() -> None:
+    content = build_encrypted_pdf_bytes(
+        "Revenue grew.", algorithm="RC4-128", user_password="secret"
+    )
+
+    with pytest.raises(
+        InvalidDocumentError,
+        match="not a readable PDF: File has not been decrypted",
+    ):
+        PyPDFParser().extract_text(content)
+
+
+def test_extract_text_missing_crypto_provider_raises_invalid_document(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # What pypdf raises for an AES file when no crypto provider is installed.
+    def reader_without_crypto(stream: object) -> NoReturn:
+        raise DependencyError(
+            "cryptography>=3.1 is required for AES algorithm"
+        )
+
+    monkeypatch.setattr(pdf_parser, "PdfReader", reader_without_crypto)
+
+    with pytest.raises(
+        InvalidDocumentError, match="encryption this server cannot decrypt"
+    ):
+        PyPDFParser().extract_text(build_pdf_bytes("Revenue grew."))
 
 
 def _pdf_bytes(draw: Callable[[FPDF], None]) -> bytes:
@@ -114,6 +170,30 @@ def test_extract_text_two_columns_keep_reading_order() -> None:
     assert right_text.replace("\n", " ") == right
 
 
+def test_extract_text_two_column_table_rows_keep_row_order() -> None:
+    # Same geometry as prose columns written row by row, which still
+    # interleave (see docs/column-reading-order.md); a fix must keep this.
+    rows = [
+        ("Revenue", "1,284"),
+        ("Operating costs", "912"),
+        ("Net profit", "372"),
+        ("Dividend", "120"),
+    ]
+
+    def draw(pdf: FPDF) -> None:
+        top = pdf.get_y()
+        for i, (label, value) in enumerate(rows):
+            pdf.set_xy(10, top + 5 * i)
+            pdf.cell(90, 5, label)
+            pdf.set_xy(110, top + 5 * i)
+            pdf.cell(90, 5, value)
+
+    extracted = PyPDFParser().extract_text(_pdf_bytes(draw))
+
+    expected = [f"{label} {value}" for label, value in rows]
+    assert extracted.split("\n") == expected
+
+
 def _line(text: str, y: float) -> TextLine:
     return TextLine(text=text, y=y, font_size=10.0)
 
@@ -159,3 +239,130 @@ def test_join_lines_zero_font_size_never_breaks() -> None:
     lines = [TextLine("a", 800, 0.0), TextLine("b", 700, 0.0)]
 
     assert join_lines(lines) == "a\nb"
+
+
+# 10 pt body at a 14.2 pt pitch (spacing 1.42), as fpdf's multi_cell(0, 5).
+@pytest.mark.parametrize("heading_size", [14.0, 16.0, 20.0])
+def test_join_lines_large_heading_after_body_with_close_gap_breaks_paragraph(
+    heading_size: float,
+) -> None:
+    # The 24 pt gap is ~1.7x the body pitch but under 1.8 heading sizes.
+    lines = [
+        _line("a1", 800),
+        _line("a2", 785.8),
+        TextLine("Section 2", 761.8, heading_size),
+        _line("b1", 731.8),
+        _line("b2", 717.6),
+    ]
+
+    assert join_lines(lines) == "a1\na2\n\nSection 2\n\nb1\nb2"
+
+
+def test_join_lines_large_first_word_mid_paragraph_keeps_lines() -> None:
+    lines = [
+        _line("a1", 800),
+        TextLine("A2 starts with a large initial", 785.8, 20.0),
+        _line("a3", 771.6),
+        _line("a4", 757.4),
+    ]
+
+    assert join_lines(lines) == "a1\nA2 starts with a large initial\na3\na4"
+
+
+def test_join_lines_small_first_piece_mid_paragraph_keeps_lines() -> None:
+    lines = [
+        _line("a1", 800),
+        TextLine("1 footnote marker begins it", 785.8, 7.0),
+        _line("a3", 771.6),
+        _line("a4", 757.4),
+    ]
+
+    assert join_lines(lines) == "a1\n1 footnote marker begins it\na3\na4"
+
+
+def test_join_lines_large_heading_above_body_breaks_paragraph() -> None:
+    lines = [
+        TextLine("Section 1", 800, 20.0),
+        _line("b1", 770),
+        _line("b2", 755.8),
+    ]
+
+    assert join_lines(lines) == "Section 1\n\nb1\nb2"
+
+
+def _footnotes(top: float, count: int) -> list[TextLine]:
+    # 7 pt footnotes at a 9.8 pt pitch (spacing 1.4 in their own size).
+    return [TextLine(f"f{i + 1}", top - 9.8 * i, 7.0) for i in range(count)]
+
+
+def test_join_lines_body_lines_on_footnote_heavy_page_stay_together() -> None:
+    # Five 7 pt lines make 7 the page median; body pitch 14.2 is 2.03 of it.
+    lines = [
+        _line("b1", 800),
+        _line("b2", 785.8),
+        _line("b3", 771.6),
+        *_footnotes(751.6, 5),
+    ]
+
+    assert join_lines(lines) == "b1\nb2\nb3\n\nf1\nf2\nf3\nf4\nf5"
+
+
+def test_join_lines_footnote_blocks_under_larger_body_keep_breaks() -> None:
+    # 10 pt body is the median; the 13.8 pt gaps between 7 pt footnotes are
+    # 1.4x their 9.8 pt pitch, but only 1.38 of the median.
+    body = [_line(f"b{i}", 800 - 14.2 * i) for i in range(12)]
+    notes = [
+        TextLine(text, top - 9.8 * row, 7.0)
+        for top, names in [(623.8, "ab"), (600.2, "cd"), (576.6, "ef")]
+        for row, text in enumerate(f"f{name}" for name in names)
+    ]
+
+    result = join_lines([*body, *notes])
+
+    assert result.split("\n\n")[1:] == ["fa\nfb", "fc\nfd", "fe\nff"]
+
+
+def test_join_lines_half_large_title_page_breaks_before_body() -> None:
+    lines = [
+        TextLine("t1", 800, 20.0),
+        TextLine("t2", 776, 20.0),
+        _line("b1", 740),
+        _line("b2", 725.8),
+    ]
+
+    assert join_lines(lines) == "t1\nt2\n\nb1\nb2"
+
+
+def test_extract_text_large_heading_after_body_keeps_section_label() -> None:
+    body = "Revenue grew steadily across all regions this year. " * 3
+
+    def draw(pdf: FPDF) -> None:
+        _paragraph(pdf, body, gap_after=4)
+        pdf.set_font("Helvetica", size=20)
+        heading = "Section 2. Financial Highlights"
+        pdf.multi_cell(0, 10, heading, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+        pdf.set_font("Helvetica", size=10)
+        _paragraph(pdf, "Net profit was USD 132 million.", gap_after=4)
+
+    text = PyPDFParser().extract_text(_pdf_bytes(draw))
+    chunks = ParagraphTokenChunker(chunk_tokens=300).split(text)
+
+    sections = [section for chunk, section in chunks if "Section 2" in chunk]
+    assert sections == ["Section 2. Financial Highlights"]
+
+
+def test_extract_text_small_marker_on_wrapped_line_keeps_paragraph() -> None:
+    # A 7 pt footnote marker opens the second line; its gap is 13.3 pt.
+    def draw(pdf: FPDF) -> None:
+        pdf.cell(0, 5, "Revenue grew", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", size=7)
+        width = pdf.get_string_width("1")
+        pdf.cell(width, 5, "1", new_x="RIGHT", new_y="TOP")
+        pdf.set_font("Helvetica", size=10)
+        pdf.cell(0, 5, " this year.", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 5, "Margins held.", new_x="LMARGIN", new_y="NEXT")
+
+    extracted = PyPDFParser().extract_text(_pdf_bytes(draw))
+
+    assert extracted == "Revenue grew\n1 this year.\nMargins held."

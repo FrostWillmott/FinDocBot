@@ -46,7 +46,17 @@ class ParagraphTokenChunker:
         ten characters per chunk token, but never more than a source can
         carry in the answer prompt (a longer chunk would be cut there, and
         the cut part could not be found by search).
+
+        Raises ``ValueError`` unless ``chunk_tokens >= 2`` and
+        ``0 <= overlap_ratio < 1``: otherwise the overlap can reach the chunk
+        size and the long-paragraph window would stop advancing.
         """
+        if chunk_tokens < 2:
+            msg = f"chunk_tokens must be at least 2, got {chunk_tokens}"
+            raise ValueError(msg)
+        if not 0 <= overlap_ratio < 1:
+            msg = f"overlap_ratio must be in [0, 1), got {overlap_ratio}"
+            raise ValueError(msg)
         self._chunk_tokens = chunk_tokens
         if max_chunk_chars is None:
             max_chunk_chars = chunk_tokens * _MAX_CHARS_PER_TOKEN
@@ -60,7 +70,9 @@ class ParagraphTokenChunker:
                 )
                 max_chunk_chars = MAX_SOURCE_CHARS
         self._max_chars = max_chunk_chars
-        self._overlap_tokens = max(1, int(chunk_tokens * overlap_ratio))
+        self._overlap_tokens = min(
+            max(1, int(chunk_tokens * overlap_ratio)), chunk_tokens - 1
+        )
         self._min_chunk_tokens = min_chunk_tokens
 
     def split(self, text: str) -> list[tuple[str, str | None]]:
@@ -99,6 +111,9 @@ class ParagraphTokenChunker:
         ]
         chunks: list[tuple[str, str | None]] = []
         current_parts: list[str] = []
+        # How many leading current_parts are overlap carried from the last
+        # chunk (0 or 1): text that chunk already holds (FD-02).
+        overlap_len = 0
         current_section: str | None = None
 
         for paragraph in paragraphs:
@@ -110,6 +125,7 @@ class ParagraphTokenChunker:
                     self._section_of(current_parts, current_section),
                 ))
                 current_parts = []
+                overlap_len = 0
             candidate = "\n\n".join([*current_parts, paragraph]).strip()
             if self._count_tokens(candidate) <= self._chunk_tokens:
                 current_parts.append(paragraph)
@@ -126,6 +142,7 @@ class ParagraphTokenChunker:
                     self._section_of(current_parts, current_section),
                 ))
                 current_parts = self._build_overlap(chunk_text)
+                overlap_len = len(current_parts)
 
                 # If the incoming paragraph does not fit within the
                 # remaining token budget, split it immediately and
@@ -141,6 +158,7 @@ class ParagraphTokenChunker:
                 if handled is not None:
                     chunks.extend(handled[0])
                     current_parts = handled[1]
+                    overlap_len = min(overlap_len, len(current_parts))
                     current_section = handled[2]
                     continue
             else:
@@ -158,26 +176,51 @@ class ParagraphTokenChunker:
                 current_parts=current_parts,
                 current_section=current_section,
             )
+            if len(current_parts) == overlap_len:
+                # The paragraph equals the overlap and was absorbed by it,
+                # so that element now stands for source text too.
+                overlap_len = 0
 
         if current_parts:
-            last_chunk = "\n\n".join(current_parts).strip()
-            if (
-                self._count_tokens(last_chunk) >= self._min_chunk_tokens
-                or not chunks
-            ):
-                chunks.append((
-                    last_chunk,
-                    self._section_of(current_parts, current_section),
-                ))
-            else:
-                merged_text = "\n\n".join([chunks[-1][0], last_chunk]).strip()
-                prev_section = chunks[-1][1]
-                last_section = self._section_of(current_parts, current_section)
-                chunks[-1] = (
-                    merged_text,
-                    last_section if prev_section == last_section else None,
-                )
+            self._close_tail(
+                chunks, current_parts, overlap_len, current_section
+            )
         return chunks
+
+    def _close_tail(
+        self,
+        chunks: list[tuple[str, str | None]],
+        current_parts: list[str],
+        overlap_len: int,
+        current_section: str | None,
+    ) -> None:
+        """Emit the leftover *current_parts* as a chunk or merge it.
+
+        A leftover under ``min_chunk_tokens`` joins ``chunks[-1]``. Its first
+        ``overlap_len`` parts are the overlap, which ``chunks[-1]`` already
+        ends with, so only the parts after it are joined (FD-02); with none
+        left, nothing is added.
+        """
+        last_chunk = "\n\n".join(current_parts).strip()
+        if (
+            self._count_tokens(last_chunk) >= self._min_chunk_tokens
+            or not chunks
+        ):
+            chunks.append((
+                last_chunk,
+                self._section_of(current_parts, current_section),
+            ))
+            return
+        new_parts = current_parts[overlap_len:]
+        if not new_parts:
+            return
+        merged_text = "\n\n".join([chunks[-1][0], *new_parts]).strip()
+        prev_section = chunks[-1][1]
+        last_section = self._section_of(current_parts, current_section)
+        chunks[-1] = (
+            merged_text,
+            last_section if prev_section == last_section else None,
+        )
 
     def _close_before_section(
         self,
@@ -268,7 +311,8 @@ class ParagraphTokenChunker:
                 parts.append((piece, section))
             if end >= len(tokens):
                 break
-            start = max(0, end - self._overlap_tokens)
+            # Always advance, whatever the overlap (FD-05).
+            start = max(start + 1, end - self._overlap_tokens)
         return parts
 
     def _build_overlap(self, chunk_text: str) -> list[str]:
