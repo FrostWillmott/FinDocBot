@@ -7,7 +7,10 @@ import pytest
 from fpdf import FPDF
 from pypdf.errors import DependencyError
 
-from findocbot.domain.exceptions import InvalidDocumentError
+from findocbot.domain.exceptions import (
+    InfrastructureError,
+    InvalidDocumentError,
+)
 from findocbot.infrastructure import pdf_parser
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import (
@@ -91,20 +94,16 @@ def test_extract_text_password_protected_pdf_raises_invalid_document() -> None:
         PyPDFParser().extract_text(content)
 
 
-def test_extract_text_missing_crypto_provider_raises_invalid_document(
+def test_extract_text_missing_crypto_provider_raises_infrastructure_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # What pypdf raises for an AES file when no crypto provider is installed.
+    # pypdf raises this for an AES file when no crypto provider is installed.
     def reader_without_crypto(stream: object) -> NoReturn:
-        raise DependencyError(
-            "cryptography>=3.1 is required for AES algorithm"
-        )
+        raise DependencyError("crypto provider missing")
 
     monkeypatch.setattr(pdf_parser, "PdfReader", reader_without_crypto)
 
-    with pytest.raises(
-        InvalidDocumentError, match="encryption this server cannot decrypt"
-    ):
+    with pytest.raises(InfrastructureError, match="cannot decrypt"):
         PyPDFParser().extract_text(build_pdf_bytes("Revenue grew."))
 
 

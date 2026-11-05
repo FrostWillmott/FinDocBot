@@ -101,7 +101,8 @@ decision there is superseded, refresh the corresponding line here.
   `InvalidDocumentError` → 400. Extend that list only with types observed
   from pypdf, never to `Exception`. pypdf comes with its `crypto` extra (AES
   needs `cryptography`); its `DependencyError`, raised if that provider is
-  missing, is logged as a deployment fault and also becomes a 400.
+  missing, is logged at ERROR and becomes an `InfrastructureError` (the
+  document fails with a message naming the server, not the file).
 - **PDF → chunks**: the parser rebuilds paragraph breaks (blank lines) from line
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.

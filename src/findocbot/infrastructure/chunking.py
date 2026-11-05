@@ -112,7 +112,7 @@ class ParagraphTokenChunker:
         chunks: list[tuple[str, str | None]] = []
         current_parts: list[str] = []
         # How many leading current_parts are overlap carried from the last
-        # chunk (0 or 1): text that chunk already holds (FD-02).
+        # chunk (0 or 1): text that chunk already holds.
         overlap_len = 0
         current_section: str | None = None
 
@@ -198,8 +198,8 @@ class ParagraphTokenChunker:
 
         A leftover under ``min_chunk_tokens`` joins ``chunks[-1]``. Its first
         ``overlap_len`` parts are the overlap, which ``chunks[-1]`` already
-        ends with, so only the parts after it are joined (FD-02); with none
-        left, nothing is added.
+        ends with, so only the parts after it are joined; with none left,
+        nothing is added.
         """
         last_chunk = "\n\n".join(current_parts).strip()
         if (
@@ -311,7 +311,7 @@ class ParagraphTokenChunker:
                 parts.append((piece, section))
             if end >= len(tokens):
                 break
-            # Always advance, whatever the overlap (FD-05).
+            # Always advance, whatever the overlap.
             start = max(start + 1, end - self._overlap_tokens)
         return parts
 

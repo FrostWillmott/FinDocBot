@@ -35,7 +35,7 @@ class DocumentNotFoundError(NotFoundError):
 
 
 class InfrastructureError(FinDocBotError):
-    """Base for errors originating in external systems (DB, model provider)."""
+    """Base for deployment faults: external systems, missing libraries."""
 
 
 class ModelProviderError(InfrastructureError):

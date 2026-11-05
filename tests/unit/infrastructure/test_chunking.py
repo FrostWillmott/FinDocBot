@@ -255,7 +255,7 @@ class TestParagraphTokenChunker:
     def test_split_paragraph_equal_to_overlap_is_kept_once_in_next_chunk(
         self,
     ) -> None:
-        """A paragraph equal to the overlap is absorbed by it (FD-06).
+        """A paragraph equal to the overlap is absorbed by it.
 
         The next chunk holds the text once, as overlap and paragraph alike,
         and the first chunk still ends with it: two copies in the output for
@@ -277,7 +277,7 @@ class TestParagraphTokenChunker:
 
 
 class TestShortTailMerge:
-    """A tail under min_chunk_tokens joins the last chunk (FD-02).
+    """A tail under min_chunk_tokens joins the last chunk.
 
     After a flush the running chunk starts with the overlap, the tail of
     the chunk just flushed. Merging must add only the paragraphs that

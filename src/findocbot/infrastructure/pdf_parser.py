@@ -12,7 +12,10 @@ from itertools import pairwise
 from pypdf import PageObject, PdfReader
 from pypdf.errors import DependencyError, PyPdfError
 
-from findocbot.domain.exceptions import InvalidDocumentError
+from findocbot.domain.exceptions import (
+    InfrastructureError,
+    InvalidDocumentError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +35,9 @@ _PYPDF_INTERNAL_ERRORS = (
 # lines of one size use that size. Lines of different sizes use the page's
 # median, so a large heading or a small marker starting a line does not
 # rescale its own gap, but never a unit below the smaller of the two, so
-# body text on a footnote-heavy page is not measured in footnote sizes;
-# single-spaced text sits at ~1.2-1.6. A
-# paragraph break is spacing 1.3x the page's tightest line spacing...
+# body text on a footnote-heavy page is not measured in footnote sizes.
+# Single-spaced text sits at ~1.2-1.6. A paragraph break is spacing 1.3x
+# the page's tightest line spacing...
 _PARAGRAPH_GAP_FACTOR = 1.3
 # ...capped at 1.8: a page of one-line paragraphs and headings has no
 # single-spaced pair to measure against.
@@ -65,11 +68,12 @@ class PyPDFParser:
             reader = PdfReader(BytesIO(content))
             pages = [_extract_page(page) for page in reader.pages]
         except DependencyError as exc:
-            # Not a PyPdfError: pypdf lacks the crypto provider for AES, a
-            # deployment fault (`pypdf[crypto]` missing), not the client's.
+            # Not a PyPdfError: pypdf lacks the crypto provider for AES. The
+            # file may be fine; the deployment (`pypdf[crypto]`) is not.
             logger.error(f"pypdf cannot decrypt upload: {exc}")
-            raise InvalidDocumentError(
-                "Uploaded file uses an encryption this server cannot decrypt."
+            raise InfrastructureError(
+                "The server cannot decrypt this PDF: its PDF library lacks "
+                "a crypto provider."
             ) from exc
         except PyPdfError as exc:
             raise InvalidDocumentError(
