@@ -991,6 +991,7 @@ later reversed, add a superseding entry instead of editing the old one.
   size from its neighbours is still a mixed pair. Test:
   `test_join_lines_footnote_blocks_under_larger_body_keep_breaks` failed
   before the change.
+
 - **Missing pypdf crypto provider is an `InfrastructureError`, not a 400** —
   supersedes the first entry above. The original entry stated the missing
   provider maps to `InvalidDocumentError` (400), but the file may be valid and
