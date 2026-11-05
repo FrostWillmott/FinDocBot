@@ -99,14 +99,23 @@ decision there is superseded, refresh the corresponding line here.
 - **Unreadable PDFs**: the parser maps `PyPdfError` and a fixed list of builtins
   pypdf raises from its internals (found by fuzzing, see DECISIONS.md) to
   `InvalidDocumentError` → 400. Extend that list only with types observed
-  from pypdf, never to `Exception`.
+  from pypdf, never to `Exception`. pypdf comes with its `crypto` extra (AES
+  needs `cryptography`); its `DependencyError`, raised if that provider is
+  missing, is logged at ERROR and becomes an `InfrastructureError` (the
+  document fails with a message naming the server, not the file).
 - **PDF → chunks**: the parser rebuilds paragraph breaks (blank lines) from line
   positions; the chunker treats them as paragraph boundaries and a paragraph
   starting with `Section`/`Chapter` as a section heading that closes the chunk.
   The chunker counts words and marks, not characters or the embedder's
   tokens, so `split` ends by cutting any chunk over ten characters per
   `CHUNK_TOKENS` (at a paragraph, line, sentence mark or space, else hard);
-  the `truncate: false` check in the gateway stays as the backstop.
+  the `truncate: false` check in the gateway stays as the backstop. Before
+  that cut a chunk may exceed `CHUNK_TOKENS` by at most the overlap carried
+  into a split paragraph's first piece plus a final tail under
+  `min_chunk_tokens` merged into the last chunk without its overlap (the two
+  can stack: `CHUNK_TOKENS + overlap + min_chunk_tokens - 1`).
+  Two columns drawn row by row still interleave (known limitation,
+  `docs/column-reading-order.md`).
 - **Reranking (opt-in)**: with `OLLAMA_RERANK_MODEL` set, `SearchSimilarChunksUseCase`
   fetches `max(top_k, RERANK_CANDIDATES)` candidates, asks a `RerankerPort`
   (`OllamaReranker`: Qwen3-Reranker prompt through `/api/generate`, P(yes) from
@@ -150,9 +159,11 @@ applied exactly once. The integration tests run the same revisions via
 `.env`; the class is the source of truth for field names and defaults.
 `postgres_dsn` is required (no default). `CHUNK_TOKENS` is coupled to
 `OLLAMA_NUM_CTX` and the per-source prompt cap (`_MAX_SOURCE_CHARS`), so raise
-them together — `.env.example` says so next to the setting. Embedding requests
-carry their own window, `OLLAMA_EMBED_NUM_CTX`, which must stay above the
-longest chunk: the gateway sends `truncate: false`, so a longer input is
+them together — `.env.example` says so next to the setting. `CHUNK_TOKENS` must
+be at least 2 and `CHUNK_OVERLAP_RATIO` in [0, 1), checked by `Settings` and
+again by `ParagraphTokenChunker`. Embedding requests carry their own window,
+`OLLAMA_EMBED_NUM_CTX`, which must stay above the longest chunk: the gateway
+sends `truncate: false`, so a longer input is
 refused (`EmbeddingInputTooLongError`: the document fails with a stated
 cause, a search query gets a 400) instead of being cut by Ollama.
 

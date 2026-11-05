@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+from typing import NoReturn
 
 import pytest
 from fpdf import FPDF
+from pypdf.errors import DependencyError
 
 from findocbot.domain.entities import Document, DocumentStatus
 from findocbot.domain.exceptions import (
@@ -15,10 +17,11 @@ from findocbot.domain.exceptions import (
     ModelProviderError,
     StorageError,
 )
+from findocbot.infrastructure import pdf_parser
 from findocbot.infrastructure.chunking import ParagraphTokenChunker
 from findocbot.infrastructure.pdf_parser import PyPDFParser
 from findocbot.use_cases.ingestion import IngestionUseCase
-from tests.factories import build_pdf_bytes
+from tests.factories import build_encrypted_pdf_bytes, build_pdf_bytes
 from tests.fakes import StubProvider
 from tests.in_memory import (
     InMemoryChunkRepository,
@@ -298,6 +301,60 @@ async def test_drain_empty_pdf_marks_document_failed() -> None:
     stored = documents.items[document.id]
     assert stored.status == "failed"
     assert "does not contain text" in (stored.error or "")
+
+
+async def test_ingest_aes_pdf_empty_password_marks_document_ready() -> None:
+    chunks = InMemoryChunkRepository()
+    ingestion, documents = _build_ingestion(chunks=chunks)
+    pdf_bytes = build_encrypted_pdf_bytes("Revenue grew by 20 percent.")
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
+
+    await ingestion.drain()
+
+    stored = documents.items[document.id]
+    assert (stored.status, [item.chunk.text for item in chunks.items]) == (
+        "ready",
+        ["Revenue grew by 20 percent."],
+    )
+
+
+async def test_ingest_password_protected_pdf_marks_document_failed() -> None:
+    ingestion, documents = _build_ingestion()
+    pdf_bytes = build_encrypted_pdf_bytes(
+        "Revenue grew.", algorithm="RC4-128", user_password="secret"
+    )
+    document = await _submit(ingestion, "locked.pdf", pdf_bytes)
+
+    await ingestion.drain()
+
+    stored = documents.items[document.id]
+    assert (stored.status, stored.error) == (
+        "failed",
+        "Uploaded file is not a readable PDF: File has not been decrypted",
+    )
+
+
+async def test_drain_missing_crypto_provider_stores_fixed_server_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reader_without_crypto(stream: object) -> NoReturn:
+        raise DependencyError("cryptography>=3.1 is required for AES")
+
+    monkeypatch.setattr(pdf_parser, "PdfReader", reader_without_crypto)
+    ingestion, documents = _build_ingestion()
+    pdf_bytes = build_encrypted_pdf_bytes("Revenue grew.")
+    document = await _submit(ingestion, "report.pdf", pdf_bytes)
+
+    await ingestion.drain()
+
+    stored = documents.items[document.id]
+    assert (stored.status, stored.error) == (
+        "failed",
+        (
+            "The server cannot decrypt this PDF: its PDF library lacks a "
+            "crypto provider."
+        ),
+    )
 
 
 async def test_drain_chunk_storage_failure_marks_document_failed() -> None:

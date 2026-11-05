@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import PostgresDsn
+from pydantic import Field, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,8 +44,10 @@ class Settings(BaseSettings):
     # A chunk is also capped at ten characters per token, for text whose
     # words the chunker cannot tell apart (no spaces, spaces lost), and at
     # MAX_SOURCE_CHARS, so the answer prompt never cuts a stored chunk.
-    chunk_tokens: int = 300
-    chunk_overlap_ratio: float = 0.15
+    # The overlap must stay below the chunk, or splitting a long paragraph
+    # never advances: at least 2 tokens, ratio in [0, 1).
+    chunk_tokens: int = Field(300, gt=1)
+    chunk_overlap_ratio: float = Field(0.15, ge=0.0, lt=1.0)
 
     max_history_pairs: int = 5
     embedding_cache_size: int = 1000
